@@ -1,7 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { requireLocalOrAuth } from '../../server/auth-middleware'
 import { getTerminalSession } from '../../server/terminal-sessions'
-import { requireJsonContentType } from '../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 
 export const Route = createFileRoute('/api/terminal-resize')({
   server: {
@@ -18,6 +23,9 @@ export const Route = createFileRoute('/api/terminal-resize')({
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
+        if (!rateLimit(`terminal-resize:${getClientIp(request)}`, 300, 60_000)) {
+          return rateLimitResponse()
+        }
 
         const body = (await request.json().catch(() => ({}))) as Record<
           string,

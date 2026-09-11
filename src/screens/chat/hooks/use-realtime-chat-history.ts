@@ -524,16 +524,22 @@ export function useRealtimeChatHistory({
       clearCompletedStreaming()
     }
     // Streaming just completed — capture final text so the message stays
-    // visible during the handoff from streaming placeholder to history message.
-    // The stub useChatStream never fires onDone, so this is the only path.
-    if (prev && prev.text && !streamingState) {
-      completedStreamingTextRef.current = prev.text
+    // visible during the handoff from streaming placeholder to history
+    // message. The legacy useChatStream callback is intentionally inert in
+    // this transport, so the store transition must also acknowledge
+    // completion and backfill history here.
+    if (prev && !streamingState) {
+      if (prev.text) {
+        completedStreamingTextRef.current = prev.text
+      }
       if (prev.thinking) {
         completedStreamingThinkingRef.current = prev.thinking
       }
       lastStreamClearTimeRef.current = Date.now()
+      setLastCompletedRunAt(Date.now())
+      void backfillHistory()
     }
-  }, [clearCompletedStreaming, streamingState])
+  }, [backfillHistory, clearCompletedStreaming, streamingState])
 
   // Merge history with real-time messages
   // Re-merge when realtime events arrive (lastEventAt changes)

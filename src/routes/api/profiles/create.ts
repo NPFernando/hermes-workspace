@@ -3,6 +3,9 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { createProfile } from '../../../server/profiles-browser'
 import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
   requireJsonContentType,
   safeErrorMessage,
 } from '../../../server/rate-limit'
@@ -16,6 +19,9 @@ export const Route = createFileRoute('/api/profiles/create')({
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
+        if (!rateLimit(`profile-create:${getClientIp(request)}`, 10, 60_000)) {
+          return rateLimitResponse()
+        }
         try {
           const body = (await request.json()) as {
             name?: string

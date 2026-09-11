@@ -43,6 +43,15 @@ function alertsEnabled(): boolean {
   }
 }
 
+function quietModeEnabled(): boolean {
+  try {
+    const settings = readFinanceStore().settings as Record<string, unknown>
+    return settings.quietModeEnabled === true
+  } catch {
+    return false
+  }
+}
+
 function deliverTelegram(event: AlertEvent): void {
   if (process.env.VITEST || process.env.NODE_ENV === 'test') return
   try {
@@ -68,8 +77,8 @@ function deliverTelegram(event: AlertEvent): void {
 
 /**
  * Record an alert. Always audit-logs. Delivery to Telegram is best-effort
- * and gated on settings.alertsEnabled — EXCEPT critical severity, which
- * always attempts delivery regardless of the toggle (matches
+ * and gated on settings.alertsEnabled/quietModeEnabled — EXCEPT critical
+ * severity, which always attempts delivery regardless of either toggle (matches
  * connectivity-breaker.ts's pre-existing unconditional behavior; gating
  * that behind a default-off toggle would be a silent regression for an
  * already-shipped safety alert).
@@ -81,6 +90,10 @@ export function sendAlert(event: AlertEvent): void {
     detail: event.detail,
     source: event.source,
   })
-  if (event.severity !== 'critical' && !alertsEnabled()) return
+  if (
+    event.severity !== 'critical' &&
+    (!alertsEnabled() || quietModeEnabled())
+  )
+    return
   deliverTelegram(event)
 }

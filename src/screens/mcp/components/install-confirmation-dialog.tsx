@@ -66,14 +66,16 @@ function applyOverrides(
   placeholders: Array<PlaceholderField>,
   overrides: Record<string, string>,
 ): McpClientInput {
+  const args = template.args ? [...template.args] : []
+  const env = template.env ? { ...template.env } : {}
   const out: McpClientInput = {
     ...template,
-    args: template.args ? [...template.args] : [],
-    env: template.env ? { ...template.env } : {},
+    args,
+    env,
   }
   for (const ph of placeholders) {
+    if (!Object.prototype.hasOwnProperty.call(overrides, ph.path)) continue
     const val = overrides[ph.path]
-    if (val === undefined) continue
     if (ph.kind === 'url') {
       out.url = val
     } else if (ph.kind === 'arg') {
@@ -81,12 +83,12 @@ function applyOverrides(
       const m = ph.path.match(/^args\[(\d+)\]$/)
       if (m) {
         const idx = parseInt(m[1], 10)
-        if (out.args) out.args[idx] = val
+        args[idx] = val
       }
-    } else if (ph.kind === 'env') {
+    } else {
       // Path is "env.KEY"
       const key = ph.path.slice(4) // strip "env."
-      if (out.env) out.env[key] = val
+      env[key] = val
     }
   }
   return out

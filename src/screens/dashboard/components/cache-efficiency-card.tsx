@@ -1,5 +1,14 @@
 import { useMemo } from 'react'
+import {
+  DashboardEmptyState,
+  DashboardLoadingState,
+  DashboardUnavailableState,
+} from './dashboard-empty-state'
 import type { DashboardOverview } from '@/server/dashboard-aggregator'
+import {
+  safeAnalyticsDaily,
+  safeNumber,
+} from '@/screens/dashboard/lib/analytics-normalizers'
 
 function formatTokens(n: number): string {
   if (!n || n <= 0) return '0'
@@ -26,23 +35,48 @@ function formatTokens(n: number): string {
  */
 export function CacheEfficiencyCard({
   analytics,
+  loading = false,
+  unavailable = false,
 }: {
   analytics: DashboardOverview['analytics']
+  loading?: boolean
+  unavailable?: boolean
 }) {
-  if (!analytics || analytics.source !== 'analytics') return null
-
-  const cache = analytics.cacheReadTokens
-  const input = analytics.inputTokens
+  const cache = safeNumber(analytics?.cacheReadTokens)
+  const input = safeNumber(analytics?.inputTokens)
   const denom = cache + input
 
   const dailyRates = useMemo(() => {
-    return analytics.daily.map((d) => {
+    const daily = analytics ? safeAnalyticsDaily(analytics) : []
+    return daily.map((d) => {
       const sum = d.cacheReadTokens + d.inputTokens
       return sum > 0 ? (d.cacheReadTokens / sum) * 100 : 0
     })
-  }, [analytics.daily])
+  }, [analytics])
 
-  if (denom === 0) return null
+  const daily = analytics ? safeAnalyticsDaily(analytics) : []
+
+  if (loading) return <DashboardLoadingState title="Cache efficiency" />
+  if (unavailable) return <DashboardUnavailableState title="Cache efficiency" />
+  if (!analytics || analytics.source === 'unavailable') {
+    return <DashboardUnavailableState title="Cache efficiency" />
+  }
+  if (analytics.source !== 'analytics') {
+    return (
+      <DashboardEmptyState
+        title="Cache efficiency"
+        description="Cache hit-rate insights will appear after the workspace records token activity."
+      />
+    )
+  }
+  if (denom === 0) {
+    return (
+      <DashboardEmptyState
+        title="Cache efficiency"
+        description="Cache hit-rate insights will appear after the workspace records token activity."
+      />
+    )
+  }
 
   const ratePct = (cache / denom) * 100
   const max = Math.max(...dailyRates, 1)
@@ -72,22 +106,16 @@ export function CacheEfficiencyCard({
       />
 
       <div className="flex items-center justify-between">
-        <h3
-          className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]"
-        >
+        <h2 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--theme-text)]">
           Cache efficiency
-        </h3>
-        <span
-          className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]"
-        >
+        </h2>
+        <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--theme-muted)]">
           {analytics.windowDays}d
         </span>
       </div>
 
       <div className="flex items-baseline gap-2">
-        <span
-          className="font-mono text-2xl font-bold leading-none tracking-tight tabular-nums text-[var(--theme-text)]"
-        >
+        <span className="font-mono text-2xl font-bold leading-none tracking-tight tabular-nums text-[var(--theme-text)]">
           {ratePct.toFixed(1)}%
         </span>
         <span
@@ -99,9 +127,7 @@ export function CacheEfficiencyCard({
       </div>
 
       <div className="flex items-end justify-between gap-2">
-        <div
-          className="font-mono text-[10px] leading-snug text-[var(--theme-muted)]"
-        >
+        <div className="font-mono text-[10px] leading-snug text-[var(--theme-muted)]">
           <span className="text-[var(--theme-text)]">
             {formatTokens(cache)}
           </span>{' '}
@@ -127,8 +153,7 @@ export function CacheEfficiencyCard({
           aria-hidden
         >
           {dailyRates.map((rate, idx) => {
-            const heightPct =
-              max > 0 ? Math.max(6, (rate / max) * 100) : 6
+            const heightPct = max > 0 ? Math.max(6, (rate / max) * 100) : 6
             return (
               <div
                 key={idx}
@@ -140,7 +165,7 @@ export function CacheEfficiencyCard({
                       ? 'color-mix(in srgb, var(--theme-border) 35%, transparent)'
                       : `color-mix(in srgb, var(--theme-success) ${Math.max(35, heightPct)}%, transparent)`,
                 }}
-                title={`${analytics.daily[idx]?.day ?? ''} \u00b7 ${rate.toFixed(1)}%`}
+                title={`${daily[idx]?.day ?? ''} \u00b7 ${rate.toFixed(1)}%`}
               />
             )
           })}

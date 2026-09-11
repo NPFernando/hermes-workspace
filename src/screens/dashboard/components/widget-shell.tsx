@@ -1,3 +1,5 @@
+import { Cancel01Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 import type { ReactNode } from 'react'
 import type {
   DashboardLayout,
@@ -64,11 +66,16 @@ export function WidgetShell({
             e.stopPropagation()
             layout.hide(id)
           }}
-          className="absolute -right-2 -top-2 z-10 inline-flex size-6 items-center justify-center rounded-full text-[14px] font-bold leading-none shadow-md transition-transform hover:scale-110 bg-[var(--theme-card)] text-[var(--theme-danger)] border border-[var(--theme-border)]"
+          className="absolute -right-2 -top-2 z-10 inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-danger)] shadow-md motion-safe:transition-transform motion-safe:hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-card)] lg:min-h-0 lg:min-w-0 lg:size-6"
           title={`Hide ${meta?.label ?? id}`}
           aria-label={`Hide widget ${meta?.label ?? id}`}
         >
-          ×
+          <HugeiconsIcon
+            icon={Cancel01Icon}
+            size={13}
+            strokeWidth={2}
+            aria-hidden
+          />
         </button>
       ) : null}
     </div>

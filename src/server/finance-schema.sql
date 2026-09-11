@@ -42,9 +42,11 @@ CREATE TABLE IF NOT EXISTS income_records (
   taxable INTEGER NOT NULL DEFAULT 1,
   notes TEXT,
   document_ref TEXT,
+  stock_holding_id TEXT,
   source TEXT NOT NULL,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS expense_records (
@@ -64,7 +66,8 @@ CREATE TABLE IF NOT EXISTS expense_records (
   document_ref TEXT,
   source TEXT NOT NULL,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS budget_categories (

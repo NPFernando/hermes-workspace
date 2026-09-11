@@ -25,8 +25,8 @@ export type LocalMessage = {
 }
 
 type StoreData = {
-  sessions: Record<string, LocalSession>
-  messages: Record<string, Array<LocalMessage>>
+  sessions: Record<string, LocalSession | undefined>
+  messages: Record<string, Array<LocalMessage> | undefined>
 }
 
 let store: StoreData = { sessions: {}, messages: {} }
@@ -35,9 +35,9 @@ function loadFromDisk(): void {
   try {
     if (existsSync(SESSIONS_FILE)) {
       const raw = readFileSync(SESSIONS_FILE, 'utf-8')
-      const parsed = JSON.parse(raw) as StoreData
+      const parsed = JSON.parse(raw) as Partial<StoreData>
       if (parsed.sessions && parsed.messages) {
-        store = parsed
+        store = { sessions: parsed.sessions, messages: parsed.messages }
       }
     }
   } catch {
@@ -57,7 +57,9 @@ function saveToDisk(): void {
 loadFromDisk()
 
 export function listLocalSessions(): Array<LocalSession> {
-  return Object.values(store.sessions).sort((a, b) => b.updatedAt - a.updatedAt)
+  return Object.values(store.sessions)
+    .filter((session): session is LocalSession => Boolean(session))
+    .sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
 export function getLocalSession(sessionId: string): LocalSession | null {
@@ -68,19 +70,20 @@ export function ensureLocalSession(
   sessionId: string,
   model?: string,
 ): LocalSession {
-  if (!store.sessions[sessionId]) {
-    store.sessions[sessionId] = {
-      id: sessionId,
-      title: null,
-      model: model ?? null,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      messageCount: 0,
-    }
-    store.messages[sessionId] = []
-    saveToDisk()
+  const existing = store.sessions[sessionId]
+  if (existing) return existing
+  const session: LocalSession = {
+    id: sessionId,
+    title: null,
+    model: model ?? null,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    messageCount: 0,
   }
-  return store.sessions[sessionId]
+  store.sessions[sessionId] = session
+  store.messages[sessionId] = []
+  saveToDisk()
+  return session
 }
 
 export function updateLocalSessionTitle(

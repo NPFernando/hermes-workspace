@@ -700,28 +700,28 @@ export function ClaudeConfigSection({
                 </label>
                 <label className="space-y-1">
                   <span className="text-xs font-medium text-[var(--theme-muted)]">
-                    Fallback model id
+                  Fallback model
                   </span>
                   <Input
                     value={fallbackModelInput}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                       setFallbackModelInput(e.target.value)
                     }
-                    placeholder="provider/model or model id"
+                  placeholder="provider/model or model name"
                     className="font-mono text-sm"
                   />
                 </label>
               </div>
               <label className="block space-y-1">
                 <span className="text-xs font-medium text-[var(--theme-muted)]">
-                  Fallback base URL
+                  Fallback service address
                 </span>
                 <Input
                   value={fallbackBaseUrlInput}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     setFallbackBaseUrlInput(e.target.value)
                   }
-                  placeholder="Leave blank for hosted APIs"
+                  placeholder="Leave blank for hosted services"
                   className="font-mono text-sm"
                 />
               </label>
@@ -761,8 +761,8 @@ export function ClaudeConfigSection({
       </SettingsSection>
 
       <SettingsSection
-        title="API Keys"
-        description="Manage provider API keys stored in ~/.hermes/.env"
+        title="Provider Keys"
+        description="Manage provider keys saved securely on this device"
         icon={CloudIcon}
       >
         {data.providers
@@ -872,7 +872,10 @@ export function ClaudeConfigSection({
         description="Shell execution settings."
         icon={SourceCodeSquareIcon}
       >
-        <SettingsRow label="Backend" description="Terminal execution backend.">
+        <SettingsRow
+          label="Execution environment"
+          description="Where terminal commands run."
+        >
           <span className="text-sm font-mono text-[var(--theme-muted)]">
             {(terminalConfig.backend as string) || 'local'}
           </span>
@@ -1465,8 +1468,8 @@ export function ClaudeConfigSection({
         />
       </SettingsRow>
       <SettingsRow
-        label="Gateway timeout"
-        description="Seconds before gateway times out a request."
+        label="Service timeout"
+        description="Seconds before the workspace service stops waiting for a request."
       >
         <Input
           type="number"

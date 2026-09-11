@@ -2,6 +2,9 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
   requireJsonContentType,
   safeErrorMessage,
 } from '../../server/rate-limit'
@@ -12,7 +15,6 @@ import {
 import { readFinanceStore } from '../../server/finance-store'
 import { getEngineState } from '../../server/demo-trading-engine'
 import type {
-  GuardianConfig,
   GuardianContext,
   GuardianVerdict,
   OrderProposal,
@@ -101,6 +103,9 @@ export const Route = createFileRoute('/api/risk-check')({
 
         const csrf = requireJsonContentType(request)
         if (csrf) return csrf
+        if (!rateLimit(`risk-check:post:${getClientIp(request)}`, 30, 60_000)) {
+          return rateLimitResponse()
+        }
 
         try {
           const body = await parseJsonBody(request)
@@ -151,16 +156,14 @@ export const Route = createFileRoute('/api/risk-check')({
           })
           const context = buildGuardianContext()
 
-          // Optional: allow override of guardian config
-          const configOverride = body.config as
-            | Partial<GuardianConfig>
-            | undefined
-          const config = configOverride
-            ? { ...DEFAULT_GUARDIAN_CONFIG, ...configOverride }
-            : DEFAULT_GUARDIAN_CONFIG
-
           // Run the risk check
-          const verdict = checkOrderProposal(proposal, context, config)
+          // Risk limits are server-owned. Never let a caller rewrite the
+          // limits used to decide whether a proposal is safe.
+          const verdict = checkOrderProposal(
+            proposal,
+            context,
+            DEFAULT_GUARDIAN_CONFIG,
+          )
 
           // Format response
           return json({

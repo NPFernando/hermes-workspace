@@ -285,13 +285,14 @@ async function runRebalanceCycleInner(
           createdAt: new Date(order.transactTime).toISOString(),
         })
       } else {
+        const hasPrice = Object.prototype.hasOwnProperty.call(priceBySymbol, t.symbol)
+        if (!hasPrice) continue
         const price = priceBySymbol[t.symbol]
         // See docs/tsconfig-strictness-rollout.md — real Record-lookup
         // risk the current lax tsconfig (missing noUncheckedIndexedAccess)
         // doesn't reflect in `price`'s type.
 
-        const quantity =
-          price !== undefined && price > 0 ? t.notionalQuote / price : 0
+        const quantity = price > 0 ? t.notionalQuote / price : 0
         if (quantity <= 0) continue
         const order = await client.placeOrder({
           symbol: t.symbol,

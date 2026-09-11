@@ -1,31 +1,101 @@
 export type PersonalFinancePayload = {
   ok: boolean
-  /** Epoch ms the server built this payload — drives the "updated HH:MM" line. */
-  checkedAt: number
-  /** PF-201: reporting currency every `*Lkr` figure in this payload is expressed
-   * in (default 'LKR'). Storage stays LKR-denominated. */
-  baseCurrency: string
-  /** PF-201: LKR->baseCurrency multiplier for components that sum raw
-   * LKR-denominated records client-side. 1 when base is 'LKR' or no rate exists. */
-  fxToBase: number
-  summary: {
-    /** PF-201: reporting currency of the `*Lkr` figures below (default 'LKR'). */
-    baseCurrency: string
+  baseCurrency?: string
+  proactiveInsightsEnabled?: boolean
+  alertsEnabled?: boolean
+  quietModeEnabled?: boolean
+  salaryHistory?: Array<{
+    id: string
+    incomeSourceId?: string
+    employerName: string
+    effectiveDate: string
+    amount: number
+    currency: string
+    reason?: string
+    source: string
+    createdAt: string
+    updatedAt: string
+  }>
+  netWorthSnapshots: Array<{
+    id: string
+    snapshotDate: string
+    netWorthLkr: number
+    cashLkr: number
+    debtLkr: number
+    investmentsLkr: number
+    liquidNetWorthLkr: number
+    lockedWealthLkr: number
+    portfolioPositions?: Array<{
+      holdingId: string
+      symbol: string
+      currency: string
+      quantity: number
+      price: number
+      marketValue: number
+      costBasis: number
+      priceSource: string
+    }>
+    source: string
+    createdAt: string
+  }>
+  /** Base-currency projection used by the net-worth trend card. */
+  netWorthHistory?: Array<{
+    date: string
     netWorthBase: number
-    cashBalanceBase: number
-    netSavingsBase: number
-    savingsRate: number
-    totalIncomeBase: number
-    totalExpensesBase: number
-    taxReserveBase: number
-    stockHoldingsValueBase: number
-    fixedDepositsValueBase: number
+    cashBase: number
+    investmentsBase: number
     debtBase: number
-    unrealizedStockPnlBase: number
+  }>
+  financialRules: {
+    monthlyInvestmentTargetLkr?: number
+    largeTransactionThresholdLkr?: number
+    discretionarySpendingThresholdLkr?: number
+    investmentAllocationTargetPct?: number
+  }
+  summary: {
+    baseCurrency?: string
+    baseSummary?: {
+      totalIncome: number
+      totalExpenses: number
+      netSavings: number
+      savingsRate: number
+      cashBalance: number
+      taxReserve: number
+      stockHoldingsValue: number
+      fixedDepositsValue: number
+      debt: number
+      liquidNetWorth: number
+      lockedWealth: number
+      propertyValue: number
+      netWorth: number
+      unrealizedStockPnl: number
+      unrealizedStockPnlPct: number
+      accountCount: number
+    }
+    netWorthLkr: number
+    cashBalanceLkr: number
+    netSavingsLkr: number
+    savingsRate: number
+    totalIncomeLkr: number
+    totalExpensesLkr: number
+    taxReserveLkr: number
+    stockHoldingsValueLkr: number
+    fixedDepositsValueLkr: number
+    debtLkr: number
+    liquidNetWorthLkr: number
+    lockedWealthLkr: number
+    unrealizedStockPnlLkr: number
     unrealizedStockPnlPct: number
     accountCount: number
-    /** PF-206: asset currencies with no exchange rate on file — counted raw. */
     fxUnconverted?: Array<string>
+  }
+  cseProviderHealth?: {
+    status: 'healthy' | 'degraded' | 'stale' | 'manual' | 'unknown'
+    holdingsCount: number
+    cseQuoteCount: number
+    manualFallbackCount: number
+    staleQuoteCount: number
+    latestQuoteAt: string | null
   }
   budgetVsActual: Array<{
     category: string
@@ -36,72 +106,102 @@ export type PersonalFinancePayload = {
     variance: number
     percentUsed: number
     overBudget: boolean
+    approachingBudget: boolean
+    actualConversionAvailable?: boolean
   }>
+  budgetAlertThresholdPct: number
+  budgetTemplates?: Array<{
+    id: string
+    name: string
+    lines: Array<{ category: string; currency: string; budgetAmount: number }>
+    source: string
+    createdAt: string
+    updatedAt: string
+  }>
+  goalCompletionEvents?: Array<{
+    id: string
+    goalId: string
+    goalName: string
+    targetAmount: number
+    currency: string
+    completedAt: string
+  }>
+  annualBudgetVsActual: Array<{
+    category: string
+    year: number
+    currency: string
+    budget: number
+    actual: number
+    variance: number
+    percentUsed: number
+    overBudget: boolean
+    approachingBudget: boolean
+    monthsTracked: number
+    actualConversionAvailable?: boolean
+  }>
+  exchangeRates: Array<{
+    base: string
+    target: string
+    rate: number
+    date: string
+    updatedAt?: string
+    source?: string
+    observedAt?: string
+  }>
+  fxProviderHealth: {
+    status: 'healthy' | 'stale' | 'unknown'
+    source?: string
+    latestRateDate?: string
+    lastObservedAt?: string
+    detail: string
+  }
+  safeToSpend: {
+    cashLkr: number
+    reserveLkr: number
+    committedLkr: number
+    amountLkr: number
+    configured: boolean
+    basis: string
+  }
+  transactions: Array<Record<string, unknown>>
+  deletedTransactions: Array<Record<string, unknown>>
+  transactionAudit?: Array<{
+    id: string
+    action: string
+    details: Record<string, unknown>
+    source: string
+    createdAt: string
+  }>
+  backupHealth: {
+    status: 'healthy' | 'stale' | 'unconfigured' | 'missing'
+    configured: boolean
+    backupCount: number
+    latestCreatedAt: string | null
+    latestAgeMs: number | null
+    staleAfterMs: number
+    retention: number
+  }
+  financialHealth: {
+    score: number
+    band: 'excellent' | 'stable' | 'needs_attention' | 'at_risk'
+    components: Array<{
+      key: 'savings' | 'emergency' | 'budget' | 'debt' | 'data'
+      label: string
+      score: number
+      maxScore: number
+      detail: string
+    }>
+  }
   alerts: Array<{
     level: 'info' | 'warning' | 'critical'
     title: string
     detail: string
   }>
-  /** PF review item 7: server-computed dashboard derivations. Amounts are raw
-   * LKR — scale by `fxToBase` for display. */
-  trends: {
-    series: Array<{
-      month: string
-      income: number
-      expense: number
-      net: number
-    }>
-    categoriesThisMonth: Array<{ category: string; amount: number }>
-  }
-  recurringBills: Array<{
-    vendor: string
-    displayVendor: string
-    category: string
-    monthsSeen: number
-    averageAmount: number
-    loggedThisMonth: boolean
-    thisMonthAmount: number | null
-    drift: number | null
-  }>
-  upcomingMoney: {
-    paydays: Array<{ name: string; state: 'due_soon' | 'overdue'; days: number }>
-    contracts: Array<{ name: string; days: number }>
-    fdMaturities: Array<{ name: string; days: number }>
-    scheduled: Array<{
-      id: string
-      dueDate: string
-      kind: 'income' | 'expense'
-      counterparty: string
-      amount: number
-      days: number
-    }>
-  }
-  currencyExposure: Array<{
-    currency: string
-    amount: number
-    breakdown: Array<{
-      source: 'jobs' | 'holdings' | 'fixed_deposits'
-      label: string
-      amount: number
-      count: number
-    }>
-  }>
-  /** Daily net-worth history for the trend chart, in the reporting currency. */
-  netWorthHistory: Array<{
-    date: string
-    netWorthBase: number
-    cashBase: number
-    investmentsBase: number
-    debtBase: number
-  }>
-  /** PF review item 1: `data.income_records` / `data.expense_records` carry
-   * only the trailing N months. Older rows: `list_transactions` + JSON export. */
-  transactionsWindowMonths: number
   emergencyFund: {
     targetMonths: number
-    avgMonthlyExpensesBase: number
-    currentBase: number
-    targetBase: number
+    avgMonthlyExpensesLkr: number
+    currentLkr: number
+    targetLkr: number
     coverageMonths: number
     progressPct: number
   }
@@ -112,14 +212,15 @@ export type PersonalFinancePayload = {
     hasData: boolean
   }
   wealthGoal: {
-    targetBase: number
+    targetLkr: number
     targetDate: string | null
-    currentBase: number
+    currentLkr: number
     progressPct: number
   }
   financeQaHistory: Array<{ at: number; question: string; answer: string }>
   storage: {
-    active: 'postgres' | 'unavailable'
+    active: 'postgres' | 'json'
+    fallback: 'json'
     postgres: {
       enabled: boolean
       available: boolean
@@ -129,11 +230,27 @@ export type PersonalFinancePayload = {
       lastWriteError?: string
     }
     health: {
-      status: 'healthy' | 'postgres_unavailable' | 'json_primary'
+      status:
+        | 'healthy'
+        | 'json_primary'
+        | 'postgres_unavailable'
+        | 'postgres_behind'
+        | 'mirror_mismatch'
       warnings: Array<string>
+      jsonUpdatedAt: string | null
       postgresUpdatedAt: string | null
+      postgresLagMs: number
+      isPostgresBehindJson: boolean
+      selfHeal: {
+        attempted: boolean
+        attempts: number
+        succeeded: boolean
+        lastAttemptAt: string | null
+      }
       rowCounts: {
+        json: Record<string, number>
         postgres: Record<string, number>
+        lagging: Record<string, { json: number; postgres: number }>
       }
     }
   }
@@ -141,8 +258,6 @@ export type PersonalFinancePayload = {
     finance_accounts: Array<Record<string, unknown>>
     income_records: Array<Record<string, unknown>>
     expense_records: Array<Record<string, unknown>>
-    transfers: Array<Record<string, unknown>>
-    scheduled_transactions: Array<Record<string, unknown>>
     budget_categories: Array<Record<string, unknown>>
     categories: Array<Record<string, unknown>>
     subcategories: Array<Record<string, unknown>>
@@ -153,18 +268,72 @@ export type PersonalFinancePayload = {
     income_sources: Array<Record<string, unknown>>
     stock_holdings: Array<Record<string, unknown>>
     fixed_deposits: Array<Record<string, unknown>>
+    investment_journal: Array<Record<string, unknown>>
+    /** Optional for payloads cached before AI-106 shipped. */
+    ai_tasks?: Array<Record<string, unknown>>
     loans: Array<Record<string, unknown>>
     properties: Array<Record<string, unknown>>
     beneficiaries: Array<Record<string, unknown>>
-    /** Latest rate per `base -> target` pair (FX cron / manual). */
-    exchange_rates: Array<{
-      base: string
-      target: string
-      rate: number
-      date: string
-      updatedAt?: string
-    }>
+    insurance_policies: Array<Record<string, unknown>>
+    exchange_rates?: Array<{ base: string; target: string; rate: number; date: string }>
+    scheduled_transactions?: Array<Record<string, unknown>>
   }
+}
+
+export type AssistantMemoryKind = 'category_rule' | 'financial_rule' | 'other'
+
+export type AssistantMemory = {
+  id: string
+  content: string
+  kind: AssistantMemoryKind
+}
+
+export type PendingAssistantMemory = AssistantMemory & { createdAt: string | null }
+
+export type AssistantMemoriesResponse = {
+  harpEnabled: boolean
+  memories: Array<AssistantMemory>
+  pending: Array<PendingAssistantMemory>
+}
+
+export type ExtractedSalarySlip = {
+  employerName: string
+  employeeName?: string
+  payPeriod?: string
+  paymentDate?: string
+  grossAmount?: number
+  deductions?: number
+  netAmount: number
+  currency: string
+  confidence: 'high' | 'medium' | 'low'
+}
+
+export type ExtractedContractNote = {
+  symbol: string
+  companyName?: string
+  side: 'buy' | 'sell'
+  quantity: number
+  price: number
+  grossAmount?: number
+  fees?: number
+  currency: string
+  broker?: string
+  tradeDate?: string
+  settlementDate?: string
+  confidence: 'high' | 'medium' | 'low'
+}
+
+export type ExtractedFdCertificate = {
+  bankName: string
+  certificateNumber?: string
+  principal: number
+  currency: string
+  interestRatePct: number
+  interestPayout: 'monthly' | 'quarterly' | 'annually' | 'at_maturity'
+  startDate?: string
+  maturityDate?: string
+  autoRenew?: boolean
+  confidence: 'high' | 'medium' | 'low'
 }
 
 export type ExtractedTransaction = {
@@ -181,6 +350,12 @@ export type ContractRisk = {
   severity: 'high' | 'medium' | 'low'
   clause: string
   concern: string
+}
+
+export type ContractChange = {
+  field: string
+  previous: string
+  current: string
 }
 
 export type ExtractedContract = {
@@ -202,10 +377,17 @@ export type PendingIngestion = {
   id: string
   status: 'awaiting_password' | 'awaiting_review' | 'confirmed' | 'rejected'
   source: 'gmail' | 'upload'
-  documentType: 'transaction' | 'contract'
+  documentType: 'transaction' | 'statement' | 'contract'
+  documentClass?: 'salary_slip' | 'contract_note' | 'fd_certificate' | 'bank_statement' | 'employment_contract' | 'receipt' | 'bill' | 'transaction_notice' | 'unknown'
   passwordHint?: string
   extracted?: ExtractedTransaction
+  extractedSalarySlip?: ExtractedSalarySlip
+  extractedContractNote?: ExtractedContractNote
+  extractedFdCertificate?: ExtractedFdCertificate
   extractedContract?: ExtractedContract
+  contractChanges?: Array<ContractChange>
   rawPreviewImagePath?: string
   error?: string
+  createdAt?: string
+  updatedAt?: string
 }

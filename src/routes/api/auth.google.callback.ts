@@ -1,9 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import {
   GOOGLE_ALLOWED_EMAIL,
+  clearOAuthStateCookie,
   consumeOAuthState,
   exchangeCodeForEmail,
   exchangeCodeForGmailTokens,
+  getOAuthStateCookie,
   isGoogleOAuthEnabled,
   storeGmailRefreshToken,
   storeUserProfile,
@@ -18,11 +20,15 @@ export const Route = createFileRoute('/api/auth/google/callback')({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        const redirect = (location: string, sessionCookie?: string) => {
+          const headers = new Headers({ Location: location })
+          headers.append('Set-Cookie', clearOAuthStateCookie())
+          if (sessionCookie) headers.append('Set-Cookie', sessionCookie)
+          return new Response(null, { status: 302, headers })
+        }
+
         if (!isGoogleOAuthEnabled()) {
-          return new Response(null, {
-            status: 302,
-            headers: { Location: '/?error=oauth_disabled' },
-          })
+          return redirect('/?error=oauth_disabled')
         }
 
         const url = new URL(request.url)
@@ -30,10 +36,11 @@ export const Route = createFileRoute('/api/auth/google/callback')({
         const state = url.searchParams.get('state')
 
         if (!code || !state) {
-          return new Response(null, {
-            status: 302,
-            headers: { Location: '/?error=oauth_invalid' },
-          })
+          return redirect('/?error=oauth_invalid')
+        }
+
+        if (getOAuthStateCookie(request.headers.get('cookie')) !== state) {
+          return redirect('/?error=oauth_state')
         }
 
         // CSRF: verify state via server-side store (avoids cookie-transmission issues).
@@ -41,10 +48,7 @@ export const Route = createFileRoute('/api/auth/google/callback')({
         // Gmail-connect — since both share this one registered redirect_uri.
         const purpose = consumeOAuthState(state)
         if (!purpose) {
-          return new Response(null, {
-            status: 302,
-            headers: { Location: '/?error=oauth_state' },
-          })
+          return redirect('/?error=oauth_state')
         }
 
         if (purpose === 'gmail_connect') {
@@ -52,16 +56,10 @@ export const Route = createFileRoute('/api/auth/google/callback')({
             const { refreshToken, email } =
               await exchangeCodeForGmailTokens(code)
             storeGmailRefreshToken(refreshToken, email)
-            return new Response(null, {
-              status: 302,
-              headers: { Location: '/personal-finance?gmail=connected' },
-            })
+            return redirect('/personal-finance?gmail=connected')
           } catch (err) {
             console.error('[auth/google/callback][gmail_connect]', err)
-            return new Response(null, {
-              status: 302,
-              headers: { Location: '/personal-finance?gmail=error' },
-            })
+            return redirect('/personal-finance?gmail=error')
           }
         }
 
@@ -69,10 +67,7 @@ export const Route = createFileRoute('/api/auth/google/callback')({
           const { email, name, picture } = await exchangeCodeForEmail(code)
 
           if (email.toLowerCase() !== GOOGLE_ALLOWED_EMAIL.toLowerCase()) {
-            return new Response(null, {
-              status: 302,
-              headers: { Location: '/?error=unauthorized_email' },
-            })
+            return redirect('/?error=unauthorized_email')
           }
 
           storeUserProfile({ email, name, picture })
@@ -80,15 +75,10 @@ export const Route = createFileRoute('/api/auth/google/callback')({
           const token = generateSessionToken()
           storeSessionToken(token, true) // 1-year for Google login
 
-          const headers = new Headers({ Location: '/' })
-          headers.append('Set-Cookie', createSessionCookie(token, true))
-          return new Response(null, { status: 302, headers })
+          return redirect('/', createSessionCookie(token, true))
         } catch (err) {
           console.error('[auth/google/callback]', err)
-          return new Response(null, {
-            status: 302,
-            headers: { Location: '/?error=oauth_failed' },
-          })
+          return redirect('/?error=oauth_failed')
         }
       },
     },

@@ -2,6 +2,9 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
   requireJsonContentType,
   safeErrorMessage,
 } from '../../server/rate-limit'
@@ -16,6 +19,9 @@ export const Route = createFileRoute('/api/agent-pause')({
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
+        if (!rateLimit(`agent-pause:${getClientIp(request)}`, 20, 60_000)) {
+          return rateLimitResponse()
+        }
 
         try {
           const body = await request.json()

@@ -17,6 +17,9 @@ import {
   ensureGatewayProbed,
 } from '../../../server/gateway-capabilities'
 import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
   requireJsonContentType,
   safeErrorMessage,
 } from '../../../server/rate-limit'
@@ -43,6 +46,9 @@ export const Route = createFileRoute('/api/profiles/toggle-skill')({
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
+        if (!rateLimit(`profile-skill-toggle:${getClientIp(request)}`, 30, 60_000)) {
+          return rateLimitResponse()
+        }
 
         try {
           const body = (await request.json()) as {

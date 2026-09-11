@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { googleNewsRssUrl, parseGoogleNewsRss } from './finance-news.service'
+import {
+  fetchGoogleNewsTextWithRetry,
+  googleNewsRssUrl,
+  parseGoogleNewsRss,
+} from './finance-news.service'
 
 const RSS = `<?xml version="1.0"?><rss><channel>
   <item>
@@ -50,5 +54,31 @@ describe('finance-news.service', () => {
       sourceName: 'Google News',
       sourceUrl: 'https://news.google.com',
     })
+  })
+
+  it('retries one transient RSS fetch failure', async () => {
+    let attempts = 0
+    await expect(
+      fetchGoogleNewsTextWithRetry(async () => {
+        attempts += 1
+        if (attempts === 1) throw new Error('temporary network failure')
+        return '<rss />'
+      }, 'https://example.test/rss'),
+    ).resolves.toBe('<rss />')
+    expect(attempts).toBe(2)
+  })
+
+  it('does not retry an explicitly non-retryable fetch failure', async () => {
+    let attempts = 0
+    const error = Object.assign(new Error('response too large'), {
+      retryable: false,
+    })
+    await expect(
+      fetchGoogleNewsTextWithRetry(async () => {
+        attempts += 1
+        throw error
+      }, 'https://example.test/rss'),
+    ).rejects.toBe(error)
+    expect(attempts).toBe(1)
   })
 })

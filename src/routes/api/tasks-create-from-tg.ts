@@ -4,6 +4,13 @@ import { json } from '@tanstack/react-start'
 import { generateTaskFromText } from '../../server/astra-tasks'
 import { createTask } from '../../server/tasks-store'
 import { resolveHermesBin } from '../../server/hermes-bin'
+import { requireLocalOrAuth } from '../../server/auth-middleware'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 
 // ---------------------------------------------------------------------------
 // POST /api/tasks-create-from-tg
@@ -20,6 +27,16 @@ export const Route = createFileRoute('/api/tasks-create-from-tg')({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        if (!requireLocalOrAuth(request)) {
+          return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (
+          !rateLimit(`tasks-create-from-tg:${getClientIp(request)}`, 5, 60_000)
+        ) {
+          return rateLimitResponse()
+        }
         let body: {
           text?: string
           chat_id?: string

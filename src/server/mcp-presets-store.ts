@@ -457,6 +457,7 @@ function makeCacheKey(
  * HIGH-3: statKey now distinguishes ENOENT (bootstrap) from EACCES/ELOOP/
  * other (permission/symlink error → return source:'invalid').
  */
+// eslint-disable-next-line @typescript-eslint/require-await -- the catalog read contract is shared with async source providers
 export async function readPresets(): Promise<ReadPresetsResult> {
   const path = presetsFilePath()
 

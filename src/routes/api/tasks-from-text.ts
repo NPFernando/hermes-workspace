@@ -2,6 +2,12 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { generateTaskFromText } from '../../server/astra-tasks'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 
 export const Route = createFileRoute('/api/tasks-from-text')({
   server: {
@@ -9,6 +15,11 @@ export const Route = createFileRoute('/api/tasks-from-text')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`tasks-from-text:${getClientIp(request)}`, 10, 60_000)) {
+          return rateLimitResponse()
         }
         let body: Record<string, unknown>
         try {

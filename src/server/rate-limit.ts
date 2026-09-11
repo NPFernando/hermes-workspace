@@ -75,7 +75,11 @@ export function rateLimitResponse(): Response {
     JSON.stringify({ error: 'Too many requests, please try again later' }),
     {
       status: 429,
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+        'Retry-After': '60',
+      },
     },
   )
 }
@@ -102,9 +106,27 @@ export function requireJsonContentType(request: Request): Response | null {
 /**
  * Sanitize error for response — hide details in production.
  */
+export const MAX_SAFE_ERROR_MESSAGE_LENGTH = 500
+
+export function redactSensitiveErrorMessage(message: string): string {
+  const redacted = message
+    .replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g, '[REDACTED]')
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]')
+    .replace(
+      /\b(api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret|token)\s*[:=]\s*(["']?)[^\s,;"']+\2/gi,
+      '$1=[REDACTED]',
+    )
+    .replace(/(https?:\/\/[^\s/@:]+:)[^\s/@]+(@)/gi, '$1[REDACTED]$2')
+  return redacted.length > MAX_SAFE_ERROR_MESSAGE_LENGTH
+    ? `${redacted.slice(0, MAX_SAFE_ERROR_MESSAGE_LENGTH - 1)}…`
+    : redacted
+}
+
 export function safeErrorMessage(err: unknown): string {
   if (process.env.NODE_ENV === 'production') {
     return 'Internal server error'
   }
-  return err instanceof Error ? err.message : String(err)
+  return redactSensitiveErrorMessage(
+    err instanceof Error ? err.message : String(err),
+  )
 }

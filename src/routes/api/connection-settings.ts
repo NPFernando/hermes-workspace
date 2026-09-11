@@ -16,6 +16,9 @@ import {
   setGatewayUrl,
 } from '../../server/gateway-capabilities'
 import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
   requireJsonContentType,
   safeErrorMessage,
 } from '../../server/rate-limit'
@@ -32,7 +35,7 @@ function isValidHttpUrl(u: string): boolean {
 export const Route = createFileRoute('/api/connection-settings')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -44,6 +47,9 @@ export const Route = createFileRoute('/api/connection-settings')({
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck
+        if (!rateLimit(`connection-settings-write:${getClientIp(request)}`, 15, 60_000)) {
+          return rateLimitResponse()
+        }
         try {
           const body = (await request.json().catch(() => ({}))) as {
             gateway?: unknown

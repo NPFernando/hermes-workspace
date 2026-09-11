@@ -191,8 +191,8 @@ export function WorkspaceSkillsScreen() {
   )
 
   const selectedSkill =
-    visibleSkills.find((skill) => skill.id === selectedSkillId) ??
-    visibleSkills[0] ??
+    visibleSkills.find((skill) => skill.id === selectedSkillId) ||
+    visibleSkills.at(0) ||
     null
 
   useEffect(() => {
@@ -208,7 +208,7 @@ export function WorkspaceSkillsScreen() {
 
   useEffect(() => {
     if (selectedMemoryPath) return
-    const firstFile = memoryQuery.data?.files?.[0]
+    const firstFile = memoryQuery.data?.files[0]
     if (firstFile) {
       setSelectedMemoryPath(firstFile.path)
     }
@@ -230,7 +230,10 @@ export function WorkspaceSkillsScreen() {
   }
 
   return (
-    <div data-route-page className="min-h-full px-4 pb-10 pt-5 text-[var(--theme-text)] md:px-6 md:pt-8">
+    <div
+      data-route-page
+      className="min-h-full px-4 pb-10 pt-5 text-[var(--theme-text)] md:px-6 md:pt-8"
+    >
       <section className="mx-auto flex min-h-full w-full max-w-[1480px] flex-col gap-5">
         <header className="flex flex-col gap-4 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-5 py-4 shadow-sm md:flex-row md:items-center md:justify-between">
           <div className="flex items-start gap-3">
@@ -421,7 +424,7 @@ export function WorkspaceSkillsScreen() {
                       <div className="max-h-96 overflow-y-auto rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] p-4 text-sm text-[var(--theme-text)] prose prose-sm prose-primary max-w-none">
                         <SkillMarkdown
                           content={
-                            skillContentQuery.data?.trim() ||
+                            skillContentQuery.data.trim() ||
                             'No content available.'
                           }
                         />
@@ -543,19 +546,25 @@ export function WorkspaceSkillsScreen() {
                   </div>
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center justify-between gap-4 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2">
-                      <span className="text-[var(--theme-muted)]">Workspace memory</span>
+                      <span className="text-[var(--theme-muted)]">
+                        Workspace memory
+                      </span>
                       <span className="font-medium text-[var(--theme-text)]">
                         Permanent
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-4 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2">
-                      <span className="text-[var(--theme-muted)]">Project memory</span>
+                      <span className="text-[var(--theme-muted)]">
+                        Project memory
+                      </span>
                       <span className="font-medium text-[var(--theme-text)]">
                         Per-project
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-4 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2">
-                      <span className="text-[var(--theme-muted)]">Agent memory</span>
+                      <span className="text-[var(--theme-muted)]">
+                        Agent memory
+                      </span>
                       <span className="font-medium text-[var(--theme-text)]">
                         30 day rolling
                       </span>
@@ -614,10 +623,16 @@ function MemorySectionBlock({
                   />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span title={file.name} className="block truncate text-sm font-medium text-[var(--theme-text)]">
+                  <span
+                    title={file.name}
+                    className="block truncate text-sm font-medium text-[var(--theme-text)]"
+                  >
                     {file.name}
                   </span>
-                  <span title={file.path} className="block truncate text-xs text-[var(--theme-muted)]">
+                  <span
+                    title={file.path}
+                    className="block truncate text-xs text-[var(--theme-muted)]"
+                  >
                     {file.path}
                   </span>
                 </span>

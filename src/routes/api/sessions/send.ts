@@ -3,6 +3,9 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
   requireJsonContentType,
   safeErrorMessage,
 } from '../../../server/rate-limit'
@@ -20,6 +23,9 @@ export const Route = createFileRoute('/api/sessions/send')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        if (!rateLimit(`sessions-send:${getClientIp(request)}`, 60, 60_000)) {
+          return rateLimitResponse()
         }
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck

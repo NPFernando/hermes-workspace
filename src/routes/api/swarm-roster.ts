@@ -8,14 +8,25 @@ import {
 } from '../../server/swarm-roster'
 import { listSwarmWorkerIds } from '../../server/swarm-foundation'
 
-import { safeErrorMessage } from '../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../server/rate-limit'
 
 export const Route = createFileRoute('/api/swarm-roster')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`swarm-roster:${getClientIp(request)}`, 30, 60_000)) {
+          return rateLimitResponse()
         }
         const ids = listSwarmWorkerIds()
         return json({
@@ -28,6 +39,13 @@ export const Route = createFileRoute('/api/swarm-roster')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (
+          !rateLimit(`swarm-roster:post:${getClientIp(request)}`, 30, 60_000)
+        ) {
+          return rateLimitResponse()
         }
         let body: unknown
         try {

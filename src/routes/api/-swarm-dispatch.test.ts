@@ -144,13 +144,15 @@ describe('buildHermesTmuxLaunchCommand', () => {
     const command = buildHermesTmuxLaunchCommand({
       profilePath: '/tmp/hermes profiles/swarm1',
       hermesBin: '/opt/homebrew/bin/hermes',
-      ghToken: 'ghp_te...3456',
     })
 
     expect(command).toContain("HERMES_HOME='/tmp/hermes profiles/swarm1'")
     expect(command).toContain("'/opt/homebrew/bin/hermes' chat --tui")
     expect(command).toContain('[Hermes worker exited with status %s]')
     expect(command).not.toContain('exec ')
+    expect(command).not.toContain('ghp_te...3456')
+    expect(command).not.toContain('GH_TOKEN=')
+    expect(command).not.toContain('GITHUB_TOKEN=')
   })
 })
 

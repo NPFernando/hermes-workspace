@@ -335,16 +335,16 @@ export async function dashboardAuthHeaders(options?: {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-function withDashboardBase(path: string): string {
-  if (/^https?:\/\//i.test(path)) return path
-  return `${CLAUDE_DASHBOARD_URL}${path.startsWith('/') ? path : `/${path}`}`
+function withDashboardBase(routePath: string): string {
+  if (/^https?:\/\//i.test(routePath)) return routePath
+  return `${CLAUDE_DASHBOARD_URL}${routePath.startsWith('/') ? routePath : `/${routePath}`}`
 }
 
 export async function dashboardFetch(
-  path: string,
+  routePath: string,
   init: RequestInit = {},
 ): Promise<Response> {
-  const requestPath = withDashboardBase(path)
+  const requestPath = withDashboardBase(routePath)
   const method = (init.method || 'GET').toUpperCase()
   const doFetch = async (forceToken = false) => {
     const headers = new Headers(init.headers)
@@ -387,12 +387,12 @@ export async function dashboardFetch(
  * `/health/detailed`.
  */
 export async function gatewayFetch(
-  path: string,
+  routePath: string,
   init: RequestInit = {},
 ): Promise<Response> {
-  const url = /^https?:\/\//i.test(path)
-    ? path
-    : `${CLAUDE_API}${path.startsWith('/') ? path : `/${path}`}`
+  const url = /^https?:\/\//i.test(routePath)
+    ? routePath
+    : `${CLAUDE_API}${routePath.startsWith('/') ? routePath : `/${routePath}`}`
   const headers = new Headers(init.headers)
   for (const [k, v] of Object.entries(authHeaders())) {
     if (!headers.has(k)) headers.set(k, v)
@@ -402,9 +402,9 @@ export async function gatewayFetch(
 
 // ── Probing ───────────────────────────────────────────────────────
 
-async function probe(path: string): Promise<boolean> {
+async function probe(routePath: string): Promise<boolean> {
   try {
-    const res = await fetch(`${CLAUDE_API}${path}`, {
+    const res = await fetch(`${CLAUDE_API}${routePath}`, {
       headers: authHeaders(),
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     })

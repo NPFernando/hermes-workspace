@@ -281,7 +281,7 @@ function sendTmux(
         if (loadErr)
           return resolve({
             ok: false,
-            error: stderr?.toString() || loadErr.message,
+            error: stderr.toString() || loadErr.message,
           })
         execFile(tmux, ['send-keys', '-t', session, 'C-u'], () => {
           execFile(
@@ -298,7 +298,7 @@ function sendTmux(
               if (pasteErr)
                 return resolve({
                   ok: false,
-                  error: err2?.toString() || pasteErr.message,
+                  error: err2.toString() || pasteErr.message,
                 })
               setTimeout(
                 () =>
@@ -309,7 +309,7 @@ function sendTmux(
                       if (enterErr)
                         return resolve({
                           ok: false,
-                          error: err3?.toString() || enterErr.message,
+                          error: err3.toString() || enterErr.message,
                         })
                       resolve({ ok: true })
                     },
@@ -410,10 +410,10 @@ function startWorkerProcessNative(workerId: string): {
   workerProcesses.set(workerId, proc)
 
   // Log stdout/stderr
-  proc.stdout?.on('data', (data: Buffer) => {
+  proc.stdout.on('data', (data: Buffer) => {
     appendWorkerLog(workerId, `[stdout] ${data.toString().trimEnd()}`)
   })
-  proc.stderr?.on('data', (data: Buffer) => {
+  proc.stderr.on('data', (data: Buffer) => {
     appendWorkerLog(workerId, `[stderr] ${data.toString().trimEnd()}`)
   })
 
@@ -526,7 +526,7 @@ function tmuxKill(workerId: string): Promise<{ ok: boolean; error?: string }> {
         if (err)
           return resolve({
             ok: false,
-            error: stderr?.toString() || err.message,
+            error: stderr.toString() || err.message,
           })
         resolve({ ok: true })
       },
@@ -556,7 +556,7 @@ function tmuxStart(workerId: string): Promise<{ ok: boolean; error?: string }> {
         if (err)
           return resolve({
             ok: false,
-            error: stderr?.toString() || err.message,
+            error: stderr.toString() || err.message,
           })
         resolve({ ok: true })
       },
@@ -613,7 +613,7 @@ export async function renewWorker(workerId: string): Promise<{
     /* best-effort */
   }
   return {
-    ok: started.ok && sent.ok,
+    ok: sent.ok,
     restarted: started.ok,
     resumeSent: sent.ok,
     error: sent.error,

@@ -29,9 +29,18 @@ type SystemMetrics = {
 }
 
 async function fetchSystemMetrics(): Promise<SystemMetrics> {
-  const response = await fetch('/api/system-metrics', { cache: 'no-store' })
-  if (!response.ok) throw new Error(`HTTP ${response.status}`)
-  return response.json() as Promise<SystemMetrics>
+  const controller = new AbortController()
+  const timeout = globalThis.setTimeout(() => controller.abort(), 5_000)
+  try {
+    const response = await fetch('/api/system-metrics', {
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    return response.json() as Promise<SystemMetrics>
+  } finally {
+    globalThis.clearTimeout(timeout)
+  }
 }
 
 function formatBytes(bytes: number): string {
@@ -84,17 +93,22 @@ function MetricItem({
         tone === 'accent' && 'text-[var(--theme-accent)]',
       )}
     >
-      <span className="text-[9px] font-medium uppercase tracking-[0.16em] text-[var(--theme-muted)]">
+      <span className="text-[9px] font-medium uppercase tracking-[0.16em] text-[var(--theme-muted)] md:max-lg:text-[8px] md:max-lg:tracking-[0.1em]">
         {label}
       </span>
-      <span className="truncate font-medium tabular-nums">{value}</span>
+      <span className="truncate font-medium tabular-nums md:max-lg:text-[10px]">
+        {value}
+      </span>
     </span>
   )
 }
 
 function Separator() {
   return (
-    <span className="h-3 w-px shrink-0 bg-[var(--theme-border)]" aria-hidden />
+    <span
+      className="h-3 w-px shrink-0 bg-[var(--theme-border)] md:max-lg:hidden"
+      aria-hidden
+    />
   )
 }
 
@@ -116,13 +130,15 @@ function StatusDot({ tone }: { tone: 'ok' | 'warn' | 'critical' | 'muted' }) {
 export function SystemMetricsFooter({
   leftOffsetPx = 0,
 }: {
-  leftOffsetPx?: number
+  leftOffsetPx?: number | string
 }) {
   const { data, isError } = useQuery({
     queryKey: ['system-metrics-footer'],
     queryFn: fetchSystemMetrics,
     refetchInterval: 15_000,
     staleTime: 14_000,
+    retry: 1,
+    retryDelay: 1_000,
   })
 
   const hermesHealthy =
@@ -140,12 +156,15 @@ export function SystemMetricsFooter({
 
   return (
     <footer
-      className="fixed bottom-0 right-0 z-40 hidden h-7 items-center border-t border-[var(--theme-border)] bg-[var(--theme-card)] px-4 text-[11px] leading-none text-[var(--theme-text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.025)] md:flex"
+      // This strip is informational only. Keep it visually above the page,
+      // but let pointer input reach a dashboard card when the fixed footer
+      // overlaps the viewport edge.
+      className="pointer-events-none fixed bottom-0 right-0 z-40 hidden h-7 items-center border-t border-[var(--theme-border)] bg-[var(--theme-card)] px-4 text-[11px] leading-none text-[var(--theme-text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.025)] md:flex md:max-lg:px-2"
       data-testid="system-metrics-footer"
       aria-label="System metrics footer"
       style={{ left: leftOffsetPx }}
     >
-      <div className="flex max-w-full items-center justify-center gap-3 overflow-hidden opacity-85">
+      <div className="flex max-w-full items-center justify-center gap-3 overflow-hidden opacity-85 md:max-lg:gap-2">
         {data ? (
           <>
             <MetricItem

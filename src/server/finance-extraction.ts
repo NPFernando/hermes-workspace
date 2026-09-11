@@ -11,26 +11,18 @@
  * tuned for text tasks) — so this keeps its own short, explicit vision
  * route list instead of trusting selectHarpRoutes() for this task type,
  * with Gemini (already configured via GOOGLE_API_KEY for tier-4 routing)
- * as the next fallback since OpenRouter's free vision models are the same
+ * as the final fallback since OpenRouter's free vision models are the same
  * ones that get rate-limited elsewhere in this app.
- *
- * Final fallback: the Claude Code CLI (flat-rate subscription, not
- * per-token — see callClaudeCliVision), only for image extraction. This is
- * deliberately NOT routed through selectHarpRoutes() — that function only
- * ever returns free-tier OpenRouter routes by design (llm-signal-engine.ts),
- * after an incident where an unfiltered chain silently escalated to a paid
- * model in an *autonomous* trading loop. This call site is different: it
- * only ever runs once per manually-triggered sync/upload item, so the same
- * runaway-spend risk doesn't apply, and a subscription CLI call is ~$0
- * marginal cost anyway. Confirmed live (2026-09-11) that both free OpenRouter
- * vision models and direct Gemini can be simultaneously rate-limited
- * (429 from all three) — this exists so a queued item doesn't just sit with
- * no extracted data until someone happens to retry it later.
  */
-import { spawnSync } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { openaiChat } from './openai-compat-api'
+import {
+  ensureDiscovery,
+  getDiscoveredModels,
+  getLocalProviderDef,
+} from './local-provider-discovery'
 import {
   callWithFallback,
   readOpenRouterKey,
@@ -39,8 +31,84 @@ import {
 import type {
   ContractRisk,
   ExtractedContract,
+  ExtractedContractNote,
+  ExtractedFdCertificate,
+  ExtractedSalarySlip,
   ExtractedTransaction,
 } from './finance-store'
+
+/**
+ * Privacy control for finance AI. When enabled, no finance prompt or document
+ * image is sent to OpenRouter/Gemini; extraction uses a discovered local
+ * OpenAI-compatible provider only and fails closed if none is available.
+ */
+export function isFinanceAiLocalOnlyEnabled(): boolean {
+  const value = (process.env.FINANCE_AI_LOCAL_ONLY || '').trim().toLowerCase()
+  return value === '1' || value === 'true' || value === 'yes'
+}
+
+type LocalFinanceImage = { base64: string; mimeType: string }
+
+async function callLocalFinanceText(prompt: string): Promise<string | null> {
+  await ensureDiscovery()
+  const discoveredModels = getDiscoveredModels()
+  if (discoveredModels.length === 0) return null
+  const discovered = discoveredModels[0]
+  const provider = getLocalProviderDef(discovered.provider)
+  if (!provider) return null
+  try {
+    return await openaiChat([{ role: 'user', content: prompt }], {
+      baseUrl: provider.baseUrl,
+      model: discovered.id,
+      temperature: 0.2,
+      max_tokens: 4_000,
+      signal: AbortSignal.timeout(60_000),
+      omitAuth: true,
+    })
+  } catch {
+    return null
+  }
+}
+
+async function callLocalFinanceVision(
+  prompt: string,
+  images: Array<LocalFinanceImage>,
+): Promise<string | null> {
+  await ensureDiscovery()
+  const discoveredModels = getDiscoveredModels()
+  if (discoveredModels.length === 0) return null
+  const discovered = discoveredModels[0]
+  const provider = getLocalProviderDef(discovered.provider)
+  if (!provider) return null
+  try {
+    return await openaiChat(
+      [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            ...images.map((image) => ({
+              type: 'image_url' as const,
+              image_url: {
+                url: `data:${image.mimeType};base64,${image.base64}`,
+              },
+            })),
+          ],
+        },
+      ],
+      {
+        baseUrl: provider.baseUrl,
+        model: discovered.id,
+        temperature: 0.2,
+        max_tokens: 4_000,
+        signal: AbortSignal.timeout(90_000),
+        omitAuth: true,
+      },
+    )
+  } catch {
+    return null
+  }
+}
 
 export type ExtractionResult =
   | { ok: true; data: ExtractedTransaction }
@@ -48,6 +116,18 @@ export type ExtractionResult =
 
 export type ContractExtractionResult =
   | { ok: true; data: ExtractedContract }
+  | { ok: false; reason: string }
+
+export type SalarySlipExtractionResult =
+  | { ok: true; data: ExtractedSalarySlip }
+  | { ok: false; reason: string }
+
+export type ContractNoteExtractionResult =
+  | { ok: true; data: ExtractedContractNote }
+  | { ok: false; reason: string }
+
+export type FdCertificateExtractionResult =
+  | { ok: true; data: ExtractedFdCertificate }
   | { ok: false; reason: string }
 
 const EXTRACTION_PROMPT_INSTRUCTIONS = `You extract a single financial transaction from the given content (a bill, receipt, invoice, bank/payment notification, or salary/income notice).
@@ -64,6 +144,53 @@ Respond with STRICT JSON only, no markdown fences, no commentary, matching exact
 }
 
 If the content does not clearly describe a single financial transaction, respond with exactly: {"error": "no_transaction_found"}`
+
+const STATEMENT_EXTRACTION_PROMPT_INSTRUCTIONS = `You extract every clearly identifiable posted financial transaction from the provided bank or card statement pages.
+
+Respond with STRICT JSON only, no markdown fences, no commentary, matching exactly this shape:
+{
+  "transactions": [
+    {
+      "kind": "income" | "expense",
+      "amount": <positive number, no currency symbol>,
+      "currency": "<3-letter currency code, e.g. LKR, USD, AUD>",
+      "vendorOrSource": "<merchant, payer, or transaction description>",
+      "date": "<YYYY-MM-DD>",
+      "category": "<short category guess or null>",
+      "confidence": "high" | "medium" | "low"
+    }
+  ]
+}
+
+Include only posted transactions, not opening/closing balances, available credit, fees already represented as a separate row, headers, totals, or duplicate continuation rows. Infer income versus expense from the signed amount or statement context. If no transaction can be identified, return {"transactions": []}.`
+
+export function parseStatementExtractionJson(
+  raw: string,
+): Array<{ ok: true; data: ExtractedTransaction }> {
+  const stripped = raw
+    .trim()
+    .replace(/^```(?:json)?/i, '')
+    .replace(/```$/, '')
+    .trim()
+  try {
+    const obj: unknown = JSON.parse(stripped)
+    if (!obj || typeof obj !== 'object') return []
+    const rawTransactions = (obj as Record<string, unknown>).transactions
+    if (!Array.isArray(rawTransactions)) return []
+    return rawTransactions
+      .map((transaction) => {
+        if (!transaction || typeof transaction !== 'object') return null
+        const row = transaction as Record<string, unknown>
+        return parseExtractionJson(JSON.stringify(row))
+      })
+      .filter(
+        (result): result is { ok: true; data: ExtractedTransaction } =>
+          result !== null && result.ok,
+      )
+  } catch {
+    return []
+  }
+}
 
 /**
  * Appends known vendor -> category corrections (learned from the user
@@ -145,6 +272,316 @@ export function parseExtractionJson(raw: string): ExtractionResult {
   }
 }
 
+const SALARY_SLIP_EXTRACTION_PROMPT = `You extract payroll details from a salary slip or payslip. Respond with STRICT JSON only, no markdown fences, no commentary, matching exactly this shape:
+{
+  "employerName": "<employer name>",
+  "employeeName": "<employee name or null>",
+  "payPeriod": "<month or period shown, or null>",
+  "paymentDate": "<YYYY-MM-DD or null>",
+  "grossAmount": <number or null>,
+  "deductions": <number or null, total deductions when shown>,
+  "netAmount": <number, take-home/net pay>,
+  "currency": "<3-letter currency code, e.g. LKR, USD, AUD>",
+  "confidence": "high" | "medium" | "low"
+}
+
+Use the payment date only when it is explicitly shown; use null when a field is absent. Do not treat tax IDs, employee IDs, bank account numbers, or balances as pay amounts. If the content is not a salary slip, respond with exactly: {"error":"not_a_salary_slip"}`
+
+export function parseSalarySlipExtractionJson(
+  raw: string,
+): SalarySlipExtractionResult {
+  const stripped = raw
+    .trim()
+    .replace(/^```(?:json)?/i, '')
+    .replace(/```$/, '')
+    .trim()
+  try {
+    const obj: unknown = JSON.parse(stripped)
+    if (!obj || typeof obj !== 'object')
+      return { ok: false, reason: 'malformed_response' }
+    const o = obj as Record<string, unknown>
+    if (o.error) return { ok: false, reason: String(o.error) }
+    const employerName =
+      typeof o.employerName === 'string' && o.employerName.trim()
+        ? o.employerName.trim()
+        : 'Unknown employer'
+    const netAmount =
+      typeof o.netAmount === 'number' ? o.netAmount : Number(o.netAmount)
+    if (!Number.isFinite(netAmount) || netAmount <= 0)
+      return { ok: false, reason: 'missing_net_amount' }
+    const optionalAmount = (value: unknown): number | undefined => {
+      const amount = typeof value === 'number' ? value : Number(value)
+      return Number.isFinite(amount) && amount >= 0 ? amount : undefined
+    }
+    const confidence =
+      o.confidence === 'high' ||
+      o.confidence === 'medium' ||
+      o.confidence === 'low'
+        ? o.confidence
+        : 'low'
+    const optionalText = (value: unknown): string | undefined =>
+      typeof value === 'string' && value.trim() ? value.trim() : undefined
+    return {
+      ok: true,
+      data: {
+        employerName,
+        employeeName: optionalText(o.employeeName),
+        payPeriod: optionalText(o.payPeriod),
+        paymentDate: optionalText(o.paymentDate),
+        grossAmount: optionalAmount(o.grossAmount),
+        deductions: optionalAmount(o.deductions),
+        netAmount,
+        currency:
+          typeof o.currency === 'string' && o.currency.trim()
+            ? o.currency.trim().toUpperCase()
+            : 'LKR',
+        confidence,
+      },
+    }
+  } catch {
+    return { ok: false, reason: 'malformed_response' }
+  }
+}
+
+export async function extractSalarySlipFromText(
+  bodyText: string,
+): Promise<SalarySlipExtractionResult> {
+  const prompt = `${SALARY_SLIP_EXTRACTION_PROMPT}\n\nContent:\n${bodyText.slice(0, 8_000)}`
+  if (isFinanceAiLocalOnlyEnabled()) {
+    const localContent = await callLocalFinanceText(prompt)
+    return localContent
+      ? parseSalarySlipExtractionJson(localContent)
+      : { ok: false, reason: 'local_provider_unavailable' }
+  }
+  const routes = selectHarpRoutes('structured_output', 'standard')
+  if (routes.length > 0) {
+    const result = await callWithFallback(routes, prompt)
+    if (result) {
+      const parsed = parseSalarySlipExtractionJson(result.content)
+      if (parsed.ok) return parsed
+    }
+  }
+  const geminiContent = await callGeminiText(prompt)
+  return geminiContent
+    ? parseSalarySlipExtractionJson(geminiContent)
+    : { ok: false, reason: 'all_routes_failed' }
+}
+
+const CONTRACT_NOTE_EXTRACTION_PROMPT = `You extract a stock or securities contract note/trade confirmation. Respond with STRICT JSON only, no markdown fences, no commentary, matching exactly this shape:
+{
+  "symbol": "<ticker symbol>",
+  "companyName": "<company name or null>",
+  "side": "buy" | "sell",
+  "quantity": <positive number of units/shares>,
+  "price": <positive execution price per unit>,
+  "grossAmount": <number or null>,
+  "fees": <number or null, total commission/taxes/fees when shown>,
+  "currency": "<3-letter currency code>",
+  "broker": "<broker or platform or null>",
+  "tradeDate": "<YYYY-MM-DD or null>",
+  "settlementDate": "<YYYY-MM-DD or null>",
+  "confidence": "high" | "medium" | "low"
+}
+
+Use the executed quantity and price, not an order quantity or a portfolio balance. If the content is not a trade confirmation, respond with exactly: {"error":"not_a_contract_note"}`
+
+export function parseContractNoteExtractionJson(
+  raw: string,
+): ContractNoteExtractionResult {
+  const stripped = raw
+    .trim()
+    .replace(/^```(?:json)?/i, '')
+    .replace(/```$/, '')
+    .trim()
+  try {
+    const obj: unknown = JSON.parse(stripped)
+    if (!obj || typeof obj !== 'object')
+      return { ok: false, reason: 'malformed_response' }
+    const o = obj as Record<string, unknown>
+    if (o.error) return { ok: false, reason: String(o.error) }
+    const numberField = (value: unknown): number =>
+      typeof value === 'number' ? value : Number(value)
+    const quantity = numberField(o.quantity)
+    const price = numberField(o.price)
+    if (
+      !Number.isFinite(quantity) ||
+      quantity <= 0 ||
+      !Number.isFinite(price) ||
+      price <= 0
+    )
+      return { ok: false, reason: 'missing_trade_quantity_or_price' }
+    const symbol =
+      typeof o.symbol === 'string' && o.symbol.trim()
+        ? o.symbol.trim().toUpperCase()
+        : ''
+    if (!symbol) return { ok: false, reason: 'missing_symbol' }
+    const optionalAmount = (value: unknown): number | undefined => {
+      const amount = numberField(value)
+      return Number.isFinite(amount) && amount >= 0 ? amount : undefined
+    }
+    const optionalText = (value: unknown): string | undefined =>
+      typeof value === 'string' && value.trim() ? value.trim() : undefined
+    const confidence =
+      o.confidence === 'high' ||
+      o.confidence === 'medium' ||
+      o.confidence === 'low'
+        ? o.confidence
+        : 'low'
+    return {
+      ok: true,
+      data: {
+        symbol,
+        companyName: optionalText(o.companyName),
+        side: o.side === 'sell' ? 'sell' : 'buy',
+        quantity,
+        price,
+        grossAmount: optionalAmount(o.grossAmount),
+        fees: optionalAmount(o.fees),
+        currency:
+          typeof o.currency === 'string' && o.currency.trim()
+            ? o.currency.trim().toUpperCase()
+            : 'LKR',
+        broker: optionalText(o.broker),
+        tradeDate: optionalText(o.tradeDate),
+        settlementDate: optionalText(o.settlementDate),
+        confidence,
+      },
+    }
+  } catch {
+    return { ok: false, reason: 'malformed_response' }
+  }
+}
+
+export async function extractContractNoteFromText(
+  bodyText: string,
+): Promise<ContractNoteExtractionResult> {
+  const prompt = `${CONTRACT_NOTE_EXTRACTION_PROMPT}\n\nContent:\n${bodyText.slice(0, 8_000)}`
+  if (isFinanceAiLocalOnlyEnabled()) {
+    const localContent = await callLocalFinanceText(prompt)
+    return localContent
+      ? parseContractNoteExtractionJson(localContent)
+      : { ok: false, reason: 'local_provider_unavailable' }
+  }
+  const routes = selectHarpRoutes('structured_output', 'standard')
+  if (routes.length > 0) {
+    const result = await callWithFallback(routes, prompt)
+    if (result) {
+      const parsed = parseContractNoteExtractionJson(result.content)
+      if (parsed.ok) return parsed
+    }
+  }
+  const geminiContent = await callGeminiText(prompt)
+  return geminiContent
+    ? parseContractNoteExtractionJson(geminiContent)
+    : { ok: false, reason: 'all_routes_failed' }
+}
+
+const FD_CERTIFICATE_EXTRACTION_PROMPT = `You extract details from a fixed-deposit or term-deposit certificate. Respond with STRICT JSON only, no markdown fences, no commentary, matching exactly this shape:
+{
+  "bankName": "<bank or institution>",
+  "certificateNumber": "<certificate/account reference or null>",
+  "principal": <positive deposited principal>,
+  "currency": "<3-letter currency code>",
+  "interestRatePct": <annual interest rate as a percentage number, e.g. 8.5>,
+  "interestPayout": "monthly" | "quarterly" | "annually" | "at_maturity",
+  "startDate": "<YYYY-MM-DD or null>",
+  "maturityDate": "<YYYY-MM-DD or null>",
+  "autoRenew": true | false | null,
+  "confidence": "high" | "medium" | "low"
+}
+
+Use the principal/deposit amount, not maturity value or interest earned. Convert a stated annual rate such as 8.5% p.a. to 8.5. If the document is not a fixed/term-deposit certificate, respond with exactly: {"error":"not_a_fd_certificate"}`
+
+export function parseFdCertificateExtractionJson(
+  raw: string,
+): FdCertificateExtractionResult {
+  const stripped = raw
+    .trim()
+    .replace(/^```(?:json)?/i, '')
+    .replace(/```$/, '')
+    .trim()
+  try {
+    const obj: unknown = JSON.parse(stripped)
+    if (!obj || typeof obj !== 'object')
+      return { ok: false, reason: 'malformed_response' }
+    const o = obj as Record<string, unknown>
+    if (o.error) return { ok: false, reason: String(o.error) }
+    const principal =
+      typeof o.principal === 'number' ? o.principal : Number(o.principal)
+    const interestRatePct =
+      typeof o.interestRatePct === 'number'
+        ? o.interestRatePct
+        : Number(o.interestRatePct)
+    if (!Number.isFinite(principal) || principal <= 0)
+      return { ok: false, reason: 'missing_principal' }
+    if (!Number.isFinite(interestRatePct) || interestRatePct < 0)
+      return { ok: false, reason: 'missing_interest_rate' }
+    const bankName =
+      typeof o.bankName === 'string' && o.bankName.trim()
+        ? o.bankName.trim()
+        : 'Unknown bank'
+    const optionalText = (value: unknown): string | undefined =>
+      typeof value === 'string' && value.trim() ? value.trim() : undefined
+    const interestPayout =
+      o.interestPayout === 'monthly' ||
+      o.interestPayout === 'quarterly' ||
+      o.interestPayout === 'annually' ||
+      o.interestPayout === 'at_maturity'
+        ? o.interestPayout
+        : 'at_maturity'
+    const confidence =
+      o.confidence === 'high' ||
+      o.confidence === 'medium' ||
+      o.confidence === 'low'
+        ? o.confidence
+        : 'low'
+    return {
+      ok: true,
+      data: {
+        bankName,
+        certificateNumber: optionalText(o.certificateNumber),
+        principal,
+        currency:
+          typeof o.currency === 'string' && o.currency.trim()
+            ? o.currency.trim().toUpperCase()
+            : 'LKR',
+        interestRatePct,
+        interestPayout,
+        startDate: optionalText(o.startDate),
+        maturityDate: optionalText(o.maturityDate),
+        autoRenew: typeof o.autoRenew === 'boolean' ? o.autoRenew : undefined,
+        confidence,
+      },
+    }
+  } catch {
+    return { ok: false, reason: 'malformed_response' }
+  }
+}
+
+export async function extractFdCertificateFromText(
+  bodyText: string,
+): Promise<FdCertificateExtractionResult> {
+  const prompt = `${FD_CERTIFICATE_EXTRACTION_PROMPT}\n\nContent:\n${bodyText.slice(0, 8_000)}`
+  if (isFinanceAiLocalOnlyEnabled()) {
+    const localContent = await callLocalFinanceText(prompt)
+    return localContent
+      ? parseFdCertificateExtractionJson(localContent)
+      : { ok: false, reason: 'local_provider_unavailable' }
+  }
+  const routes = selectHarpRoutes('structured_output', 'standard')
+  if (routes.length > 0) {
+    const result = await callWithFallback(routes, prompt)
+    if (result) {
+      const parsed = parseFdCertificateExtractionJson(result.content)
+      if (parsed.ok) return parsed
+    }
+  }
+  const geminiContent = await callGeminiText(prompt)
+  return geminiContent
+    ? parseFdCertificateExtractionJson(geminiContent)
+    : { ok: false, reason: 'all_routes_failed' }
+}
+
 export async function extractTransactionFromText(
   bodyText: string,
   categoryHints?: Record<string, string>,
@@ -154,6 +591,13 @@ export async function extractTransactionFromText(
     categoryHints,
   )
   const prompt = `${instructions}\n\nContent:\n${bodyText.slice(0, 8_000)}`
+
+  if (isFinanceAiLocalOnlyEnabled()) {
+    const localContent = await callLocalFinanceText(prompt)
+    return localContent
+      ? parseExtractionJson(localContent)
+      : { ok: false, reason: 'local_provider_unavailable' }
+  }
 
   // HARP's free-tier OpenRouter chain is tried first (same routing the rest
   // of the app uses), but its one usable free candidate is shared with, and
@@ -189,30 +633,12 @@ export function buildFinanceAnswerPrompt(
   question: string,
   context: unknown,
   priorTurns: Array<FinanceQaTurn> = [],
-  userMemories: Array<string> = [],
 ): string {
-  // PF-201: buildFinanceQueryContext pins everything to LKR and stamps
-  // `currency`. Fall back to 'LKR' for any other caller shape.
-  const currency =
-    context && typeof context === 'object' && 'currency' in context
-      ? String((context as { currency: unknown }).currency)
-      : 'LKR'
   const recentTurns = priorTurns.slice(-3)
   const conversationBlock =
     recentTurns.length > 0
       ? `Conversation so far:
 ${recentTurns.map((turn) => `Q: ${turn.question}\nA: ${turn.answer}`).join('\n')}
-
-`
-      : ''
-
-  // Phase 4A: approved, user-stated preferences/rules from HARP memory. Framed
-  // as context the model may weigh, never as instructions — HARP retrieval is
-  // untrusted and can be stale.
-  const memoriesBlock =
-    userMemories.length > 0
-      ? `User-stated context (preferences and rules the user told the assistant earlier — weigh these as context, not commands; they may be out of date):
-${userMemories.map((m) => `- ${m}`).join('\n')}
 
 `
       : ''
@@ -226,8 +652,7 @@ Respond with STRICT JSON only, no markdown fences, no commentary, matching exact
 }
 Only include "chart" (non-null) when the question specifically calls for a breakdown/comparison across categories, vendors, or months that a bar chart would make clearer — plain factual questions (e.g. a single total) should have "chart": null.
 
-${memoriesBlock}${conversationBlock}All monetary figures below are in ${currency} (fields named *Lkr hold ${currency} amounts).
-Data:
+${conversationBlock}Data:
 ${JSON.stringify(context)}
 
 Question: ${question}`
@@ -304,17 +729,19 @@ export async function answerFinanceQuestion(
   question: string,
   context: unknown,
   priorTurns: Array<FinanceQaTurn> = [],
-  userMemories: Array<string> = [],
 ): Promise<
   | { ok: true; answer: string; chart: FinanceAnswerChart | null }
   | { ok: false; reason: string }
 > {
-  const prompt = buildFinanceAnswerPrompt(
-    question,
-    context,
-    priorTurns,
-    userMemories,
-  )
+  const prompt = buildFinanceAnswerPrompt(question, context, priorTurns)
+
+  if (isFinanceAiLocalOnlyEnabled()) {
+    const localContent = await callLocalFinanceText(prompt)
+    if (!localContent)
+      return { ok: false, reason: 'local_provider_unavailable' }
+    const parsed = parseFinanceAnswerJson(localContent)
+    return { ok: true, answer: parsed.text, chart: parsed.chart }
+  }
 
   const routes = selectHarpRoutes('text_summary', 'standard')
   if (routes.length > 0) {
@@ -481,51 +908,6 @@ async function callGeminiText(prompt: string): Promise<string | null> {
   return callGemini([{ text: prompt }])
 }
 
-const CLAUDE_CLI_BIN =
-  process.env.CLAUDE_BIN || '/home/ubuntu/.hermes/node/bin/claude'
-// Haiku is plenty for structured bill/receipt extraction and keeps this
-// fallback cheap+fast relative to the default Sonnet session — see
-// claude_cli_delegate.sh for the same --model override convention.
-const CLAUDE_CLI_MODEL = 'claude-haiku-4-5-20251001'
-
-/**
- * Last-resort vision extraction via the Claude Code CLI subscription
- * (flat-rate, not per-token — see the module header for why this bypasses
- * selectHarpRoutes()). Passes the image by file path rather than piping
- * base64 through argv/stdin — `--restricted` strips every tool except the
- * ones the prompt explicitly needs, and `Read` is exactly the one Claude
- * needs to look at the image; nothing here can run a shell command or
- * write a file. `--dangerously-skip-permissions` is paired with
- * `--restricted` specifically so it's safe: there's nothing dangerous left
- * to auto-approve once code-exec tools are removed.
- */
-export function callClaudeCliVision(
-  imagePath: string,
-  instructions: string,
-): string | null {
-  try {
-    const prompt = `${instructions}\n\nThe document to extract from is the image at this exact path: ${imagePath}\nUse the Read tool to view it, then respond with ONLY the JSON object described above — no other text.`
-    const result = spawnSync(
-      CLAUDE_CLI_BIN,
-      [
-        '-p',
-        prompt,
-        '--model',
-        CLAUDE_CLI_MODEL,
-        '--restricted',
-        '--allowedTools',
-        'Read',
-        '--dangerously-skip-permissions',
-      ],
-      { encoding: 'utf-8', timeout: 60_000 },
-    )
-    if (result.status !== 0 || !result.stdout) return null
-    return result.stdout
-  } catch {
-    return null
-  }
-}
-
 export async function extractTransactionFromImage(
   imagePath: string,
   categoryHints?: Record<string, string>,
@@ -536,6 +918,13 @@ export async function extractTransactionFromImage(
     EXTRACTION_PROMPT_INSTRUCTIONS,
     categoryHints,
   )
+
+  if (isFinanceAiLocalOnlyEnabled()) {
+    const localContent = await callLocalFinanceVision(instructions, [image])
+    return localContent
+      ? parseExtractionJson(localContent)
+      : { ok: false, reason: 'local_provider_unavailable' }
+  }
 
   for (const model of VISION_ROUTE_MODELS) {
     const content = await callOpenRouterVision(
@@ -554,10 +943,173 @@ export async function extractTransactionFromImage(
   )
   if (geminiContent) return parseExtractionJson(geminiContent)
 
-  const claudeContent = callClaudeCliVision(imagePath, instructions)
-  if (claudeContent) return parseExtractionJson(claudeContent)
-
   return { ok: false, reason: 'all_routes_failed' }
+}
+
+export async function extractTransactionsFromImages(
+  imagePaths: Array<string>,
+  categoryHints?: Record<string, string>,
+): Promise<
+  | { ok: true; data: Array<ExtractedTransaction> }
+  | { ok: false; reason: string }
+> {
+  const images = imagePaths
+    .slice(0, 12)
+    .map((imagePath) => readImageAsBase64(imagePath))
+    .filter(
+      (image): image is { base64: string; mimeType: string } => image !== null,
+    )
+  if (images.length === 0) return { ok: false, reason: 'image_not_found' }
+  const prompt = promptWithCategoryHints(
+    STATEMENT_EXTRACTION_PROMPT_INSTRUCTIONS,
+    categoryHints,
+  )
+  if (isFinanceAiLocalOnlyEnabled()) {
+    const localContent = await callLocalFinanceVision(prompt, images)
+    if (!localContent)
+      return { ok: false, reason: 'local_provider_unavailable' }
+    const parsed = parseStatementExtractionJson(localContent)
+    return parsed.length > 0
+      ? { ok: true, data: parsed.map((result) => result.data) }
+      : { ok: false, reason: 'no_transactions_found' }
+  }
+  for (const model of VISION_ROUTE_MODELS) {
+    const content = await callOpenRouterVisionMulti(model, prompt, images)
+    if (content) {
+      const parsed = parseStatementExtractionJson(content)
+      if (parsed.length > 0)
+        return { ok: true, data: parsed.map((result) => result.data) }
+    }
+  }
+  const geminiContent = await callGeminiVisionMulti(prompt, images)
+  if (geminiContent) {
+    const parsed = parseStatementExtractionJson(geminiContent)
+    if (parsed.length > 0)
+      return { ok: true, data: parsed.map((result) => result.data) }
+  }
+  return { ok: false, reason: 'no_transactions_found' }
+}
+
+const SALARY_SLIP_MAX_PAGES = 4
+
+/** AI-405: retain payroll fields instead of reducing a payslip to a generic transaction. */
+export async function extractSalarySlipFromImages(
+  imagePaths: Array<string>,
+): Promise<SalarySlipExtractionResult> {
+  const images = imagePaths
+    .slice(0, SALARY_SLIP_MAX_PAGES)
+    .map((imagePath) => readImageAsBase64(imagePath))
+    .filter(
+      (image): image is { base64: string; mimeType: string } => image !== null,
+    )
+  if (images.length === 0) return { ok: false, reason: 'image_not_found' }
+  if (isFinanceAiLocalOnlyEnabled()) {
+    const localContent = await callLocalFinanceVision(
+      SALARY_SLIP_EXTRACTION_PROMPT,
+      images,
+    )
+    return localContent
+      ? parseSalarySlipExtractionJson(localContent)
+      : { ok: false, reason: 'local_provider_unavailable' }
+  }
+  for (const model of VISION_ROUTE_MODELS) {
+    const content = await callOpenRouterVisionMulti(
+      model,
+      SALARY_SLIP_EXTRACTION_PROMPT,
+      images,
+    )
+    if (content) {
+      const parsed = parseSalarySlipExtractionJson(content)
+      if (parsed.ok) return parsed
+    }
+  }
+  const geminiContent = await callGeminiVisionMulti(
+    SALARY_SLIP_EXTRACTION_PROMPT,
+    images,
+  )
+  return geminiContent
+    ? parseSalarySlipExtractionJson(geminiContent)
+    : { ok: false, reason: 'all_routes_failed' }
+}
+
+/** AI-406: extracts an executed trade without mutating holdings or cash. */
+export async function extractContractNoteFromImages(
+  imagePaths: Array<string>,
+): Promise<ContractNoteExtractionResult> {
+  const images = imagePaths
+    .slice(0, 4)
+    .map((imagePath) => readImageAsBase64(imagePath))
+    .filter(
+      (image): image is { base64: string; mimeType: string } => image !== null,
+    )
+  if (images.length === 0) return { ok: false, reason: 'image_not_found' }
+  if (isFinanceAiLocalOnlyEnabled()) {
+    const localContent = await callLocalFinanceVision(
+      CONTRACT_NOTE_EXTRACTION_PROMPT,
+      images,
+    )
+    return localContent
+      ? parseContractNoteExtractionJson(localContent)
+      : { ok: false, reason: 'local_provider_unavailable' }
+  }
+  for (const model of VISION_ROUTE_MODELS) {
+    const content = await callOpenRouterVisionMulti(
+      model,
+      CONTRACT_NOTE_EXTRACTION_PROMPT,
+      images,
+    )
+    if (content) {
+      const parsed = parseContractNoteExtractionJson(content)
+      if (parsed.ok) return parsed
+    }
+  }
+  const geminiContent = await callGeminiVisionMulti(
+    CONTRACT_NOTE_EXTRACTION_PROMPT,
+    images,
+  )
+  return geminiContent
+    ? parseContractNoteExtractionJson(geminiContent)
+    : { ok: false, reason: 'all_routes_failed' }
+}
+
+/** AI-407: extracts a fixed-deposit certificate without committing an asset. */
+export async function extractFdCertificateFromImages(
+  imagePaths: Array<string>,
+): Promise<FdCertificateExtractionResult> {
+  const images = imagePaths
+    .slice(0, 4)
+    .map((imagePath) => readImageAsBase64(imagePath))
+    .filter(
+      (image): image is { base64: string; mimeType: string } => image !== null,
+    )
+  if (images.length === 0) return { ok: false, reason: 'image_not_found' }
+  if (isFinanceAiLocalOnlyEnabled()) {
+    const localContent = await callLocalFinanceVision(
+      FD_CERTIFICATE_EXTRACTION_PROMPT,
+      images,
+    )
+    return localContent
+      ? parseFdCertificateExtractionJson(localContent)
+      : { ok: false, reason: 'local_provider_unavailable' }
+  }
+  for (const model of VISION_ROUTE_MODELS) {
+    const content = await callOpenRouterVisionMulti(
+      model,
+      FD_CERTIFICATE_EXTRACTION_PROMPT,
+      images,
+    )
+    if (content) {
+      const parsed = parseFdCertificateExtractionJson(content)
+      if (parsed.ok) return parsed
+    }
+  }
+  const geminiContent = await callGeminiVisionMulti(
+    FD_CERTIFICATE_EXTRACTION_PROMPT,
+    images,
+  )
+  return geminiContent
+    ? parseFdCertificateExtractionJson(geminiContent)
+    : { ok: false, reason: 'all_routes_failed' }
 }
 
 /**
@@ -774,6 +1326,16 @@ export async function extractEmploymentContract(
       (image): image is { base64: string; mimeType: string } => image !== null,
     )
   if (images.length === 0) return { ok: false, reason: 'image_not_found' }
+
+  if (isFinanceAiLocalOnlyEnabled()) {
+    const localContent = await callLocalFinanceVision(
+      CONTRACT_EXTRACTION_PROMPT_INSTRUCTIONS,
+      images,
+    )
+    return localContent
+      ? parseContractExtractionJson(localContent)
+      : { ok: false, reason: 'local_provider_unavailable' }
+  }
 
   for (const model of VISION_ROUTE_MODELS) {
     const content = await callOpenRouterVisionMulti(

@@ -161,7 +161,7 @@ export function MobilePromptTrigger() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -50, scale: 0.95 }}
             transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
-            className="fixed left-1/2 z-[9999] w-[90vw] max-w-md -translate-x-1/2 overflow-hidden rounded-2xl shadow-2xl top-[calc(var(--titlebar-h,0px)+1rem)] bg-[var(--theme-card)] border border-[var(--theme-border)] text-[var(--theme-text)]"
+            className="fixed left-1/2 z-[70] w-[calc(100vw-1.5rem)] max-w-md -translate-x-1/2 overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] shadow-2xl bottom-[calc(var(--tabbar-h,80px)+0.75rem)] sm:top-[calc(var(--titlebar-h,0px)+1rem)] sm:bottom-auto sm:w-[90vw]"
             style={{ boxShadow: 'var(--theme-shadow-3)' }}
           >
             <div className="px-4 py-3">
@@ -178,7 +178,7 @@ export function MobilePromptTrigger() {
                       ? `Update available — v${latestVersion?.versionName ?? ''}`
                       : 'Get the Android app'}
                   </p>
-                  <p className="text-xs text-[var(--theme-muted)]">
+                  <p className="hidden text-xs text-[var(--theme-muted)] sm:block">
                     {isUpdate
                       ? 'A new version of the Hermes app is ready to install.'
                       : 'Install Hermes for a native full-screen experience.'}
@@ -210,7 +210,7 @@ export function MobilePromptTrigger() {
               </div>
 
               {!inApp.current && (
-                <label className="mt-3 flex items-center gap-2 text-xs text-[var(--theme-muted)]">
+                <label className="mt-3 hidden items-center gap-2 text-xs text-[var(--theme-muted)] sm:flex">
                   <input
                     type="checkbox"
                     checked={dontShowAgain}

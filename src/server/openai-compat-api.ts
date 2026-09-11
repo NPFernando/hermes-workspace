@@ -26,7 +26,11 @@ export function getBearerToken(): string {
   // This bridges the gap for users who authenticated via `codex login`
   // but don't have HERMES_API_TOKEN configured.
   try {
-    const codexAuthPath = join(homedir(), '.codex', 'auth.json')
+    // Prefer the current environment value so isolated workers/tests and
+    // service accounts do not accidentally fall through to the operator's
+    // real home directory when HOME changes after module initialization.
+    const home = process.env.HOME?.trim() || homedir()
+    const codexAuthPath = join(home, '.codex', 'auth.json')
     if (existsSync(codexAuthPath)) {
       const auth = JSON.parse(readFileSync(codexAuthPath, 'utf-8')) as {
         tokens?: { access_token?: string }
@@ -92,6 +96,8 @@ export type OpenAIChatOptions = {
   sessionId?: string
   /** Override the base URL (e.g. for local providers). Bypasses gateway. */
   baseUrl?: string
+  /** Do not forward workspace credentials to a trusted local endpoint. */
+  omitAuth?: boolean
 }
 
 type OpenAIChatRequest = {
@@ -204,9 +210,9 @@ export async function* parseOpenAIStream(
   const decoder = new TextDecoder()
   let buffer = ''
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
+  let result = await reader.read()
+  while (!result.done) {
+    const value = result.value
 
     buffer += decoder.decode(value, { stream: true })
 
@@ -265,6 +271,7 @@ export async function* parseOpenAIStream(
 
       boundary = buffer.indexOf('\n\n')
     }
+    result = await reader.read()
   }
 }
 
@@ -281,7 +288,7 @@ export async function openaiChat(
   options: OpenAIChatOptions = {},
 ): Promise<string | AsyncGenerator<StreamChunkType, void, void>> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  const bearer = getBearerToken()
+  const bearer = options.omitAuth ? '' : getBearerToken()
   if (bearer) {
     headers['Authorization'] = `Bearer ${bearer}`
   }

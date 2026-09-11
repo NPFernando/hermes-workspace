@@ -32,10 +32,10 @@ export const Route = createFileRoute('/api/openrouter-credits')({
         }
 
         if (!apiKey) {
-          return jsonResponse(
-            { error: 'OPENROUTER_API_KEY not configured' },
-            503,
-          )
+          // Credits are an optional dashboard enhancement. Keep a missing
+          // provider configuration from becoming a noisy failed resource in
+          // the browser console or an error state for the whole workspace.
+          return jsonResponse({ available: false })
         }
 
         try {
@@ -44,10 +44,7 @@ export const Route = createFileRoute('/api/openrouter-credits')({
             signal: AbortSignal.timeout(10_000),
           })
           if (!resp.ok) {
-            return jsonResponse(
-              { error: `OpenRouter API error: ${resp.status}` },
-              502,
-            )
+            return jsonResponse({ available: false })
           }
           const data = (await resp.json()) as { data?: Record<string, unknown> }
           const d = data.data ?? {}
@@ -62,7 +59,9 @@ export const Route = createFileRoute('/api/openrouter-credits')({
 
           return jsonResponse({ total, used, remaining, level })
         } catch (err) {
-          return jsonResponse({ error: String(err) }, 502)
+          // Upstream outages should only hide this optional banner. Do not
+          // expose provider errors or turn them into page-level failures.
+          return jsonResponse({ available: false })
         }
       },
     },

@@ -84,7 +84,7 @@ const PROVIDERS = [
     id: 'anthropic',
     name: 'Anthropic',
     logo: '/providers/anthropic.png',
-    desc: 'API key required',
+    desc: 'Provider key required',
     authType: 'api_key',
     envKey: 'ANTHROPIC_API_KEY',
   },
@@ -92,7 +92,7 @@ const PROVIDERS = [
     id: 'openrouter',
     name: 'OpenRouter',
     logo: '/providers/openrouter.png',
-    desc: 'API key required',
+    desc: 'Provider key required',
     authType: 'api_key',
     envKey: 'OPENROUTER_API_KEY',
   },
@@ -112,9 +112,9 @@ const PROVIDERS = [
   },
   {
     id: 'custom',
-    name: 'Custom (OpenAI-compat)',
+    name: 'Custom compatible service',
     logo: '/providers/openai.png',
-    desc: 'Any OpenAI-compatible endpoint',
+    desc: 'Connect any compatible AI service',
     authType: 'custom',
   },
 ]
@@ -248,8 +248,8 @@ export function ClaudeOnboarding() {
         setBackendStatus('ready')
         setBackendMessage(
           data.capabilities.sessions
-            ? 'Backend connected. Core chat works, and Hermes Agent gateway enhancements are available.'
-            : 'Backend connected. Core chat is ready.',
+            ? 'AI service connected. Core chat works, and workspace features are available.'
+            : 'AI service connected. Core chat is ready.',
         )
         return
       }
@@ -257,13 +257,13 @@ export function ClaudeOnboarding() {
       if (data.capabilities?.health) {
         setBackendStatus('error')
         setBackendMessage(
-          'Backend is reachable, but /v1/chat/completions is not available yet.',
+          'AI service is reachable, but chat is not available yet.',
         )
         return
       }
 
       setBackendStatus('error')
-      setBackendMessage('No compatible backend detected yet.')
+      setBackendMessage('No compatible AI service detected yet.')
     } catch (err) {
       setBackendInfo(null)
       setBackendStatus('error')
@@ -358,7 +358,7 @@ export function ClaudeOnboarding() {
           sessionKey: 'new',
           friendlyId: 'new',
           message:
-            'Reply with one short sentence confirming the backend connection works.',
+            'Reply with one short sentence confirming the AI service connection works.',
         }),
       })
 
@@ -538,9 +538,8 @@ export function ClaudeOnboarding() {
               />
               <h2 className="text-xl font-bold">Welcome to Hermes Workspace</h2>
               <p className="text-sm" style={mutedStyle}>
-                Works with any OpenAI-compatible backend. Hermes Agent gateway
-                APIs unlock sessions, memory, skills, and other extras
-                automatically.
+                Connect a compatible AI service. Hermes Workspace adds sessions,
+                memory, skills, and other workspace features automatically.
               </p>
               <button
                 onClick={() => {
@@ -549,7 +548,7 @@ export function ClaudeOnboarding() {
                 }}
                 className="w-full rounded-xl bg-accent-500 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-600"
               >
-                Connect Backend
+                Connect AI Service
               </button>
               <button onClick={complete} className="text-xs" style={mutedStyle}>
                 Skip setup
@@ -560,10 +559,10 @@ export function ClaudeOnboarding() {
           {step === 'connect' && (
             <div className="space-y-4 text-center">
               <div className="text-4xl">🔌</div>
-              <h2 className="text-lg font-bold">Connect Your Backend</h2>
+              <h2 className="text-lg font-bold">Connect Your AI Service</h2>
               <p className="text-sm" style={mutedStyle}>
-                Start by verifying that Hermes Workspace can reach your
-                OpenAI-compatible backend.
+                Start by verifying that Hermes Workspace can reach your AI
+                service.
               </p>
 
               {backendStatus === 'checking' && (
@@ -572,7 +571,7 @@ export function ClaudeOnboarding() {
                   style={mutedStyle}
                 >
                   <span className="size-2 animate-pulse rounded-full bg-accent-500" />
-                  Checking backend capabilities...
+                  Checking service capabilities...
                 </div>
               )}
 
@@ -586,7 +585,7 @@ export function ClaudeOnboarding() {
                     className="rounded-xl p-3 text-left text-xs"
                     style={cardStyle}
                   >
-                    <p style={mutedStyle}>Backend URL</p>
+                    <p style={mutedStyle}>Service URL</p>
                     <p className="mt-1 font-mono">
                       {backendInfo?.claudeUrl || 'Configured automatically'}
                     </p>
@@ -605,13 +604,13 @@ export function ClaudeOnboarding() {
                     style={{ ...cardStyle, borderColor: 'var(--theme-border)' }}
                   >
                     <p className="font-medium text-white">
-                      Compatible backends
+                      Compatible AI services
                     </p>
                     <p className="mt-2" style={mutedStyle}>
-                      Use any backend that exposes{' '}
+                      Use any service that exposes{' '}
                       <code>/v1/chat/completions</code>. If you point Hermes
-                      Agent Workspace at a Hermes Agent gateway, enhanced
-                      features unlock automatically.
+                      Workspace at a Hermes service, enhanced features unlock
+                      automatically.
                     </p>
                     <div
                       className="mt-3 rounded-lg px-3 py-2 font-mono text-[11px]"
@@ -658,15 +657,15 @@ export function ClaudeOnboarding() {
               <p className="text-center text-xs" style={mutedStyle}>
                 {canEditConfig
                   ? 'Save provider settings here, then choose a model before testing chat.'
-                  : 'This backend manages provider settings outside Hermes Workspace. Confirm the model you expect to use, then test chat.'}
+                  : 'Your AI service manages provider settings outside Hermes Workspace. Confirm the model you expect to use, then test chat.'}
               </p>
 
               <div className="rounded-xl p-3 text-xs" style={cardStyle}>
-                <p style={mutedStyle}>Backend mode</p>
+                <p style={mutedStyle}>Service mode</p>
                 <p className="mt-1">
                   {backendInfo?.capabilities?.sessions
-                    ? 'Hermes Agent gateway detected'
-                    : 'Portable OpenAI-compatible backend'}
+                    ? 'Hermes Workspace service detected'
+                    : 'External compatible AI service'}
                 </p>
                 {configuredModel ? (
                   <p className="mt-2" style={mutedStyle}>
@@ -925,16 +924,16 @@ export function ClaudeOnboarding() {
                 )}
                 <p className="mt-2 text-xs" style={mutedStyle}>
                   {canFetchModels
-                    ? 'Models were fetched from the backend when available.'
-                    : 'If your backend does not expose /v1/models, enter the model name manually.'}
+                    ? 'Available models were loaded when possible.'
+                    : 'If your AI service does not list models, enter the model name manually.'}
                 </p>
               </div>
 
               {!canEditConfig ? (
                 <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-3 text-xs text-yellow-200">
-                  In-app provider editing is unavailable on this backend. That
-                  is optional. If the backend is already configured, continue to
-                  the chat test.
+                  Provider editing is unavailable here. That is optional; if
+                  your AI service is already configured, continue to the chat
+                  test.
                 </div>
               ) : null}
 
@@ -997,7 +996,7 @@ export function ClaudeOnboarding() {
                 className="rounded-xl p-3 text-left text-xs"
                 style={cardStyle}
               >
-                <p style={mutedStyle}>Backend</p>
+                <p style={mutedStyle}>AI service</p>
                 <p className="mt-1 font-mono">
                   {backendInfo?.claudeUrl || 'Configured automatically'}
                 </p>
@@ -1026,7 +1025,7 @@ export function ClaudeOnboarding() {
                   style={mutedStyle}
                 >
                   <span className="size-2 animate-pulse rounded-full bg-accent-500" />
-                  Waiting for the backend response...
+                  Waiting for the AI service response...
                 </div>
               ) : null}
 
@@ -1066,11 +1065,11 @@ export function ClaudeOnboarding() {
                       </p>
                     ) : testMessage.toLowerCase().includes('model') ? (
                       <p className="mt-2 text-xs text-yellow-400">
-                        Confirm the selected model exists on this backend.
+                        Confirm the selected model is available from your AI service.
                       </p>
                     ) : (
                       <p className="mt-2 text-xs text-yellow-400">
-                        Confirm the backend is running and still reachable from
+                        Confirm your AI service is running and reachable from
                         Hermes Workspace.
                       </p>
                     )}
@@ -1108,8 +1107,8 @@ export function ClaudeOnboarding() {
               <p className="text-sm" style={mutedStyle}>
                 Core chat is set up.{' '}
                 {enhancedFeatures.length > 0
-                  ? 'This backend also exposes Hermes Agent gateway enhancements.'
-                  : 'If you later connect a Hermes Agent gateway, enhanced features unlock automatically.'}
+                  ? 'Your AI service also supports enhanced workspace features.'
+                  : 'Enhanced workspace features will unlock automatically when supported.'}
               </p>
               <div
                 className="grid grid-cols-3 gap-2 text-xs"

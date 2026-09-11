@@ -3,7 +3,13 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { retainHindsight } from '../../../server/hindsight-client'
 
-import { safeErrorMessage } from '../../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../../server/rate-limit'
 
 export const Route = createFileRoute('/api/hindsight/retain')({
   server: {
@@ -11,6 +17,11 @@ export const Route = createFileRoute('/api/hindsight/retain')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`hindsight-retain:${getClientIp(request)}`, 30, 60_000)) {
+          return rateLimitResponse()
         }
         try {
           const body = (await request.json()) as {

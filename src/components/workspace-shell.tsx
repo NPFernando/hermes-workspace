@@ -25,7 +25,6 @@ import type { AuthStatus } from '@/lib/claude-auth'
 import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
 import { cn } from '@/lib/utils'
 import { ConnectionStartupScreen } from '@/components/connection-startup-screen'
-import { ChatSidebar } from '@/screens/chat/components/chat-sidebar'
 import { useChatSessions } from '@/screens/chat/hooks/use-chat-sessions'
 import { useWorkspaceStore } from '@/stores/workspace-store'
 import { SIDEBAR_TOGGLE_EVENT } from '@/hooks/use-global-shortcuts'
@@ -50,6 +49,14 @@ import { useSettings } from '@/hooks/use-settings'
 const ChatPanel = lazy(() =>
   import('@/components/chat-panel').then((m) => ({ default: m.ChatPanel })),
 )
+// The sidebar pulls in session actions, motion, tooltips, and profile UI. Keep
+// it out of the eager dashboard shell while preserving its desktop footprint
+// with the stable fallback below.
+const ChatSidebar = lazy(() =>
+  import('@/screens/chat/components/chat-sidebar').then((m) => ({
+    default: m.ChatSidebar,
+  })),
+)
 // ActivityTicker moved to dashboard-only (too noisy for global header)
 
 const TerminalWorkspace = lazy(() =>
@@ -59,13 +66,25 @@ const TerminalWorkspace = lazy(() =>
 )
 
 export const DESKTOP_SIDEBAR_BACKDROP_CLASS =
-  'fixed left-0 bottom-0 top-[var(--titlebar-h,0px)] w-[300px] z-10 bg-black/10 backdrop-blur-[1px]'
+  'fixed left-0 bottom-0 top-[var(--titlebar-h,0px)] w-[var(--desktop-sidebar-width)] z-10 bg-black/10 backdrop-blur-[1px]'
 
 type WorkspaceShellProps = {
   children?: React.ReactNode
+  /** Auth/gateway status already verified by the root bootstrap. */
+  initialAuthStatus?: AuthStatus | null
 }
 
-export function WorkspaceShell({ children }: WorkspaceShellProps) {
+export function shouldAdoptInitialAuthStatus(
+  initialAuthStatus: AuthStatus | null | undefined,
+  connectionVerified: boolean,
+): boolean {
+  return initialAuthStatus !== null && initialAuthStatus !== undefined && !connectionVerified
+}
+
+export function WorkspaceShell({
+  children,
+  initialAuthStatus = null,
+}: WorkspaceShellProps) {
   const navigate = useNavigate()
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
@@ -95,6 +114,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const { settings } = useSettings()
   const sidebarCollapsed = useWorkspaceStore((s) => s.sidebarCollapsed)
   const chatFocusMode = useWorkspaceStore((s) => s.chatFocusMode)
+  const chatPanelOpen = useWorkspaceStore((s) => s.chatPanelOpen)
   const toggleSidebar = useWorkspaceStore((s) => s.toggleSidebar)
   const setSidebarCollapsed = useWorkspaceStore((s) => s.setSidebarCollapsed)
   const { onTouchStart, onTouchMove, onTouchEnd } = useSwipeNavigation()
@@ -133,8 +153,12 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const isClient = typeof window !== 'undefined'
   // Both SSR and client start with the same value to avoid hydration mismatch.
   // The ConnectionStartupScreen overlay verifies the real status on mount.
-  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null)
-  const [connectionVerified, setConnectionVerified] = useState(false)
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(
+    initialAuthStatus,
+  )
+  const [connectionVerified, setConnectionVerified] = useState(
+    initialAuthStatus !== null,
+  )
 
   const authState = {
     checked: !isClient || connectionVerified,
@@ -146,6 +170,17 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     setAuthStatus(status)
     setConnectionVerified(true)
   }, [])
+
+  // RootLayout owns the first auth check and may finish after this shell has
+  // mounted. Adopt that result so the shell does not keep a second startup
+  // checker/overlay alive after the application is already ready.
+  useEffect(() => {
+    if (!shouldAdoptInitialAuthStatus(initialAuthStatus, connectionVerified)) {
+      return
+    }
+    setAuthStatus(initialAuthStatus)
+    setConnectionVerified(true)
+  }, [connectionVerified, initialAuthStatus])
 
   // Fallback startup verification in the shell itself.
   // This prevents a bad loading loop if the splash component gets stuck even
@@ -371,6 +406,12 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
 
   return (
     <>
+      <a
+        href="#main-content"
+        className="fixed left-3 top-3 z-[110] -translate-y-24 rounded-md bg-[var(--theme-accent)] px-3 py-2 text-xs font-semibold text-[var(--theme-on-accent,white)] shadow-lg transition-transform focus:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-text)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-bg)]"
+      >
+        Skip to main content
+      </a>
       <div
         className="relative overflow-hidden theme-bg theme-text"
         style={shellStyle}
@@ -410,28 +451,69 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
           {/* Persistent sidebar */}
           {!isMobile && !hideChatSidebar && (
             <div className="relative z-30">
-              <ChatSidebar
-                sessions={sessions}
-                activeFriendlyId={activeFriendlyId}
-                creatingSession={creatingSession}
-                onCreateSession={startNewChat}
-                isCollapsed={sidebarCollapsed}
-                onToggleCollapse={toggleSidebar}
-                onSelectSession={handleSelectSession}
-                onActiveSessionDelete={handleActiveSessionDelete}
-                sessionsLoading={sessionsLoading}
-                sessionsFetching={sessionsFetching}
-                sessionsError={sessionsError}
-                onRetrySessions={refetchSessions}
-              />
+              <Suspense
+                fallback={
+                  <div
+                    className={cn(
+                      'flex h-full flex-col border-r border-[var(--theme-border)] bg-[var(--theme-sidebar)] p-3',
+                      sidebarCollapsed
+                        ? 'w-12 items-center'
+                        : 'w-[var(--desktop-sidebar-width)]',
+                    )}
+                    role="status"
+                    aria-label="Loading workspace navigation"
+                  >
+                    <div className="flex w-full items-center gap-2">
+                      <span className="size-8 shrink-0 rounded-lg bg-[var(--theme-border)]/60 motion-safe:animate-pulse" />
+                      {!sidebarCollapsed ? (
+                        <span className="h-3 w-28 rounded bg-[var(--theme-border)]/60 motion-safe:animate-pulse" />
+                      ) : null}
+                    </div>
+                    {!sidebarCollapsed ? (
+                      <div className="mt-6 space-y-2" aria-hidden>
+                        {[0, 1, 2, 3, 4].map((item) => (
+                          <span
+                            key={item}
+                            className="block h-9 rounded-lg bg-[var(--theme-border)]/35 motion-safe:animate-pulse"
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                }
+              >
+                <ChatSidebar
+                  sessions={sessions}
+                  activeFriendlyId={activeFriendlyId}
+                  creatingSession={creatingSession}
+                  onCreateSession={startNewChat}
+                  isCollapsed={sidebarCollapsed}
+                  onToggleCollapse={toggleSidebar}
+                  onSelectSession={handleSelectSession}
+                  onActiveSessionDelete={handleActiveSessionDelete}
+                  sessionsLoading={sessionsLoading}
+                  sessionsFetching={sessionsFetching}
+                  sessionsError={sessionsError}
+                  onRetrySessions={refetchSessions}
+                />
+              </Suspense>
             </div>
           )}
 
           {/* Main content area — renders the matched route */}
           <main
+            id="main-content"
+            tabIndex={-1}
             onTouchStart={isMobile ? onTouchStart : undefined}
             onTouchMove={isMobile ? onTouchMove : undefined}
             onTouchEnd={isMobile ? onTouchEnd : undefined}
+            style={
+              isMobile && !isOnChatRoute
+                ? {
+                    scrollPaddingBottom: 'calc(var(--tabbar-h, 80px) + 1rem)',
+                  }
+                : undefined
+            }
             className={[
               'h-full min-h-0 min-w-0 overflow-x-hidden bg-[var(--theme-bg)] relative',
               isOnChatRoute ? 'overflow-hidden' : 'overflow-y-auto',
@@ -498,7 +580,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
           </main>
 
           {/* Chat panel — visible on non-chat routes */}
-          {!isOnChatRoute && !isMobile && (
+          {!isOnChatRoute && !isMobile && chatPanelOpen && (
             <Suspense fallback={null}>
               <ChatPanel />
             </Suspense>
@@ -525,7 +607,9 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
       <MobileHamburgerMenu />
       <MobileTabBar />
       {!isMobile && settings.showSystemMetricsFooter ? (
-        <SystemMetricsFooter leftOffsetPx={sidebarCollapsed ? 48 : 300} />
+        <SystemMetricsFooter
+          leftOffsetPx={sidebarCollapsed ? 48 : 'var(--desktop-sidebar-width)'}
+        />
       ) : null}
       <CommandPalette pathname={pathname} sessions={sessions} />
     </>

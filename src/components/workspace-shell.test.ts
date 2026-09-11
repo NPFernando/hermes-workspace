@@ -1,12 +1,38 @@
 import { describe, expect, it } from 'vitest'
 import { MOBILE_HAMBURGER_NAV_ITEMS } from './mobile-hamburger-menu'
 import { MOBILE_NAV_TABS } from './mobile-tab-bar'
-import { DESKTOP_SIDEBAR_BACKDROP_CLASS } from './workspace-shell'
+import {
+  DESKTOP_SIDEBAR_BACKDROP_CLASS,
+  shouldAdoptInitialAuthStatus,
+} from './workspace-shell'
 
 describe('workspace shell sidebar backdrop', () => {
   it('only spans the desktop sidebar width, not the full viewport', () => {
-    expect(DESKTOP_SIDEBAR_BACKDROP_CLASS).toContain('w-[300px]')
+    expect(DESKTOP_SIDEBAR_BACKDROP_CLASS).toContain(
+      'w-[var(--desktop-sidebar-width)]',
+    )
     expect(DESKTOP_SIDEBAR_BACKDROP_CLASS).not.toContain('inset-0')
+  })
+})
+
+describe('workspace shell startup ownership', () => {
+  it('adopts a root result that arrives after shell mount', () => {
+    expect(
+      shouldAdoptInitialAuthStatus(
+        { authenticated: true, authRequired: false },
+        false,
+      ),
+    ).toBe(true)
+  })
+
+  it('does not reopen startup verification after the shell is ready', () => {
+    expect(
+      shouldAdoptInitialAuthStatus(
+        { authenticated: true, authRequired: false },
+        true,
+      ),
+    ).toBe(false)
+    expect(shouldAdoptInitialAuthStatus(null, false)).toBe(false)
   })
 })
 
@@ -27,5 +53,14 @@ describe('swarm2 navigation alias handling', () => {
 
     expect(swarm?.to).toBe('/swarm')
     expect(swarm2).toBeUndefined()
+  })
+})
+
+describe('mobile navigation naming', () => {
+  it('uses Dashboard consistently for the primary workspace route', () => {
+    const dashboard = MOBILE_NAV_TABS.find((item) => item.id === 'dashboard')
+
+    expect(dashboard?.label).toBe('Dashboard')
+    expect(dashboard?.to).toBe('/dashboard')
   })
 })

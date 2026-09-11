@@ -47,10 +47,10 @@ export function toast(
 }
 
 const typeStyles: Record<ToastType, string> = {
-  info: 'bg-accent-600 text-white',
-  success: 'bg-green-600 text-white',
-  warning: 'bg-amber-500 text-white',
-  error: 'bg-red-600 text-white',
+  info: 'bg-[var(--theme-accent)] text-[var(--theme-on-accent,white)]',
+  success: 'bg-[var(--theme-success)] text-[var(--theme-on-success,white)]',
+  warning: 'bg-[var(--theme-warning)] text-[var(--theme-on-warning,white)]',
+  error: 'bg-[var(--theme-danger)] text-[var(--theme-on-danger,white)]',
 }
 
 const defaultIcons: Record<ToastType, string> = {
@@ -88,10 +88,15 @@ export function Toaster() {
   if (!toasts.length) return null
 
   return createPortal(
-    <div className="pointer-events-none fixed left-2 right-2 z-[9999] flex flex-col gap-2 top-[calc(var(--titlebar-h,0px)+1rem)] sm:left-auto sm:right-4 sm:w-auto">
+    <div
+      aria-live="polite"
+      aria-atomic="false"
+      className="pointer-events-none fixed bottom-[calc(var(--tabbar-h,80px)+1rem)] left-2 right-2 z-[9999] flex flex-col gap-2 sm:bottom-[calc(var(--metrics-footer-h,0px)+1rem)] sm:left-auto sm:right-20 sm:top-auto sm:w-auto"
+    >
       {toasts.map((t) => (
         <div
           key={t.id}
+          role="status"
           className={cn(
             'pointer-events-auto flex w-full max-w-[calc(100vw-1rem)] items-start gap-2.5 rounded-xl px-4 py-3 text-sm font-medium shadow-lg backdrop-blur-sm animate-in slide-in-from-right-5 fade-in duration-200 sm:w-auto',
             typeStyles[t.type],
@@ -116,6 +121,7 @@ export function Toaster() {
             onClick={() =>
               setToasts((prev) => prev.filter((x) => x.id !== t.id))
             }
+            aria-label="Dismiss notification"
             className="ml-2 shrink-0 rounded-full p-0.5 opacity-70 transition-opacity hover:opacity-100"
           >
             ✕

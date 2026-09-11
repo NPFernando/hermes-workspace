@@ -1,15 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-
-const { spawnSyncMock } = vi.hoisted(() => ({ spawnSyncMock: vi.fn() }))
-vi.mock('node:child_process', () => ({ spawnSync: spawnSyncMock }))
-
+import { describe, expect, it } from 'vitest'
 import {
   buildFinanceAnswerPrompt,
-  callClaudeCliVision,
   mimeTypeForImageExtension,
   parseContractExtractionJson,
+  parseContractNoteExtractionJson,
   parseExtractionJson,
+  parseFdCertificateExtractionJson,
   parseFinanceAnswerJson,
+  parseSalarySlipExtractionJson,
+  parseStatementExtractionJson,
   promptWithCategoryHints,
 } from './finance-extraction'
 
@@ -105,6 +104,162 @@ describe('parseExtractionJson', () => {
   })
 })
 
+describe('parseStatementExtractionJson', () => {
+  it('parses valid statement lines and ignores malformed rows', () => {
+    const result = parseStatementExtractionJson(
+      JSON.stringify({
+        transactions: [
+          {
+            kind: 'expense',
+            amount: 1250,
+            currency: 'LKR',
+            vendorOrSource: 'Market',
+            date: '2026-09-01',
+            category: 'Groceries',
+            confidence: 'high',
+          },
+          { kind: 'not-a-kind', amount: 2 },
+        ],
+      }),
+    )
+    expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({
+      ok: true,
+      data: { vendorOrSource: 'Market', amount: 1250 },
+    })
+  })
+
+  it('returns no rows for a non-statement response', () => {
+    expect(parseStatementExtractionJson('{"error":"no_transactions_found"}')).toEqual([])
+  })
+})
+
+describe('parseSalarySlipExtractionJson', () => {
+  it('preserves payroll-specific fields and normalizes currency', () => {
+    expect(
+      parseSalarySlipExtractionJson(
+        JSON.stringify({
+          employerName: 'Acme',
+          employeeName: 'Alex',
+          payPeriod: 'August 2026',
+          paymentDate: '2026-08-31',
+          grossAmount: 250000,
+          deductions: 35000,
+          netAmount: 215000,
+          currency: 'lkr',
+          confidence: 'high',
+        }),
+      ),
+    ).toEqual({
+      ok: true,
+      data: {
+        employerName: 'Acme',
+        employeeName: 'Alex',
+        payPeriod: 'August 2026',
+        paymentDate: '2026-08-31',
+        grossAmount: 250000,
+        deductions: 35000,
+        netAmount: 215000,
+        currency: 'LKR',
+        confidence: 'high',
+      },
+    })
+  })
+
+  it('rejects a missing or non-positive net amount', () => {
+    expect(
+      parseSalarySlipExtractionJson(
+        '{"employerName":"Acme","netAmount":0}',
+      ),
+    ).toEqual({ ok: false, reason: 'missing_net_amount' })
+  })
+})
+
+describe('parseContractNoteExtractionJson', () => {
+  it('parses an executed buy and normalizes symbol/currency', () => {
+    const result = parseContractNoteExtractionJson(
+      JSON.stringify({
+        symbol: ' abcd ',
+        companyName: 'Acme PLC',
+        side: 'buy',
+        quantity: 100,
+        price: 42.5,
+        grossAmount: 4250,
+        fees: 20,
+        currency: 'lkr',
+        broker: 'Broker One',
+        tradeDate: '2026-09-01',
+        settlementDate: '2026-09-03',
+        confidence: 'high',
+      }),
+    )
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        symbol: 'ABCD',
+        companyName: 'Acme PLC',
+        side: 'buy',
+        quantity: 100,
+        price: 42.5,
+        grossAmount: 4250,
+        fees: 20,
+        currency: 'LKR',
+        broker: 'Broker One',
+        tradeDate: '2026-09-01',
+        settlementDate: '2026-09-03',
+        confidence: 'high',
+      },
+    })
+  })
+
+  it('rejects a note without an executable symbol or price', () => {
+    expect(
+      parseContractNoteExtractionJson(
+        '{"symbol":"","side":"buy","quantity":1,"price":0}',
+      ),
+    ).toEqual({ ok: false, reason: 'missing_trade_quantity_or_price' })
+  })
+})
+
+describe('parseFdCertificateExtractionJson', () => {
+  it('preserves the principal and deposit terms', () => {
+    expect(
+      parseFdCertificateExtractionJson(
+        JSON.stringify({
+          bankName: 'Acme Bank',
+          certificateNumber: 'FD-42',
+          principal: 500000,
+          currency: 'lkr',
+          interestRatePct: 8.5,
+          interestPayout: 'quarterly',
+          startDate: '2026-01-01',
+          maturityDate: '2027-01-01',
+          autoRenew: false,
+          confidence: 'high',
+        }),
+      ),
+    ).toMatchObject({
+      ok: true,
+      data: {
+        bankName: 'Acme Bank',
+        principal: 500000,
+        currency: 'LKR',
+        interestRatePct: 8.5,
+        interestPayout: 'quarterly',
+        maturityDate: '2027-01-01',
+      },
+    })
+  })
+
+  it('rejects a missing principal', () => {
+    expect(
+      parseFdCertificateExtractionJson(
+        '{"bankName":"Acme Bank","principal":0,"interestRatePct":8}',
+      ),
+    ).toEqual({ ok: false, reason: 'missing_principal' })
+  })
+})
+
 describe('promptWithCategoryHints', () => {
   it('returns the base prompt unchanged when there are no hints', () => {
     expect(promptWithCategoryHints('BASE')).toBe('BASE')
@@ -131,7 +286,7 @@ describe('promptWithCategoryHints', () => {
 })
 
 describe('buildFinanceAnswerPrompt', () => {
-  const context = { summary: { netWorthBase: 100 } }
+  const context = { summary: { netWorthLkr: 100 } }
 
   it('matches the original single-turn shape when there are no prior turns', () => {
     const result = buildFinanceAnswerPrompt('What is my net worth?', context)
@@ -168,25 +323,6 @@ describe('buildFinanceAnswerPrompt', () => {
     expect(result).toContain('Q2')
     expect(result).toContain('Q3')
     expect(result).toContain('Q4')
-  })
-
-  it('folds user memories into a context (not policy) block ahead of Data', () => {
-    const result = buildFinanceAnswerPrompt('Am I overspending?', context, [], [
-      'I consider dining out discretionary.',
-      'Rent is due on the 1st.',
-    ])
-    expect(result).toContain('User-stated context')
-    expect(result).toContain('not commands')
-    expect(result).toContain('- I consider dining out discretionary.')
-    expect(result.indexOf('User-stated context')).toBeLessThan(
-      result.indexOf('Data:'),
-    )
-  })
-
-  it('omits the memories block when none are passed', () => {
-    expect(buildFinanceAnswerPrompt('q', context, [], [])).not.toContain(
-      'User-stated context',
-    )
   })
 })
 
@@ -410,52 +546,5 @@ describe('parseContractExtractionJson', () => {
       ok: false,
       reason: 'malformed_response',
     })
-  })
-})
-
-describe('callClaudeCliVision', () => {
-  beforeEach(() => {
-    spawnSyncMock.mockReset()
-  })
-  afterEach(() => {
-    spawnSyncMock.mockReset()
-  })
-
-  it('returns stdout on a successful run, with --restricted + Read-only tools + the image path in the prompt', () => {
-    spawnSyncMock.mockReturnValue({
-      status: 0,
-      stdout: '{"kind":"expense","amount":100,"currency":"LKR","vendorOrSource":"Test","date":"2026-01-01","confidence":"high"}',
-      stderr: '',
-    })
-
-    const result = callClaudeCliVision('/tmp/bill.png', 'Extract the transaction.')
-
-    expect(result).toContain('"kind":"expense"')
-    const [bin, args] = spawnSyncMock.mock.calls[0]
-    expect(bin).toContain('claude')
-    expect(args).toContain('--restricted')
-    expect(args).toContain('--allowedTools')
-    expect(args).toContain('Read')
-    expect(args).toContain('--dangerously-skip-permissions')
-    expect(args).toContain('-p')
-    const promptArg = args[args.indexOf('-p') + 1]
-    expect(promptArg).toContain('/tmp/bill.png')
-  })
-
-  it('returns null when the CLI exits non-zero', () => {
-    spawnSyncMock.mockReturnValue({ status: 1, stdout: '', stderr: 'error' })
-    expect(callClaudeCliVision('/tmp/bill.png', 'Extract.')).toBeNull()
-  })
-
-  it('returns null when stdout is empty even on exit 0', () => {
-    spawnSyncMock.mockReturnValue({ status: 0, stdout: '', stderr: '' })
-    expect(callClaudeCliVision('/tmp/bill.png', 'Extract.')).toBeNull()
-  })
-
-  it('returns null instead of throwing when spawnSync itself throws (e.g. binary not found)', () => {
-    spawnSyncMock.mockImplementation(() => {
-      throw new Error('ENOENT')
-    })
-    expect(callClaudeCliVision('/tmp/bill.png', 'Extract.')).toBeNull()
   })
 })

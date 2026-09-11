@@ -12,7 +12,9 @@ import type { HubTrust } from './types'
 const SHELL_METACHAR_RE = /[;|&$`<>]/
 
 // Control characters (including NUL) that must not appear in command or args
-const CONTROL_CHAR_RE = /[\x00-\x1F\x7F]/
+const CONTROL_CHAR_RE = new RegExp(
+  `[${String.fromCharCode(0)}-${String.fromCharCode(31)}${String.fromCharCode(127)}]`,
+)
 
 // Env key must be SCREAMING_SNAKE_CASE (same rule as mcp-input-validate.ts)
 const ENV_KEY_RE = /^[A-Z][A-Z0-9_]*$/

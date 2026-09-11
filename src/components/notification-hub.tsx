@@ -2,6 +2,7 @@
 
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useLocation } from '@tanstack/react-router'
 
 import { MobilePromptTrigger } from './mobile-prompt/MobilePromptTrigger'
 import { NotificationBell } from './notification-bell'
@@ -60,6 +61,8 @@ export function NotificationHub() {
   const [digestDismissed, setDigestDismissed] = useState(false)
   const [mobileAllowed, setMobileAllowed] = useState(false)
   const decided = useRef(false)
+  const location = useLocation()
+  const isDashboardRoute = location.pathname === '/dashboard'
 
   const publish = useNotificationCenterStore((s) => s.publish)
   const markRead = useNotificationCenterStore((s) => s.markRead)
@@ -129,7 +132,8 @@ export function NotificationHub() {
         }
         if (
           inserted &&
-          useNotificationCenterStore.getState().prefs.toastOnNewItems
+          useNotificationCenterStore.getState().prefs.toastOnNewItems &&
+          !isDashboardRoute
         ) {
           toast('Updates available', {
             type: 'info',
@@ -149,7 +153,7 @@ export function NotificationHub() {
     // Don't hold the changelog hostage to a hanging status request
     const t = setTimeout(() => decide(), STATUS_WAIT_TIMEOUT_MS)
     return () => clearTimeout(t)
-  }, [isFetched, updateStatus, publish, openDigest])
+  }, [isFetched, updateStatus, publish, openDigest, isDashboardRoute])
 
   // Auto-popup path (autoPopupDigest pref): goes through the popup queue
   const wantAutoDigest = digest !== null && !digestDismissed

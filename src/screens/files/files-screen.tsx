@@ -308,7 +308,7 @@ function tokenizeJson(code: string): Array<HighlightToken> {
   let lastIndex = 0
 
   for (const match of code.matchAll(pattern)) {
-    const index = match.index ?? 0
+    const index = match.index
     pushHighlightToken(tokens, code.slice(lastIndex, index))
 
     const [value, stringValue, colon] = match
@@ -335,7 +335,7 @@ function tokenizeCode(code: string): Array<HighlightToken> {
   let lastIndex = 0
 
   for (const match of code.matchAll(pattern)) {
-    const index = match.index ?? 0
+    const index = match.index
     const value = match[0]
     pushHighlightToken(tokens, code.slice(lastIndex, index))
 

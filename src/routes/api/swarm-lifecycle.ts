@@ -10,10 +10,37 @@ import {
 } from '../../server/swarm-lifecycle'
 import { listSwarmWorkerIds } from '../../server/swarm-foundation'
 import { isSwarmWorkerId } from '../../server/swarm-roster'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+} from '../../server/rate-limit'
 
 type LifecyclePost = {
   action?: unknown
   workerId?: unknown
+  responseMode?: unknown
+}
+
+export function summarizeLifecycleSweep(
+  sweep: ReadonlyArray<{
+    action: string
+    result?: { ok: boolean }
+  }>,
+): {
+  processed: number
+  actions: Record<string, number>
+  failed: number
+} {
+  return {
+    processed: sweep.length,
+    actions: sweep.reduce<Record<string, number>>((counts, item) => {
+      counts[item.action] = (counts[item.action] ?? 0) + 1
+      return counts
+    }, {}),
+    failed: sweep.filter((item) => item.result?.ok === false).length,
+  }
 }
 
 function validWorkerId(value: unknown): string | null {
@@ -23,9 +50,14 @@ function validWorkerId(value: unknown): string | null {
 export const Route = createFileRoute('/api/swarm-lifecycle')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request))
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`swarm-lifecycle:${getClientIp(request)}`, 60, 60_000)) {
+          return rateLimitResponse()
+        }
         const url = new URL(request.url)
         const requested = validWorkerId(url.searchParams.get('workerId'))
         const ids = requested ? [requested] : listSwarmWorkerIds()
@@ -38,6 +70,11 @@ export const Route = createFileRoute('/api/swarm-lifecycle')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request))
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`swarm-lifecycle:post:${getClientIp(request)}`, 30, 60_000)) {
+          return rateLimitResponse()
+        }
         let body: LifecyclePost
         try {
           body = (await request.json()) as LifecyclePost
@@ -52,6 +89,13 @@ export const Route = createFileRoute('/api/swarm-lifecycle')({
         if (action === 'auto-sweep') {
           const targets = workerIdMaybe ? [workerIdMaybe] : listSwarmWorkerIds()
           const sweep = await autoSweepLifecycle(targets)
+          if (body.responseMode === 'scheduler_ack') {
+            return json({
+              ok: true,
+              action,
+              ...summarizeLifecycleSweep(sweep),
+            })
+          }
           return json({ ok: true, action, sweep })
         }
         if (!workerIdMaybe)

@@ -3,6 +3,9 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
   requireJsonContentType,
   safeErrorMessage,
 } from '../../server/rate-limit'
@@ -85,6 +88,9 @@ export const Route = createFileRoute('/api/sessions')({
         }
         const csrfCheckPost = requireJsonContentType(request)
         if (csrfCheckPost) return csrfCheckPost
+        if (!rateLimit(`session-create:${getClientIp(request)}`, 30, 60_000)) {
+          return rateLimitResponse()
+        }
         const capabilities = await ensureGatewayProbed()
         if (!capabilities.sessions) {
           const friendlyId = randomUUID()
@@ -165,6 +171,9 @@ export const Route = createFileRoute('/api/sessions')({
         }
         const csrfCheckPatch = requireJsonContentType(request)
         if (csrfCheckPatch) return csrfCheckPatch
+        if (!rateLimit(`session-update:${getClientIp(request)}`, 60, 60_000)) {
+          return rateLimitResponse()
+        }
         const capabilities = await ensureGatewayProbed()
         if (!capabilities.sessions) {
           const body = (await request.json().catch(() => ({}))) as Record<
@@ -270,6 +279,9 @@ export const Route = createFileRoute('/api/sessions')({
       DELETE: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+        }
+        if (!rateLimit(`session-delete:${getClientIp(request)}`, 20, 60_000)) {
+          return rateLimitResponse()
         }
         const url = new URL(request.url)
         const rawSessionKey = url.searchParams.get('sessionKey') ?? ''

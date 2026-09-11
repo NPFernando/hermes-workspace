@@ -125,7 +125,7 @@ function parseExecNotification(text: string): ExecNotification | null {
 
   if (!name) {
     const withoutPrefix = trimmed.replace(/^Exec completed[:\s-]*/i, '').trim()
-    const nameMatch = withoutPrefix.match(/^([^\(\{\[]+?)(?:\s*\(|\s*$)/)
+    const nameMatch = withoutPrefix.match(/^([^({\x5B]+?)(?:\s*\(|\s*$)/)
     if (nameMatch) name = nameMatch[1].trim()
   }
 

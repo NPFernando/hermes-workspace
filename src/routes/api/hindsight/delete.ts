@@ -3,7 +3,13 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
 import { deleteHindsightMemory } from '../../../server/hindsight-client'
 
-import { safeErrorMessage } from '../../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../../server/rate-limit'
 
 export const Route = createFileRoute('/api/hindsight/delete')({
   server: {
@@ -11,6 +17,11 @@ export const Route = createFileRoute('/api/hindsight/delete')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`hindsight-delete:${getClientIp(request)}`, 20, 60_000)) {
+          return rateLimitResponse()
         }
         try {
           const body = (await request.json()) as { id?: string; bank?: string }

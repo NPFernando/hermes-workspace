@@ -11,7 +11,13 @@
  */
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../../server/auth-middleware'
-import { safeErrorMessage } from '../../../server/rate-limit'
+import {
+  getClientIp,
+  rateLimit,
+  rateLimitResponse,
+  requireJsonContentType,
+  safeErrorMessage,
+} from '../../../server/rate-limit'
 import {
   addHubSource,
   deleteHubSource,
@@ -57,6 +63,11 @@ export const Route = createFileRoute('/api/mcp/hub-sources')({
             { ok: false, error: 'Unauthorized' },
             { status: 401 },
           )
+        }
+        const csrfCheck = requireJsonContentType(request)
+        if (csrfCheck) return csrfCheck
+        if (!rateLimit(`mcp-hub-source-create:${getClientIp(request)}`, 20, 60_000)) {
+          return rateLimitResponse()
         }
         let body: unknown
         try {
