@@ -1,0 +1,11 @@
+[Unit]
+Description=Capture the daily CSE market snapshot
+
+[Timer]
+# After the CSE session normally closes in Sri Lanka; UTC avoids local DST ambiguity.
+OnCalendar=*-*-* 10:00:00 UTC
+Persistent=true
+Unit=hermes-finance-cse-market-snapshot.service
+
+[Install]
+WantedBy=timers.target
