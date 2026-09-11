@@ -86,6 +86,23 @@ export type PersonalFinancePayload = {
       count: number
     }>
   }>
+  /** Splits each non-LKR stock holding's total return into the part from the asset's own price move vs. pure currency movement since buyDate — see getFxGainLoss in finance-store.ts. */
+  fxGainLoss: {
+    entries: Array<{
+      id: string
+      symbol: string
+      currency: string
+      quantity: number
+      assetGainLkr: number
+      fxGainLkr: number
+      totalReturnLkr: number
+      insufficientHistory: boolean
+    }>
+    totalAssetGainLkr: number
+    totalFxGainLkr: number
+    totalReturnLkr: number
+    excludedCount: number
+  }
   /** Daily net-worth history for the trend chart, in the reporting currency. */
   netWorthHistory: Array<{
     date: string

@@ -3927,6 +3927,168 @@ export function getCurrencyExposure(db: FinanceDatabase): Array<CurrencyExposure
 }
 
 /**
+ * Multi-currency FX gain/loss decomposition for stock holdings — closes the
+ * gap that `unrealizedStockPnlBase` conflates asset price movement and
+ * currency movement into one number (it converts both cost and current
+ * value at *today's* rate, per PF-206's toLkr). This splits a holding's
+ * total return in LKR into the part attributable to the asset's own price
+ * change (assetGainLkr) and the part attributable purely to the
+ * currency/LKR exchange rate moving between buyDate and now (fxGainLkr):
+ *
+ *   totalReturnLkr = valueAtCurrentFx - costAtBuyFx
+ *   assetGainLkr   = (valueNative - costNative) converted at *today's* rate
+ *   fxGainLkr      = totalReturnLkr - assetGainLkr
+ *                  = costNative * (rateNow - rateAtBuy)
+ *
+ * A holding is excluded (insufficientHistory: true, zeroed fields) when
+ * there's no exchange rate on file for its buyDate — convertCurrency()
+ * only walks direct/pivot/inverse *known* rates, it never estimates.
+ */
+export type FxGainLossEntry = {
+  id: string
+  symbol: string
+  currency: CurrencyCode
+  quantity: number
+  assetGainLkr: number
+  fxGainLkr: number
+  totalReturnLkr: number
+  insufficientHistory: boolean
+}
+
+/**
+ * Same lookup logic as getExchangeRate(), but scoped to a given `db`
+ * instead of calling ensureFinanceStore() itself. getFxGainLoss (and
+ * getCurrencyExposure alongside it) is meant to operate purely on its `db`
+ * argument — convertCurrency()/getExchangeRate() always re-read the real
+ * global store regardless of what `db` is passed around them, which is
+ * fine in production (same underlying data) but silently breaks any test
+ * that builds its own in-memory `db` without also writing it to the store.
+ */
+function localExchangeRate(
+  db: FinanceDatabase,
+  base: string,
+  target: string,
+  date?: string,
+): number | undefined {
+  let relevant = (
+    db.exchange_rates as Array<{
+      base?: unknown
+      target?: unknown
+      rate?: unknown
+      date?: unknown
+    }>
+  ).filter(
+    (r) => r.base === base && r.target === target && typeof r.rate === 'number',
+  )
+  if (date !== undefined) {
+    const targetDate = new Date(date).getTime()
+    relevant = relevant.filter(
+      (r) => new Date((r.date as string) || 0).getTime() <= targetDate,
+    )
+  }
+  relevant = relevant.sort(
+    (a, b) =>
+      new Date((b.date as string) || 0).getTime() -
+      new Date((a.date as string) || 0).getTime(),
+  )
+  return relevant.length > 0 ? (relevant[0].rate as number) : undefined
+}
+
+function localConvertToLkr(
+  db: FinanceDatabase,
+  amount: number,
+  currency: string,
+  date?: string,
+): number | undefined {
+  if (currency === 'LKR') return amount
+  const direct = localExchangeRate(db, currency, 'LKR', date)
+  if (direct !== undefined) return amount * direct
+  const inverse = localExchangeRate(db, 'LKR', currency, date)
+  if (inverse !== undefined) return amount / inverse
+  return undefined
+}
+
+export function getFxGainLoss(db: FinanceDatabase): {
+  entries: Array<FxGainLossEntry>
+  totalAssetGainLkr: number
+  totalFxGainLkr: number
+  totalReturnLkr: number
+  excludedCount: number
+} {
+  let totalAssetGainLkr = 0
+  let totalFxGainLkr = 0
+  let totalReturnLkr = 0
+  let excludedCount = 0
+
+  const entries = db.stock_holdings.map((h): FxGainLossEntry => {
+    const currentPrice = h.lastKnownPrice ?? h.buyPrice
+    const costNative = h.buyPrice * h.quantity
+    const valueNative = currentPrice * h.quantity
+
+    if (h.currency === 'LKR') {
+      const returnLkr = valueNative - costNative
+      totalAssetGainLkr += returnLkr
+      totalReturnLkr += returnLkr
+      return {
+        id: h.id,
+        symbol: h.symbol,
+        currency: h.currency,
+        quantity: h.quantity,
+        assetGainLkr: returnLkr,
+        fxGainLkr: 0,
+        totalReturnLkr: returnLkr,
+        insufficientHistory: false,
+      }
+    }
+
+    const valueLkrNow = localConvertToLkr(db, valueNative, h.currency)
+    const costLkrAtBuy = localConvertToLkr(db, costNative, h.currency, h.buyDate)
+    const assetGainLkr = localConvertToLkr(db, valueNative - costNative, h.currency)
+    if (
+      valueLkrNow === undefined ||
+      costLkrAtBuy === undefined ||
+      assetGainLkr === undefined
+    ) {
+      excludedCount += 1
+      return {
+        id: h.id,
+        symbol: h.symbol,
+        currency: h.currency,
+        quantity: h.quantity,
+        assetGainLkr: 0,
+        fxGainLkr: 0,
+        totalReturnLkr: 0,
+        insufficientHistory: true,
+      }
+    }
+
+    const returnLkr = valueLkrNow - costLkrAtBuy
+    const fxGainLkr = returnLkr - assetGainLkr
+    totalAssetGainLkr += assetGainLkr
+    totalFxGainLkr += fxGainLkr
+    totalReturnLkr += returnLkr
+    return {
+      id: h.id,
+      symbol: h.symbol,
+      currency: h.currency,
+      quantity: h.quantity,
+      assetGainLkr,
+      fxGainLkr,
+      totalReturnLkr: returnLkr,
+      insufficientHistory: false,
+    }
+  })
+
+  return {
+    entries,
+    totalAssetGainLkr,
+    totalFxGainLkr,
+    totalReturnLkr,
+    excludedCount,
+  }
+}
+
+/**
  * Trailing average of monthly expenses, excluding the current in-progress
  * calendar month (which is always partial). Used to convert an "N months of
  * expenses" emergency-fund target into an LKR amount. Returns 0 if there is

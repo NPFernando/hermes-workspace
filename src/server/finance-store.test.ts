@@ -17,6 +17,7 @@ import {
   getAverageMonthlySavingsRatePct,
   buildFinanceQueryContext,
   getCurrencyExposure,
+  getFxGainLoss,
   getFinanceTrends,
   getMonthlySummary,
   getRecurringBills,
@@ -2810,6 +2811,153 @@ describe('PF review item 7: server-side dashboard derivations', () => {
         ],
       },
     ])
+  })
+})
+
+describe('getFxGainLoss', () => {
+  function holding(over: Partial<Record<string, unknown>> = {}) {
+    return {
+      id: 'h1',
+      symbol: 'AAPL',
+      platform: 'IBKR',
+      quantity: 2,
+      buyPrice: 100,
+      buyDate: '2026-01-01',
+      currency: 'USD' as const,
+      lastKnownPrice: 150,
+      priceSource: 'manual' as const,
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      ...over,
+    }
+  }
+
+  it('splits asset gain from fx gain when the exchange rate moved between buyDate and now', () => {
+    const db = createEmptyFinanceDatabase()
+    db.exchange_rates.push(
+      {
+        base: 'USD',
+        target: 'LKR',
+        rate: 300,
+        date: '2026-01-01',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        base: 'USD',
+        target: 'LKR',
+        rate: 330,
+        date: '2026-06-01',
+        updatedAt: '2026-06-01T00:00:00.000Z',
+      },
+    )
+    db.stock_holdings.push(holding())
+
+    const result = getFxGainLoss(db)
+    expect(result.excludedCount).toBe(0)
+    expect(result.entries).toHaveLength(1)
+    const entry = result.entries[0]
+    expect(entry.insufficientHistory).toBe(false)
+    // assetGain = (150-100)*2 converted at *today's* rate (330) = 33,000
+    expect(entry.assetGainLkr).toBe(2 * (150 - 100) * 330)
+    // fxGain = costNative(200) * (rateNow(330) - rateAtBuy(300)) = 6,000
+    expect(entry.fxGainLkr).toBe(200 * (330 - 300))
+    // totalReturn = valueLkrNow(150*2*330) - costLkrAtBuy(100*2*300)
+    expect(entry.totalReturnLkr).toBe(150 * 2 * 330 - 100 * 2 * 300)
+    // Decomposition must sum back to the total return exactly.
+    expect(entry.assetGainLkr + entry.fxGainLkr).toBeCloseTo(
+      entry.totalReturnLkr,
+    )
+    expect(result.totalAssetGainLkr).toBe(entry.assetGainLkr)
+    expect(result.totalFxGainLkr).toBe(entry.fxGainLkr)
+    expect(result.totalReturnLkr).toBe(entry.totalReturnLkr)
+  })
+
+  it('reports zero fxGainLkr when the rate has not moved', () => {
+    const db = createEmptyFinanceDatabase()
+    db.exchange_rates.push({
+      base: 'USD',
+      target: 'LKR',
+      rate: 300,
+      date: '2026-01-01',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    db.stock_holdings.push(holding())
+
+    const result = getFxGainLoss(db)
+    expect(result.entries[0].fxGainLkr).toBe(0)
+    expect(result.entries[0].assetGainLkr).toBe(2 * (150 - 100) * 300)
+    expect(result.entries[0].assetGainLkr).toBe(result.entries[0].totalReturnLkr)
+  })
+
+  it('an LKR-denominated holding has zero fxGainLkr by construction, no rate lookup needed', () => {
+    const db = createEmptyFinanceDatabase()
+    db.stock_holdings.push(holding({ currency: 'LKR' }))
+
+    const result = getFxGainLoss(db)
+    expect(result.excludedCount).toBe(0)
+    expect(result.entries[0]).toMatchObject({
+      currency: 'LKR',
+      fxGainLkr: 0,
+      insufficientHistory: false,
+      assetGainLkr: 2 * (150 - 100),
+      totalReturnLkr: 2 * (150 - 100),
+    })
+  })
+
+  it('excludes a holding with no exchange rate on file at all', () => {
+    const db = createEmptyFinanceDatabase()
+    db.stock_holdings.push(holding())
+
+    const result = getFxGainLoss(db)
+    expect(result.excludedCount).toBe(1)
+    expect(result.entries[0]).toMatchObject({
+      insufficientHistory: true,
+      assetGainLkr: 0,
+      fxGainLkr: 0,
+      totalReturnLkr: 0,
+    })
+    expect(result.totalAssetGainLkr).toBe(0)
+    expect(result.totalFxGainLkr).toBe(0)
+  })
+
+  it('excludes a holding whose buyDate predates the earliest rate on file', () => {
+    const db = createEmptyFinanceDatabase()
+    // Only a rate from well after buyDate — convertCurrency(..., buyDate)
+    // has nothing dated on-or-before buyDate to use.
+    db.exchange_rates.push({
+      base: 'USD',
+      target: 'LKR',
+      rate: 330,
+      date: '2026-06-01',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    })
+    db.stock_holdings.push(holding({ buyDate: '2026-01-01' }))
+
+    const result = getFxGainLoss(db)
+    expect(result.excludedCount).toBe(1)
+    expect(result.entries[0].insufficientHistory).toBe(true)
+  })
+
+  it('sums correctly across multiple holdings, mixing included and excluded', () => {
+    const db = createEmptyFinanceDatabase()
+    db.exchange_rates.push({
+      base: 'USD',
+      target: 'LKR',
+      rate: 300,
+      date: '2026-01-01',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    db.stock_holdings.push(
+      holding({ id: 'h1' }),
+      holding({ id: 'h2', currency: 'EUR' }), // no EUR rate on file -> excluded
+    )
+
+    const result = getFxGainLoss(db)
+    expect(result.entries).toHaveLength(2)
+    expect(result.excludedCount).toBe(1)
+    expect(result.totalAssetGainLkr).toBe(2 * (150 - 100) * 300)
+    expect(result.totalFxGainLkr).toBe(0)
   })
 })
 
