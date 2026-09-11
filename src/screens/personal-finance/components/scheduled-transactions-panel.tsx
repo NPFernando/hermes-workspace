@@ -56,12 +56,20 @@ export function ScheduledTransactionsPanel({
 
   const [editOpenId, setEditOpenId] = useState<string | null>(null)
   const [editDrafts, setEditDrafts] = useState<Record<string, Draft>>({})
-  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null)
+  const [showHistory, setShowHistory] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const accounts = payload.data.finance_accounts
-  const rows = [...payload.data.scheduled_transactions].sort((a, b) =>
-    stringField(a, 'dueDate') < stringField(b, 'dueDate') ? -1 : 1,
-  )
+  const rows = [...payload.data.scheduled_transactions]
+    .filter((row) => {
+      const status = stringField(row, 'status') || 'pending'
+      return showHistory
+        ? status === 'posted' || status === 'cancelled'
+        : status === 'pending' || status === 'paused'
+    })
+    .sort((a, b) =>
+      stringField(a, 'dueDate') < stringField(b, 'dueDate') ? -1 : 1,
+    )
 
   async function submit() {
     if (!counterparty.trim()) {
@@ -140,17 +148,28 @@ export function ScheduledTransactionsPanel({
     if (data) setEditOpenId(null)
   }
 
-  async function cancelScheduled(id: string) {
+  async function deleteScheduled(id: string) {
     const data = await post(
+      {
+        action: 'delete_record',
+        kind: 'scheduled_transaction',
+        id,
+      },
+      `delete-${id}`,
+    )
+    if (data) setConfirmDeleteId(null)
+  }
+
+  async function togglePause(id: string, status: string) {
+    await post(
       {
         action: 'update_record',
         kind: 'scheduled_transaction',
         id,
-        payload: { status: 'cancelled' },
+        payload: { status: status === 'paused' ? 'pending' : 'paused' },
       },
-      `cancel-${id}`,
+      `pause-${id}`,
     )
-    if (data) setConfirmCancelId(null)
   }
 
   async function postNow(id: string) {
@@ -164,6 +183,14 @@ export function ScheduledTransactionsPanel({
         Plan a future income or expense (LKR). It isn&apos;t counted anywhere
         until you post it — from here or from “Coming up” on the Overview.
       </p>
+
+      <button
+        type="button"
+        onClick={() => setShowHistory((value) => !value)}
+        className={`${buttonClass} mt-3`}
+      >
+        {showHistory ? 'Show upcoming' : 'Show history'}
+      </button>
 
       <div className="mt-3 flex flex-wrap gap-2">
         <div className="flex overflow-hidden rounded-xl border border-[var(--theme-border)]">
@@ -369,15 +396,29 @@ export function ScheduledTransactionsPanel({
                       {status !== 'pending' && ` · ${status}`}
                     </span>
                   </div>
-                  {status === 'pending' && (
+                  {(status === 'pending' || status === 'paused') && (
                     <div className="flex gap-2">
+                      {status === 'pending' && (
+                        <button
+                          type="button"
+                          disabled={busy === `post-${id}`}
+                          onClick={() => void postNow(id)}
+                          className={confirmButtonClass}
+                        >
+                          {busy === `post-${id}` ? 'Posting…' : 'Post now'}
+                        </button>
+                      )}
                       <button
                         type="button"
-                        disabled={busy === `post-${id}`}
-                        onClick={() => void postNow(id)}
-                        className={confirmButtonClass}
+                        disabled={busy === `pause-${id}`}
+                        onClick={() => void togglePause(id, status)}
+                        className={buttonClass}
                       >
-                        {busy === `post-${id}` ? 'Posting…' : 'Post now'}
+                        {busy === `pause-${id}`
+                          ? 'Saving…'
+                          : status === 'paused'
+                            ? 'Resume'
+                            : 'Pause'}
                       </button>
                       <button
                         type="button"
@@ -388,11 +429,11 @@ export function ScheduledTransactionsPanel({
                       </button>
                       <button
                         type="button"
-                        disabled={busy === `cancel-${id}`}
-                        onClick={() => setConfirmCancelId(id)}
+                        disabled={busy === `delete-${id}`}
+                        onClick={() => setConfirmDeleteId(id)}
                         className={dangerButtonClass}
                       >
-                        Cancel
+                        Delete
                       </button>
                     </div>
                   )}
@@ -403,14 +444,14 @@ export function ScheduledTransactionsPanel({
         })}
       </div>
 
-      {confirmCancelId && (
+      {confirmDeleteId && (
         <ConfirmDialog
-          title="Cancel this scheduled transaction?"
-          body="It won't be posted. You can't undo this."
-          confirmLabel="Cancel it"
-          busy={busy === `cancel-${confirmCancelId}`}
-          onConfirm={() => void cancelScheduled(confirmCancelId)}
-          onCancel={() => setConfirmCancelId(null)}
+          title="Delete this scheduled transaction?"
+          body="It will be removed from your schedule. You can't undo this."
+          confirmLabel="Delete it"
+          busy={busy === `delete-${confirmDeleteId}`}
+          onConfirm={() => void deleteScheduled(confirmDeleteId)}
+          onCancel={() => setConfirmDeleteId(null)}
         />
       )}
     </section>

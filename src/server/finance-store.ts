@@ -223,7 +223,7 @@ export type ScheduledTransaction = {
   amount: number
   accountId?: string
   notes?: string
-  status: 'pending' | 'posted' | 'cancelled'
+  status: 'pending' | 'paused' | 'posted' | 'cancelled'
   postedRecordId?: string
   source: string
   createdAt: string

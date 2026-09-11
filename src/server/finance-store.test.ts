@@ -3510,6 +3510,12 @@ describe('scheduled_transaction (planned future income/expense)', () => {
     db = store.readFinanceStore()
     expect(db.scheduled_transactions[0].amount).toBe(90_000)
 
+    store.updateFinanceRecord('scheduled_transaction', id, { status: 'paused' })
+    expect(store.readFinanceStore().scheduled_transactions[0].status).toBe(
+      'paused',
+    )
+    store.updateFinanceRecord('scheduled_transaction', id, { status: 'pending' })
+
     store.updateFinanceRecord('scheduled_transaction', id, { status: 'cancelled' })
     expect(store.readFinanceStore().scheduled_transactions[0].status).toBe(
       'cancelled',
