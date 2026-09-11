@@ -35,9 +35,9 @@
     "@base-ui/react": "^1.1.0",
     "@fontsource-variable/inter": "^5.2.8",
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
-    "@fontsource/eb-garamond": "^5.2.7",
+    "@fontsource/eb-garamond": "^5.3.0",
     "@hugeicons/core-free-icons": "^3.1.1",
-    "@hugeicons/react": "^1.1.4",
+    "@hugeicons/react": "^1.1.10",
     "@lobehub/icons": "^5.0.1",
     "@lobehub/icons-static-png": "^1.83.0",
     "@monaco-editor/react": "^4.7.0",
@@ -74,17 +74,17 @@
     "tailwind-merge": "^3.4.0",
     "tailwindcss": "^4.1.18",
     "vite-tsconfig-paths": "^6.0.2",
-    "ws": "^8.20.1",
+    "ws": "^8.21.3",
     "xterm": "^5.3.0",
     "xterm-addon-fit": "^0.8.0",
     "xterm-addon-search": "^0.13.0",
     "xterm-addon-web-links": "^0.9.0",
-    "yaml": "^2.8.2",
+    "yaml": "^2.9.0",
     "zod": "^3.25.76",
-    "zustand": "^5.0.11"
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
-    "@tanstack/eslint-config": "0.3.4",
+    "@tanstack/eslint-config": "0.4.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/react": "^16.2.0",
     "@types/node": "^22.10.2",
@@ -95,8 +95,8 @@
     "concurrently": "^8.2.2",
     "electron": "^40.8.2",
     "electron-builder": "^26.8.1",
-    "esbuild": "^0.27.0",
-    "eslint": "^10.2.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.10.0",
     "jsdom": "^27.0.0",
     "prettier": "^3.5.3",
     "tsx": "^4.21.0",
@@ -104,6 +104,6 @@
     "vite": "^7.3.2",
     "vite-plugin-compression": "^0.5.1",
     "vitest": "^3.0.5",
-    "web-vitals": "^5.1.0"
+    "web-vitals": "^6.2.1"
   }
 }

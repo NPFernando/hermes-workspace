@@ -2715,6 +2715,99 @@ describe('PF review item 7: server-side dashboard derivations', () => {
     expect(bill).toMatchObject({ vendor: 'spotify', loggedThisMonth: false })
   })
 
+  it('getRecurringBills flags a sustained price hike — 3+ consecutive monthly rises, not just this month vs average', () => {
+    const db = createEmptyFinanceDatabase()
+    const now = new Date()
+    const push = (monthOffset: number, amount: number) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - monthOffset, 12)
+      db.expense_records.push({
+        id: `w-${monthOffset}`,
+        date: d.toISOString().slice(0, 10),
+        vendor: 'WaterCo',
+        category: 'Utilities',
+        currency: 'LKR',
+        amount,
+        convertedLkrAmount: amount,
+        recurring: false,
+        workRelated: false,
+        taxDeductiblePossible: false,
+        source: 't',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      })
+    }
+    // Steadily climbing, but each step stays within the ±20% stability
+    // band around the average — drift alone wouldn't flag this month.
+    push(3, 9_000)
+    push(2, 9_500)
+    push(1, 10_000)
+    push(0, 10_500)
+
+    const [bill] = getRecurringBills(db)
+    expect(bill.priceHikeStreak).toBe(3)
+    expect(bill.sustainedPriceHike).toBe(true)
+  })
+
+  it('getRecurringBills.priceHikeStreak resets to 0 the moment the most recent month is not higher than the one before it', () => {
+    const db = createEmptyFinanceDatabase()
+    const now = new Date()
+    const push = (monthOffset: number, amount: number) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - monthOffset, 12)
+      db.expense_records.push({
+        id: `g-${monthOffset}`,
+        date: d.toISOString().slice(0, 10),
+        vendor: 'GasCo',
+        category: 'Utilities',
+        currency: 'LKR',
+        amount,
+        convertedLkrAmount: amount,
+        recurring: false,
+        workRelated: false,
+        taxDeductiblePossible: false,
+        source: 't',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      })
+    }
+    push(3, 9_000)
+    push(2, 9_500)
+    push(1, 10_000)
+    push(0, 9_800) // down slightly this month — streak breaks, even though 2 prior months rose
+
+    const [bill] = getRecurringBills(db)
+    expect(bill.priceHikeStreak).toBe(0)
+    expect(bill.sustainedPriceHike).toBe(false)
+  })
+
+  it('getRecurringBills.priceHikeStreak is below the sustained threshold with only one rise', () => {
+    const db = createEmptyFinanceDatabase()
+    const now = new Date()
+    const push = (monthOffset: number, amount: number) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - monthOffset, 12)
+      db.expense_records.push({
+        id: `n-${monthOffset}`,
+        date: d.toISOString().slice(0, 10),
+        vendor: 'NetCo',
+        category: 'Utilities',
+        currency: 'LKR',
+        amount,
+        convertedLkrAmount: amount,
+        recurring: false,
+        workRelated: false,
+        taxDeductiblePossible: false,
+        source: 't',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      })
+    }
+    push(1, 5_000)
+    push(0, 5_400)
+
+    const [bill] = getRecurringBills(db)
+    expect(bill.priceHikeStreak).toBe(1)
+    expect(bill.sustainedPriceHike).toBe(false)
+  })
+
   it('getUpcomingMoney surfaces an FD maturing within 30 days and a due-soon payday', () => {
     const db = createEmptyFinanceDatabase()
     db.fixed_deposits.push({
