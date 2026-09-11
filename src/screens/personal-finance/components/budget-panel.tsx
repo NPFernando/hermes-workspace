@@ -9,7 +9,7 @@ import {
   dangerButtonClass,
   inputClass,
 } from '../shared-styles'
-import { numberField, stringField } from '../field-helpers'
+import { boolField, numberField, stringField } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
 
 function budgetTone(percentUsed: number): 'good' | 'warn' | 'danger' {
@@ -23,6 +23,7 @@ type BudgetDraft = {
   category: string
   budgetAmount: string
   currency: string
+  rolloverEnabled: boolean
 }
 
 export function BudgetPanel({
@@ -46,6 +47,9 @@ export function BudgetPanel({
   // to the configured reporting currency. It's stored in that currency;
   // getBudgetVsActual converts it to LKR for the vs-actual comparison.
   const [budgetCurrency, setBudgetCurrency] = useState(payload.baseCurrency)
+  const [budgetRollover, setBudgetRollover] = useState(false)
+  const [copyingBudgets, setCopyingBudgets] = useState(false)
+  const [copyNote, setCopyNote] = useState<string | null>(null)
   const budgetCurrencyOptions = [
     ...new Set([payload.baseCurrency, 'LKR', 'USD', 'AUD']),
   ]
@@ -74,6 +78,7 @@ export function BudgetPanel({
         category: stringField(row, 'category'),
         budgetAmount: String(numberField(row, 'budgetAmount')),
         currency: stringField(row, 'currency') || 'LKR',
+        rolloverEnabled: boolField(row, 'rolloverEnabled'),
       },
     }))
     setEditOpenId(id)
@@ -95,11 +100,45 @@ export function BudgetPanel({
           category: draft.category.trim(),
           currency: draft.currency,
           budgetAmount: Number(draft.budgetAmount) || 0,
+          rolloverEnabled: draft.rolloverEnabled,
         },
       },
       `edit-${id}`,
     )
     if (data) setEditOpenId(null)
+  }
+
+  async function copyLastMonth() {
+    setCopyingBudgets(true)
+    setErr(null)
+    setCopyNote(null)
+    try {
+      const res = await fetch('/api/finance', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'copy_budgets_to_month', targetMonth: currentMonth }),
+      })
+      const data = (await res.json()) as {
+        ok?: boolean
+        error?: string
+        copied?: number
+        skippedExisting?: number
+      }
+      if (data.ok === false) {
+        setErr(data.error || 'Could not copy budgets')
+        return
+      }
+      onPayload(data as unknown as PersonalFinancePayload)
+      setCopyNote(
+        `Copied ${data.copied ?? 0} budget(s) from the prior month${
+          (data.skippedExisting ?? 0) > 0
+            ? ` (${data.skippedExisting} already had a budget this month, left untouched)`
+            : ''
+        }.`,
+      )
+    } finally {
+      setCopyingBudgets(false)
+    }
   }
 
   async function deleteBudget(id: string) {
@@ -124,6 +163,7 @@ export function BudgetPanel({
           category: budgetCategory.trim(),
           currency: budgetCurrency,
           budgetAmount: Number(budgetAmount) || 0,
+          rolloverEnabled: budgetRollover,
         },
       },
       'budget',
@@ -131,6 +171,7 @@ export function BudgetPanel({
     if (data) {
       setBudgetCategory('')
       setBudgetAmount('')
+      setBudgetRollover(false)
     }
   }
 
@@ -210,6 +251,14 @@ export function BudgetPanel({
                 </option>
               ))}
             </select>
+            <label className="flex items-center gap-1 text-xs text-[var(--theme-muted)]">
+              <input
+                type="checkbox"
+                checked={budgetRollover}
+                onChange={(e) => setBudgetRollover(e.target.checked)}
+              />
+              Roll over unspent amount
+            </label>
             <button
               type="button"
               disabled={busy === 'budget'}
@@ -276,11 +325,24 @@ export function BudgetPanel({
       {err && <p className="mt-3 text-xs text-[var(--theme-danger)]">{err}</p>}
 
       <div className="mt-4">
-        <h3 className="text-sm font-semibold">This month ({currentMonth})</h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold">This month ({currentMonth})</h3>
+          <button
+            type="button"
+            disabled={copyingBudgets}
+            onClick={() => void copyLastMonth()}
+            className={buttonClass}
+          >
+            {copyingBudgets ? 'Copying…' : "Copy last month's budgets"}
+          </button>
+        </div>
+        {copyNote && (
+          <p className="mt-1 text-xs text-[var(--theme-muted)]">{copyNote}</p>
+        )}
         {payload.budgetVsActual.length === 0 ? (
           <p className="mt-2 text-sm text-[var(--theme-muted)]">
-            No budgets set for this month yet — add one above to see how actual
-            spending compares.
+            No budgets set for this month yet — add one above, or copy last
+            month's forward with the button above.
           </p>
         ) : (
           <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -362,6 +424,19 @@ export function BudgetPanel({
                           </option>
                         ))}
                       </select>
+                      <label className="flex items-center gap-1 text-xs text-[var(--theme-muted)]">
+                        <input
+                          type="checkbox"
+                          checked={editDrafts[id].rolloverEnabled}
+                          onChange={(e) =>
+                            setEditDrafts((prev) => ({
+                              ...prev,
+                              [id]: { ...prev[id], rolloverEnabled: e.target.checked },
+                            }))
+                          }
+                        />
+                        Roll over unspent
+                      </label>
                       <button
                         type="button"
                         disabled={busy === `edit-${id}`}
@@ -388,6 +463,11 @@ export function BudgetPanel({
                         {formatLkr(
                           numberField(row, 'budgetAmount'),
                           stringField(row, 'currency') || 'LKR',
+                        )}
+                        {boolField(row, 'rolloverEnabled') && (
+                          <span className="ml-1 text-[var(--theme-muted)]">
+                            (rolls over)
+                          </span>
                         )}
                       </span>
                       <div className="flex gap-2">

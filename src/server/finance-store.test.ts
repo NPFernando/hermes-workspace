@@ -16,6 +16,7 @@ import {
   getAverageMonthlyExpensesLkr,
   getAverageMonthlySavingsRatePct,
   buildFinanceQueryContext,
+  copyBudgetsToMonth,
   getCurrencyExposure,
   getFxGainLoss,
   getFinanceTrends,
@@ -27,7 +28,7 @@ import {
   maskSensitive,
   tradingPerformanceSummary,
 } from './finance-store'
-import type { FinanceAccount } from './finance-store'
+import type { BudgetCategory, FinanceAccount } from './finance-store'
 
 /**
  * Fresh `finance-store` module instance backed by a pure in-memory store — no
@@ -2811,6 +2812,150 @@ describe('PF review item 7: server-side dashboard derivations', () => {
         ],
       },
     ])
+  })
+})
+
+describe('copyBudgetsToMonth', () => {
+  function budgetRow(over: Partial<BudgetCategory> = {}): BudgetCategory {
+    return {
+      id: 'b-1',
+      month: '2026-07',
+      category: 'Groceries',
+      currency: 'LKR',
+      budgetAmount: 20_000,
+      source: 'test',
+      createdAt: '2026-07-01T00:00:00.000Z',
+      updatedAt: '2026-07-01T00:00:00.000Z',
+      ...over,
+    }
+  }
+
+  it('copies each category from the most recent prior month into the target month', () => {
+    const db = createEmptyFinanceDatabase()
+    db.budget_categories.push(budgetRow())
+
+    const result = copyBudgetsToMonth(db, '2026-08')
+    expect(result).toEqual({ copied: 1, skippedExisting: 0 })
+    const augustRows = db.budget_categories.filter((b) => b.month === '2026-08')
+    expect(augustRows).toHaveLength(1)
+    expect(augustRows[0]).toMatchObject({
+      category: 'Groceries',
+      currency: 'LKR',
+      budgetAmount: 20_000,
+      month: '2026-08',
+      source: 'rollover',
+    })
+  })
+
+  it('skips a category that already has a row for the target month, without overwriting it', () => {
+    const db = createEmptyFinanceDatabase()
+    db.budget_categories.push(
+      budgetRow(),
+      budgetRow({
+        id: 'b-2',
+        month: '2026-08',
+        budgetAmount: 99_999,
+        createdAt: '2026-08-01T00:00:00.000Z',
+        updatedAt: '2026-08-01T00:00:00.000Z',
+      }),
+    )
+
+    const result = copyBudgetsToMonth(db, '2026-08')
+    expect(result).toEqual({ copied: 0, skippedExisting: 1 })
+    const augustRows = db.budget_categories.filter((b) => b.month === '2026-08')
+    expect(augustRows).toHaveLength(1)
+    expect(augustRows[0].budgetAmount).toBe(99_999) // untouched
+  })
+
+  it('picks the most recent prior month, not just any prior month', () => {
+    const db = createEmptyFinanceDatabase()
+    db.budget_categories.push(
+      budgetRow({ id: 'b-1', month: '2026-05', budgetAmount: 10_000 }),
+      budgetRow({ id: 'b-2', month: '2026-07', budgetAmount: 20_000 }),
+    )
+
+    copyBudgetsToMonth(db, '2026-08')
+    const augustRow = db.budget_categories.find((b) => b.month === '2026-08')!
+    expect(augustRow.budgetAmount).toBe(20_000)
+  })
+
+  it('adds the positive leftover when rolloverEnabled is set and the source month was under budget', () => {
+    const db = createEmptyFinanceDatabase()
+    db.budget_categories.push(budgetRow({ rolloverEnabled: true }))
+    db.expense_records.push({
+      id: 'e-1',
+      date: '2026-07-05',
+      vendor: 'Cargills',
+      category: 'Groceries',
+      currency: 'LKR',
+      amount: 15_000,
+      convertedLkrAmount: 15_000,
+      recurring: false,
+      workRelated: false,
+      taxDeductiblePossible: false,
+      source: 'test',
+      createdAt: '2026-07-05T00:00:00.000Z',
+      updatedAt: '2026-07-05T00:00:00.000Z',
+    })
+
+    copyBudgetsToMonth(db, '2026-08')
+    const augustRow = db.budget_categories.find((b) => b.month === '2026-08')!
+    // 20,000 budget - 15,000 spent = 5,000 leftover, added on top.
+    expect(augustRow.budgetAmount).toBe(25_000)
+    expect(augustRow.rolloverEnabled).toBe(true)
+  })
+
+  it('never subtracts an overspend — rollover only ever adds unspent room', () => {
+    const db = createEmptyFinanceDatabase()
+    db.budget_categories.push(budgetRow({ rolloverEnabled: true, budgetAmount: 20_000 }))
+    db.expense_records.push({
+      id: 'e-1',
+      date: '2026-07-05',
+      vendor: 'Cargills',
+      category: 'Groceries',
+      currency: 'LKR',
+      amount: 25_000, // over budget
+      convertedLkrAmount: 25_000,
+      recurring: false,
+      workRelated: false,
+      taxDeductiblePossible: false,
+      source: 'test',
+      createdAt: '2026-07-05T00:00:00.000Z',
+      updatedAt: '2026-07-05T00:00:00.000Z',
+    })
+
+    copyBudgetsToMonth(db, '2026-08')
+    const augustRow = db.budget_categories.find((b) => b.month === '2026-08')!
+    expect(augustRow.budgetAmount).toBe(20_000) // unchanged, not reduced to 15,000
+  })
+
+  it('does not add a leftover when rolloverEnabled is not set, even if under budget', () => {
+    const db = createEmptyFinanceDatabase()
+    db.budget_categories.push(budgetRow()) // rolloverEnabled not set
+    db.expense_records.push({
+      id: 'e-1',
+      date: '2026-07-05',
+      vendor: 'Cargills',
+      category: 'Groceries',
+      currency: 'LKR',
+      amount: 5_000,
+      convertedLkrAmount: 5_000,
+      recurring: false,
+      workRelated: false,
+      taxDeductiblePossible: false,
+      source: 'test',
+      createdAt: '2026-07-05T00:00:00.000Z',
+      updatedAt: '2026-07-05T00:00:00.000Z',
+    })
+
+    copyBudgetsToMonth(db, '2026-08')
+    const augustRow = db.budget_categories.find((b) => b.month === '2026-08')!
+    expect(augustRow.budgetAmount).toBe(20_000) // straight copy, no leftover added
+  })
+
+  it('returns copied: 0, skippedExisting: 0 when there is nothing to copy', () => {
+    const db = createEmptyFinanceDatabase()
+    expect(copyBudgetsToMonth(db, '2026-08')).toEqual({ copied: 0, skippedExisting: 0 })
   })
 })
 
