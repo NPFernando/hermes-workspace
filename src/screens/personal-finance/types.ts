@@ -204,8 +204,23 @@ export type PendingIngestion = {
   source: 'gmail' | 'upload'
   documentType: 'transaction' | 'contract'
   passwordHint?: string
+  matchedSenderId?: string
+  matchedSenderLabel?: string
   extracted?: ExtractedTransaction
   extractedContract?: ExtractedContract
   rawPreviewImagePath?: string
   error?: string
+}
+
+/** Mirrors KnownSender in finance-store.ts, minus the encrypted secret — the API never returns that, only `hasPassword`. */
+export type KnownSender = {
+  id: string
+  label: string
+  matchDomain?: string
+  matchAddress?: string
+  passwordScheme?: string
+  accountId?: string
+  hasPassword: boolean
+  createdAt: string
+  updatedAt: string
 }
