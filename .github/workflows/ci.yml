@@ -32,13 +32,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: Run linter
-        run: pnpm run lint || echo "⚠️ Lint not configured, skipping"
-        continue-on-error: true
+      - name: Lint changed source files
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha || github.event.before }}"
+          FILES="$(git diff --name-only "$BASE_SHA" "$GITHUB_SHA" -- '*.js' '*.mjs' '*.cjs' '*.ts' '*.tsx')"
+          if [ -n "$FILES" ]; then
+            pnpm exec eslint $FILES --no-ignore
+          else
+            echo "No changed JavaScript or TypeScript files to lint"
+          fi
 
       - name: Type check
-        run: pnpm run typecheck || pnpm exec tsc --noEmit || echo "⚠️ Typecheck not configured"
-        continue-on-error: true
+        run: pnpm run typecheck
 
       - name: Build
         run: pnpm build
@@ -52,6 +57,8 @@ jobs:
             echo "❌ No dist folder found"
             exit 1
           fi
+      - name: Check bundle budgets
+        run: pnpm run check:bundle
 
   test:
     name: Run Tests
@@ -77,5 +84,4 @@ jobs:
         run: pnpm install --no-frozen-lockfile
 
       - name: Run tests
-        run: pnpm test || echo "⚠️ No tests configured"
-        continue-on-error: true
+        run: pnpm test
