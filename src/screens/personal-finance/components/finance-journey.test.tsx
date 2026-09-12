@@ -207,7 +207,7 @@ describe('personal finance dashboard journey', () => {
     ) as HTMLSelectElement
     const fxOnlyChange = () =>
       [...container.querySelectorAll('span')].find((span) =>
-        span.textContent?.includes('FX-only change:'),
+        span.textContent.includes('FX-only change:'),
       )?.textContent
     const initialFxScenario = fxOnlyChange()
     expect(initialFxScenario).toBeTruthy()
