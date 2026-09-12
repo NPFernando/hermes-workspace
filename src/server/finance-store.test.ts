@@ -19,6 +19,7 @@ import {
   copyBudgetsToMonth,
   getCurrencyExposure,
   getFxGainLoss,
+  getNetWorthForecast,
   getFinanceTrends,
   getMonthlySummary,
   getRecurringBills,
@@ -2905,6 +2906,135 @@ describe('PF review item 7: server-side dashboard derivations', () => {
         ],
       },
     ])
+  })
+})
+
+describe('getNetWorthForecast', () => {
+  function incomeRow(over: Partial<Record<string, unknown>> = {}) {
+    return {
+      id: `i-${Math.random()}`,
+      dateReceived: '2026-06-15',
+      sourceName: 'Job',
+      incomeType: 'Salary',
+      originalCurrency: 'LKR',
+      originalAmount: 100_000,
+      exchangeRateUsed: 1,
+      convertedLkrAmount: 100_000,
+      taxable: true,
+      source: 't',
+      createdAt: '2026-06-15T00:00:00.000Z',
+      updatedAt: '2026-06-15T00:00:00.000Z',
+      ...over,
+    }
+  }
+  function expenseRow(over: Partial<Record<string, unknown>> = {}) {
+    return {
+      id: `e-${Math.random()}`,
+      date: '2026-06-20',
+      vendor: 'Rent',
+      category: 'Housing',
+      currency: 'LKR',
+      amount: 60_000,
+      convertedLkrAmount: 60_000,
+      recurring: false,
+      workRelated: false,
+      taxDeductiblePossible: false,
+      source: 't',
+      createdAt: '2026-06-20T00:00:00.000Z',
+      updatedAt: '2026-06-20T00:00:00.000Z',
+      ...over,
+    }
+  }
+
+  it('reports hasData: false with an empty points array when there is no complete month of history', () => {
+    const db = createEmptyFinanceDatabase()
+    const forecast = getNetWorthForecast(db)
+    expect(forecast.hasData).toBe(false)
+    expect(forecast.points).toEqual([])
+    expect(forecast.monthlyDeltaBase).toBe(0)
+  })
+
+  it('projects forward using the trailing average monthly savings, excluding the current in-progress month', () => {
+    const db = createEmptyFinanceDatabase()
+    const now = new Date()
+    // Two complete prior months at a steady 40,000/month savings rate, plus
+    // a wildly different current-month row that must be excluded.
+    for (let i = 1; i <= 2; i++) {
+      const d = new Date(now.getUTCFullYear(), now.getUTCMonth() - i, 15)
+      db.income_records.push(
+        incomeRow({
+          id: `inc-${i}`,
+          dateReceived: d.toISOString().slice(0, 10),
+          originalAmount: 100_000,
+          convertedLkrAmount: 100_000,
+        }),
+      )
+      db.expense_records.push(
+        expenseRow({
+          id: `exp-${i}`,
+          date: d.toISOString().slice(0, 10),
+          amount: 60_000,
+          convertedLkrAmount: 60_000,
+        }),
+      )
+    }
+    // Current month: a huge one-off expense that would skew the average if
+    // it weren't excluded as "in progress".
+    db.expense_records.push(
+      expenseRow({
+        id: 'exp-current',
+        date: now.toISOString().slice(0, 10),
+        amount: 5_000_000,
+        convertedLkrAmount: 5_000_000,
+      }),
+    )
+
+    const forecast = getNetWorthForecast(db, 3)
+    expect(forecast.hasData).toBe(true)
+    expect(forecast.monthsOfHistoryUsed).toBe(2)
+    expect(forecast.monthlyDeltaBase).toBe(40_000) // 100k - 60k, both months identical
+    expect(forecast.points).toHaveLength(3)
+    expect(forecast.points[0].projectedNetWorthBase).toBe(
+      forecast.currentNetWorthBase + 40_000,
+    )
+    expect(forecast.points[2].projectedNetWorthBase).toBe(
+      forecast.currentNetWorthBase + 40_000 * 3,
+    )
+  })
+
+  it('produces consecutive future YYYY-MM month keys', () => {
+    const db = createEmptyFinanceDatabase()
+    const now = new Date()
+    const d = new Date(now.getUTCFullYear(), now.getUTCMonth() - 1, 10)
+    db.income_records.push(
+      incomeRow({ dateReceived: d.toISOString().slice(0, 10) }),
+    )
+    db.expense_records.push(
+      expenseRow({ date: d.toISOString().slice(0, 10) }),
+    )
+
+    const forecast = getNetWorthForecast(db, 2)
+    const expectedFirst = new Date(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)
+    const expectedKey = `${expectedFirst.getUTCFullYear()}-${String(expectedFirst.getUTCMonth() + 1).padStart(2, '0')}`
+    expect(forecast.points[0].month).toBe(expectedKey)
+  })
+
+  it('a negative trailing savings rate projects a declining net worth', () => {
+    const db = createEmptyFinanceDatabase()
+    const now = new Date()
+    const d = new Date(now.getUTCFullYear(), now.getUTCMonth() - 1, 10)
+    db.income_records.push(
+      incomeRow({ dateReceived: d.toISOString().slice(0, 10), originalAmount: 50_000, convertedLkrAmount: 50_000 }),
+    )
+    db.expense_records.push(
+      expenseRow({ date: d.toISOString().slice(0, 10), amount: 90_000, convertedLkrAmount: 90_000 }),
+    )
+
+    const forecast = getNetWorthForecast(db, 1)
+    expect(forecast.monthlyDeltaBase).toBe(-40_000)
+    expect(forecast.points[0].projectedNetWorthBase).toBe(
+      forecast.currentNetWorthBase - 40_000,
+    )
   })
 })
 

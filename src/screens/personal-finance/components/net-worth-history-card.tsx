@@ -30,22 +30,52 @@ export function NetWorthHistoryCard({
   payload: PersonalFinancePayload
 }) {
   const history = payload.netWorthHistory
+  const forecast = payload.netWorthForecast
   const [view, setView] = useState<'total' | 'breakdown'>('total')
   if (history.length < 2) return null
 
   const base = payload.baseCurrency
-  const data = history.map((point) => ({
+  const data: Array<{
+    date: string
+    label: string
+    value: number | null
+    cash: number | null
+    investments: number | null
+    debt: number | null
+    projected: number | null
+  }> = history.map((point) => ({
     date: point.date,
     label: shortDate(point.date),
     value: Math.round(point.netWorthBase),
     cash: Math.round(point.cashBase),
     investments: Math.round(point.investmentsBase),
     debt: Math.round(point.debtBase),
+    projected: null,
   }))
-  const first = data[0].value
-  const last = data[data.length - 1].value
+  const first = data[0].value ?? 0
+  const last = data[data.length - 1].value ?? 0
   const delta = last - first
   const pct = first !== 0 ? (delta / Math.abs(first)) * 100 : 0
+
+  // Extend the chart with a dashed projection — same view ('total' only,
+  // it's a single savings-driven number, not a cash/investments/debt split).
+  // The last real point doubles as `projected`'s starting value so the
+  // dashed line visually picks up exactly where the solid one ends, instead
+  // of leaving a gap.
+  if (forecast.hasData && view === 'total') {
+    data[data.length - 1] = { ...data[data.length - 1], projected: last }
+    for (const point of forecast.points) {
+      data.push({
+        date: point.month,
+        label: point.month,
+        value: null,
+        cash: null,
+        investments: null,
+        debt: null,
+        projected: Math.round(point.projectedNetWorthBase),
+      })
+    }
+  }
 
   return (
     <section className="mt-4 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
@@ -117,14 +147,29 @@ export function NetWorthHistoryCard({
               }}
             />
             {view === 'total' ? (
-              <Line
-                type="monotone"
-                dataKey="value"
-                name="Net worth"
-                stroke="var(--theme-accent)"
-                strokeWidth={2}
-                dot={false}
-              />
+              <>
+                <Line
+                  type="monotone"
+                  dataKey="value"
+                  name="Net worth"
+                  stroke="var(--theme-accent)"
+                  strokeWidth={2}
+                  dot={false}
+                  connectNulls={false}
+                />
+                {forecast.hasData && (
+                  <Line
+                    type="monotone"
+                    dataKey="projected"
+                    name="Projected"
+                    stroke="var(--theme-muted)"
+                    strokeWidth={2}
+                    strokeDasharray="4 4"
+                    dot={false}
+                    connectNulls
+                  />
+                )}
+              </>
             ) : (
               <>
                 <Legend wrapperStyle={{ fontSize: 11 }} />
@@ -157,6 +202,15 @@ export function NetWorthHistoryCard({
           </LineChart>
         </ResponsiveContainer>
       </div>
+      {view === 'total' && forecast.hasData && (
+        <p className="mt-2 text-xs text-[var(--theme-muted)]">
+          Dashed line: projected {forecast.points.length} months ahead at{' '}
+          {formatLkr(forecast.monthlyDeltaBase, base)}/month (avg. of the last{' '}
+          {forecast.monthsOfHistoryUsed} complete month
+          {forecast.monthsOfHistoryUsed === 1 ? '' : 's'} of savings) — cash
+          flow only, doesn't project market/property/interest growth.
+        </p>
+      )}
     </section>
   )
 }

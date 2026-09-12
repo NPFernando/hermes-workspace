@@ -134,6 +134,13 @@ vi.mock('../../server/finance-store', () => ({
   getCategoryCorrections: vi.fn(() => ({})),
   findPossibleDuplicate: vi.fn(() => null),
   copyBudgetsToMonth: vi.fn(() => ({ copied: 0, skippedExisting: 0 })),
+  getNetWorthForecast: vi.fn(() => ({
+    hasData: false,
+    currentNetWorthBase: 0,
+    monthlyDeltaBase: 0,
+    monthsOfHistoryUsed: 0,
+    points: [],
+  })),
 }))
 // Neither of these was mocked before (the pending_ingestions actions —
 // submit_ingestion_password, confirm_pending_ingestion, and now

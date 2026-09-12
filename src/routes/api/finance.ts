@@ -30,6 +30,7 @@ import {
   getExchangeRate,
   getFinanceTrends,
   getFxGainLoss,
+  getNetWorthForecast,
   getRecurringBills,
   getUnifiedTransactions,
   getUpcomingMoney,
@@ -542,6 +543,7 @@ function personalFinancePayload() {
     upcomingMoney: getUpcomingMoney(db),
     currencyExposure: getCurrencyExposure(db),
     fxGainLoss: getFxGainLoss(db),
+    netWorthForecast: getNetWorthForecast(db),
     // Daily net-worth history (written by the snapshot cron / action), most
     // recent 180 points, converted to the reporting currency for the chart.
     netWorthHistory: db.net_worth_snapshots
