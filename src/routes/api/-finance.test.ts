@@ -144,6 +144,17 @@ vi.mock('../../server/finance-store', () => ({
     monthsOfHistoryUsed: 0,
     points: [],
   })),
+  listKnownSenders: vi.fn(() => []),
+  upsertKnownSender: vi.fn((input: Record<string, unknown>) => ({
+    id: 'sender-1',
+    label: '',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    ...input,
+  })),
+  deleteKnownSender: vi.fn(),
+  setKnownSenderPassword: vi.fn(),
+  clearKnownSenderPassword: vi.fn(),
 }))
 // Neither of these was mocked before (the pending_ingestions actions —
 // submit_ingestion_password, confirm_pending_ingestion, and now
@@ -1182,5 +1193,57 @@ describe('copy_budgets_to_month', () => {
       }),
     })
     expect(malformed.status).toBe(400)
+  })
+})
+
+describe('bulk_import_known_senders', () => {
+  it('imports valid rows and reports skipped rows with a reason', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    vi.mocked(store.upsertKnownSender).mockClear()
+
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'bulk_import_known_senders',
+          senders: [
+            { label: 'ComBank', matchDomain: 'combank.lk' },
+            { label: '', matchDomain: 'nolabel.lk' },
+            { label: 'No match info' },
+            { label: 'CSE', matchAddress: 'statements@cse.lk', passwordScheme: 'DOB' },
+          ],
+        }),
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as {
+      imported: number
+      skipped: Array<{ row: number; reason: string }>
+    }
+    expect(body.imported).toBe(2)
+    expect(body.skipped).toEqual([
+      { row: 1, reason: 'missing label' },
+      { row: 2, reason: 'needs a matchDomain or matchAddress' },
+    ])
+    expect(vi.mocked(store.upsertKnownSender)).toHaveBeenCalledTimes(2)
+  })
+
+  it('treats a non-array senders field as zero rows, not an error', async () => {
+    state.authenticated = true
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'bulk_import_known_senders' }),
+      }),
+    })
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { imported: number }
+    expect(body.imported).toBe(0)
   })
 })
