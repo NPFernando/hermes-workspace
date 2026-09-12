@@ -11,9 +11,60 @@ type PayoffProjection =
   | {
       insufficientPayment: false
       monthsRemaining: number
+      totalInterest: number
       payoffDate: string
       termComparisonText?: string
     }
+
+type PayoffScenario =
+  | { insufficientPayment: true }
+  | { insufficientPayment: false; monthsRemaining: number; totalInterest: number }
+
+export type PayoffComparison = {
+  baseline: PayoffScenario
+  withExtra: PayoffScenario
+  /** null when either scenario never pays off, or extraPayment <= 0. */
+  monthsSaved: number | null
+  interestSaved: number | null
+}
+
+/** Capped so a payment that barely covers interest can't spin the simulation
+ *  loop for an unreasonable number of iterations — 600 months is 50 years,
+ *  already well past any real loan term. */
+const MAX_SIMULATION_MONTHS = 600
+
+/**
+ * Month-by-month amortization simulation rather than the closed-form
+ * payoff-time formula — needed to also get an exact total-interest figure
+ * (a closed form gives months-to-payoff but not total interest paid,
+ * particularly with the last month's partial payment). `monthlyPayment` is
+ * the full payment actually applied each month, extra payment included.
+ */
+function simulatePayoff(
+  currentBalance: number,
+  interestRatePct: number,
+  monthlyPayment: number,
+): PayoffScenario {
+  if (monthlyPayment <= 0 || currentBalance <= 0) {
+    return { insufficientPayment: true }
+  }
+  const r = interestRatePct / 100 / 12
+  if (r > 0 && monthlyPayment <= currentBalance * r) {
+    return { insufficientPayment: true }
+  }
+
+  let balance = currentBalance
+  let totalInterest = 0
+  let months = 0
+  while (balance > 0 && months < MAX_SIMULATION_MONTHS) {
+    const interest = balance * r
+    const principal = Math.min(monthlyPayment - interest, balance)
+    balance -= principal
+    totalInterest += interest
+    months += 1
+  }
+  return { insufficientPayment: false, monthsRemaining: months, totalInterest }
+}
 
 /**
  * WEALTH-104/105: pure client-side projection from fields the loan already
@@ -22,7 +73,7 @@ type PayoffProjection =
  * (this projects forward from currentBalance as of now, not a full
  * historical schedule reconciliation).
  */
-function payoffProjection(
+export function payoffProjection(
   loan: Record<string, unknown>,
 ): PayoffProjection | null {
   const currentBalance = numberField(loan, 'currentBalance')
@@ -32,25 +83,16 @@ function payoffProjection(
   if ((stringField(loan, 'status') || 'active') !== 'active') return null
   if (monthlyPayment <= 0 || currentBalance <= 0) return null
 
-  const r = interestRatePct / 100 / 12
-  const interestOnly = currentBalance * r
-  if (monthlyPayment <= interestOnly) return { insufficientPayment: true }
-
-  const monthsRemaining =
-    r === 0
-      ? Math.ceil(currentBalance / monthlyPayment)
-      : Math.ceil(
-          Math.log(monthlyPayment / (monthlyPayment - currentBalance * r)) /
-            Math.log(1 + r),
-        )
+  const scenario = simulatePayoff(currentBalance, interestRatePct, monthlyPayment)
+  if (scenario.insufficientPayment) return { insufficientPayment: true }
 
   const payoff = new Date()
-  payoff.setMonth(payoff.getMonth() + monthsRemaining)
+  payoff.setMonth(payoff.getMonth() + scenario.monthsRemaining)
   const payoffDate = payoff.toISOString().slice(0, 10)
 
   let termComparisonText: string | undefined
   if (termMonths > 0) {
-    const diff = monthsRemaining - termMonths
+    const diff = scenario.monthsRemaining - termMonths
     termComparisonText =
       diff <= 0
         ? `within the original ${termMonths}-month term`
@@ -59,9 +101,52 @@ function payoffProjection(
 
   return {
     insufficientPayment: false,
-    monthsRemaining,
+    monthsRemaining: scenario.monthsRemaining,
+    totalInterest: scenario.totalInterest,
     payoffDate,
     termComparisonText,
+  }
+}
+
+/**
+ * "What if I paid extra?" — compares the scheduled monthly payment against
+ * that payment plus `extraMonthlyPayment`, both simulated from the loan's
+ * current balance. Pure and client-side (no server round trip), so a
+ * calculator UI can recompute on every keystroke.
+ */
+export function payoffComparison(
+  loan: Record<string, unknown>,
+  extraMonthlyPayment: number,
+): PayoffComparison | null {
+  const currentBalance = numberField(loan, 'currentBalance')
+  const interestRatePct = numberField(loan, 'interestRatePct')
+  const monthlyPayment = numberField(loan, 'monthlyPayment')
+  if ((stringField(loan, 'status') || 'active') !== 'active') return null
+  if (monthlyPayment <= 0 || currentBalance <= 0) return null
+
+  const baseline = simulatePayoff(currentBalance, interestRatePct, monthlyPayment)
+  const withExtra = simulatePayoff(
+    currentBalance,
+    interestRatePct,
+    monthlyPayment + Math.max(0, extraMonthlyPayment),
+  )
+
+  const canCompare =
+    extraMonthlyPayment > 0 &&
+    !baseline.insufficientPayment &&
+    !withExtra.insufficientPayment
+
+  return {
+    baseline,
+    withExtra,
+    monthsSaved: canCompare
+      ? (baseline as { monthsRemaining: number }).monthsRemaining -
+        (withExtra as { monthsRemaining: number }).monthsRemaining
+      : null,
+    interestSaved: canCompare
+      ? (baseline as { totalInterest: number }).totalInterest -
+        (withExtra as { totalInterest: number }).totalInterest
+      : null,
   }
 }
 
@@ -71,6 +156,59 @@ function payoffProjection(
  * as they pay it down (unlike FixedDeposit's principal, which never
  * changes). currentBalance feeds financeSummary()'s debtBase when active.
  */
+function PayoffCalculator({
+  loan,
+  currency,
+  extraPayment,
+  onExtraPaymentChange,
+}: {
+  loan: Record<string, unknown>
+  currency: string
+  extraPayment: string
+  onExtraPaymentChange: (value: string) => void
+}) {
+  const extra = Number(extraPayment) || 0
+  const comparison = payoffComparison(loan, extra)
+
+  return (
+    <div className="mt-2 rounded-xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_5%,transparent)] p-3">
+      <p className="text-xs font-medium text-[var(--theme-text)]">
+        What if I paid extra each month?
+      </p>
+      <div className="mt-2 flex items-center gap-2">
+        <input
+          type="number"
+          placeholder="Extra monthly payment"
+          value={extraPayment}
+          onChange={(e) => onExtraPaymentChange(e.target.value)}
+          className={`${inputClass} w-44`}
+        />
+        <span className="text-xs text-[var(--theme-muted)]">{currency}/month</span>
+      </div>
+      {comparison && extra > 0 && (
+        <p className="mt-2 text-xs text-[var(--theme-muted)]">
+          {comparison.withExtra.insufficientPayment ? (
+            'Still not enough to cover interest.'
+          ) : comparison.monthsSaved !== null &&
+            comparison.interestSaved !== null ? (
+            <>
+              Paying off in ~{comparison.withExtra.monthsRemaining} months
+              instead of ~
+              {(comparison.baseline as { monthsRemaining: number })
+                .monthsRemaining}{' '}
+              — {comparison.monthsSaved} month
+              {comparison.monthsSaved === 1 ? '' : 's'} sooner, saving ~
+              {formatMoney(comparison.interestSaved, currency)} in interest.
+            </>
+          ) : (
+            'The scheduled payment alone never covers interest — extra payments alone won\'t fix that; check the interest rate and monthly payment.'
+          )}
+        </p>
+      )}
+    </div>
+  )
+}
+
 export function LoansPanel({
   payload,
   onPayload,
@@ -86,6 +224,10 @@ export function LoansPanel({
   } = useFinanceAction<PersonalFinancePayload>(onPayload)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [editOpenId, setEditOpenId] = useState<string | null>(null)
+  const [calculatorOpenId, setCalculatorOpenId] = useState<string | null>(null)
+  const [extraPaymentDrafts, setExtraPaymentDrafts] = useState<
+    Record<string, string>
+  >({})
   const [editDrafts, setEditDrafts] = useState<
     Record<
       string,
@@ -504,6 +646,21 @@ export function LoansPanel({
                       ))}
                   </div>
                   <div className="flex gap-2">
+                    {projection && !projection.insufficientPayment && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCalculatorOpenId(
+                            calculatorOpenId === id ? null : id,
+                          )
+                        }
+                        className={buttonClass}
+                      >
+                        {calculatorOpenId === id
+                          ? 'Hide calculator'
+                          : 'Payoff calculator'}
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => startEdit(loan)}
@@ -521,6 +678,19 @@ export function LoansPanel({
                     </button>
                   </div>
                 </div>
+              )}
+              {!isEditing && calculatorOpenId === id && (
+                <PayoffCalculator
+                  loan={loan}
+                  currency={loanCurrency}
+                  extraPayment={extraPaymentDrafts[id] ?? ''}
+                  onExtraPaymentChange={(value) =>
+                    setExtraPaymentDrafts((prev) => ({
+                      ...prev,
+                      [id]: value,
+                    }))
+                  }
+                />
               )}
             </div>
           )
