@@ -7,8 +7,12 @@ import { cn } from '@/lib/utils'
 
 type InputProps = Omit<
   InputPrimitive.Props & React.RefAttributes<HTMLInputElement>,
-  'size'
+  'size' | 'style'
 > & {
+  // Keep the wrapper's style contract identical for Base UI and native inputs.
+  // Base UI 1.8 adds state-dependent style callbacks, which a native input
+  // cannot interpret; callers may still provide regular inline CSS styles.
+  style?: React.CSSProperties
   size?: 'sm' | 'default' | 'lg' | number
   unstyled?: boolean
   nativeInput?: boolean
