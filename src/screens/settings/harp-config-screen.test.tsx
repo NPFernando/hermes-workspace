@@ -43,10 +43,10 @@ async function renderInto(element: React.ReactElement) {
 
 function buttonByText(container: HTMLElement, text: string): HTMLButtonElement {
   const btn = Array.from(container.querySelectorAll('button')).find((b) =>
-    (b.textContent ?? '').includes(text),
+    b.textContent.includes(text),
   )
   if (!btn) throw new Error(`no button containing text: ${text}`)
-  return btn as HTMLButtonElement
+  return btn
 }
 
 function inputByPlaceholder(
@@ -57,7 +57,7 @@ function inputByPlaceholder(
     (i.getAttribute('placeholder') ?? '').includes(fragment),
   )
   if (!el) throw new Error(`no input with placeholder containing: ${fragment}`)
-  return el as HTMLInputElement
+  return el
 }
 
 /** Set a controlled input's value so React's onChange fires in jsdom. */

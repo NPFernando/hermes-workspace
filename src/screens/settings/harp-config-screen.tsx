@@ -1301,10 +1301,7 @@ export function HarpConfigScreen() {
         <button
           type="button"
           onClick={() =>
-            mutation.mutate({ action: 'create-starter' } as Record<
-              string,
-              unknown
-            >)
+            mutation.mutate({ action: 'create-starter' })
           }
           disabled={mutation.isPending}
           className="flex items-center gap-2 rounded-xl border border-accent-300 bg-accent-50/60 px-4 py-2.5 text-sm font-medium text-accent-700 transition-colors hover:bg-accent-100 disabled:opacity-50 dark:border-accent-700/40 dark:bg-accent-950/20 dark:text-accent-300"
