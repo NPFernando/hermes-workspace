@@ -32,21 +32,21 @@ describe('harp-memory-client — disabled (no token)', () => {
 
   it('proposeCategoryPreference is a no-op and never calls fetch', async () => {
     const spy = vi.fn()
-    globalThis.fetch = spy as unknown as typeof fetch
+    globalThis.fetch = spy
     await proposeCategoryPreference({ vendor: 'Keells', category: 'Groceries' })
     expect(spy).not.toHaveBeenCalled()
   })
 
   it('getCachedCategoryPreferences returns {} and does not call fetch', () => {
     const spy = vi.fn()
-    globalThis.fetch = spy as unknown as typeof fetch
+    globalThis.fetch = spy
     expect(getCachedCategoryPreferences()).toEqual({})
     expect(spy).not.toHaveBeenCalled()
   })
 
   it('getUserFinanceMemoriesForPrompt returns [] without calling fetch', async () => {
     const spy = vi.fn()
-    globalThis.fetch = spy as unknown as typeof fetch
+    globalThis.fetch = spy
     expect(await getUserFinanceMemoriesForPrompt('am I overspending?')).toEqual(
       [],
     )
@@ -63,7 +63,7 @@ describe('harp-memory-client — enabled', () => {
 
   it('proposeCategoryPreference POSTs a confidential user-scoped candidate', async () => {
     const spy = vi.fn(async () => new Response('{"accepted":true}', { status: 200 }))
-    globalThis.fetch = spy as unknown as typeof fetch
+    globalThis.fetch = spy
 
     await proposeCategoryPreference({ vendor: '  Keells  ', category: ' Groceries ' })
 
@@ -110,8 +110,8 @@ describe('harp-memory-client — enabled', () => {
   })
 
   it('a failing search leaves the cache empty (never throws)', async () => {
-    globalThis.fetch = (async () =>
-      new Response('nope', { status: 503 })) as unknown as typeof fetch
+    globalThis.fetch = async () =>
+      new Response('nope', { status: 503 })
     getCachedCategoryPreferences()
     await new Promise((r) => setTimeout(r, 10))
     expect(getCachedCategoryPreferences()).toEqual({})
@@ -166,8 +166,8 @@ describe('harp-memory-client — enabled', () => {
         { id: 'd', source_ref: 'other-tool', memory_type: 'financial_rule', content: 'Not a finance-dashboard memory.' },
       ],
     }
-    globalThis.fetch = (async () =>
-      new Response(JSON.stringify(payload), { status: 200 })) as unknown as typeof fetch
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify(payload), { status: 200 })
 
     expect(await listActiveFinanceMemories()).toEqual([
       { id: 'a', content: 'Categorize finance transactions from "keells" as "Groceries".', kind: 'category_rule' },
@@ -190,7 +190,7 @@ describe('harp-memory-client — enabled', () => {
     await flagFinanceMemory('m-9')
 
     const bodies = spy.mock.calls.map(
-      (c) => JSON.parse((c[1] as RequestInit).body as string) as Record<string, unknown>,
+      (c) => JSON.parse((c[1]).body as string) as Record<string, unknown>,
     )
     expect(bodies[0]).toMatchObject({ memory_type: 'financial_rule', scope: 'user', data_class: 'confidential' })
     expect(bodies[1]).toMatchObject({ memory_id: 'm-9', useful: false, user_corrected: true })
@@ -198,7 +198,7 @@ describe('harp-memory-client — enabled', () => {
 
   it('proposeFinancialRule ignores an empty rule', async () => {
     const spy = vi.fn()
-    globalThis.fetch = spy as unknown as typeof fetch
+    globalThis.fetch = spy
     expect(await proposeFinancialRule('   ')).toEqual({ submitted: false })
     expect(spy).not.toHaveBeenCalled()
   })
@@ -212,8 +212,8 @@ describe('harp-memory-client — enabled', () => {
         { memory_id: '', content: 'no id' },
       ],
     }
-    globalThis.fetch = (async () =>
-      new Response(JSON.stringify(payload), { status: 200 })) as unknown as typeof fetch
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify(payload), { status: 200 })
 
     expect(await listPendingFinanceCandidates()).toEqual([
       { id: 'p1', content: 'Keep 6 months in cash.', kind: 'financial_rule', createdAt: '2026-09-08T00:00:00Z' },
@@ -233,7 +233,7 @@ describe('harp-memory-client — enabled', () => {
     expect(await approveMemory('p1')).toEqual({ ok: true })
     expect(await rejectMemory('p2')).toEqual({ ok: false }) // 503 → call() returns null
     const bodies = spy.mock.calls.map(
-      (c) => JSON.parse((c[1] as RequestInit).body as string) as Record<string, unknown>,
+      (c) => JSON.parse((c[1]).body as string) as Record<string, unknown>,
     )
     expect(bodies[0]).toEqual({ memory_id: 'p1', reviewer: 'naveen' })
     expect(bodies[1]).toEqual({ memory_id: 'p2', reviewer: 'naveen' })
