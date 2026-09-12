@@ -1,3 +1,7 @@
+strictDepBuilds: true
+
+# Keep dependency lifecycle execution explicit for pnpm 10+ in CI and the
+# floating Corepack version used by container builds.
 allowBuilds:
   electron: true
   electron-winstaller: true
