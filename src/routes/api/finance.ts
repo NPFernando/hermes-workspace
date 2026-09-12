@@ -2537,6 +2537,57 @@ export const Route = createFileRoute('/api/finance')({
               knownSender: { ...rest, hasPassword: Boolean(encryptedPassword) },
             })
           }
+          if (action === 'bulk_import_known_senders') {
+            // CSV/bulk counterpart to upsert_known_sender — never accepts a
+            // password column: passwords stay a deliberate one-at-a-time,
+            // write-only action (set_known_sender_password) so a bulk file
+            // can't become a place secrets accidentally end up on disk.
+            const rows = Array.isArray(body.senders) ? body.senders : []
+            let imported = 0
+            const skipped: Array<{ row: number; reason: string }> = []
+            rows.forEach((row: unknown, index: number) => {
+              const r = (row ?? {}) as Record<string, unknown>
+              const label = typeof r.label === 'string' ? r.label.trim() : ''
+              const matchDomain =
+                typeof r.matchDomain === 'string' ? r.matchDomain.trim() : ''
+              const matchAddress =
+                typeof r.matchAddress === 'string' ? r.matchAddress.trim() : ''
+              if (!label) {
+                skipped.push({ row: index, reason: 'missing label' })
+                return
+              }
+              if (!matchDomain && !matchAddress) {
+                skipped.push({
+                  row: index,
+                  reason: 'needs a matchDomain or matchAddress',
+                })
+                return
+              }
+              upsertKnownSender({
+                label,
+                matchDomain: matchDomain || undefined,
+                matchAddress: matchAddress || undefined,
+                passwordScheme:
+                  typeof r.passwordScheme === 'string' && r.passwordScheme.trim()
+                    ? r.passwordScheme.trim()
+                    : undefined,
+                accountId:
+                  typeof r.accountId === 'string' && r.accountId.trim()
+                    ? r.accountId.trim()
+                    : undefined,
+              })
+              imported += 1
+            })
+            return json({
+              ok: true,
+              imported,
+              skipped,
+              knownSenders: listKnownSenders().map(({ encryptedPassword, ...s }) => ({
+                ...s,
+                hasPassword: Boolean(encryptedPassword),
+              })),
+            })
+          }
           if (action === 'delete_known_sender') {
             const id = typeof body.id === 'string' ? body.id : ''
             if (!id)

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   buttonClass,
   confirmButtonClass,
@@ -6,7 +6,9 @@ import {
   dangerTone,
   inputClass,
   positiveTone,
+  warningTone,
 } from '../shared-styles'
+import { parseCsv } from './csv-import-panel'
 import type { KnownSender } from '../types'
 
 type Draft = {
@@ -48,6 +50,12 @@ export function KnownSendersCard() {
   const [passwordDrafts, setPasswordDrafts] = useState<Record<string, string>>(
     {},
   )
+  const [importBusy, setImportBusy] = useState(false)
+  const [importResult, setImportResult] = useState<{
+    imported: number
+    skipped: Array<{ row: number; reason: string }>
+  } | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -136,6 +144,65 @@ export function KnownSendersCard() {
     }
   }
 
+  async function importCsv(file: File) {
+    setImportBusy(true)
+    setNote(null)
+    setImportResult(null)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCsv(text)
+      const lower = headers.map((h) => h.trim().toLowerCase())
+      const colIndex = (name: string) => lower.indexOf(name)
+      const labelCol = colIndex('label')
+      const domainCol = colIndex('matchdomain')
+      const addressCol = colIndex('matchaddress')
+      const schemeCol = colIndex('passwordscheme')
+      if (labelCol === -1) {
+        setNote(
+          'CSV needs a "label" column, plus "matchDomain" and/or "matchAddress". Optional: "passwordScheme".',
+        )
+        return
+      }
+      const parsedSenders = rows
+        .filter((r) => r.some((cell) => cell.trim()))
+        .map((r) => ({
+          label: r[labelCol] ?? '',
+          matchDomain: domainCol !== -1 ? r[domainCol] : undefined,
+          matchAddress: addressCol !== -1 ? r[addressCol] : undefined,
+          passwordScheme: schemeCol !== -1 ? r[schemeCol] : undefined,
+        }))
+      if (parsedSenders.length === 0) {
+        setNote('No data rows found in that file.')
+        return
+      }
+      const res = await fetch('/api/finance', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'bulk_import_known_senders',
+          senders: parsedSenders,
+        }),
+      })
+      const data = (await res.json()) as {
+        ok: boolean
+        error?: string
+        imported?: number
+        skipped?: Array<{ row: number; reason: string }>
+      }
+      if (!data.ok) {
+        setNote(data.error || 'Import failed')
+        return
+      }
+      setImportResult({ imported: data.imported ?? 0, skipped: data.skipped ?? [] })
+      await load()
+    } catch {
+      setNote('Could not read that file.')
+    } finally {
+      setImportBusy(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
   async function clearPassword(id: string) {
     setBusyId(id)
     try {
@@ -157,13 +224,33 @@ export function KnownSendersCard() {
           Known Gmail senders
         </h3>
         {!editing && (
-          <button
-            type="button"
-            onClick={() => setEditing(emptyDraft())}
-            className={buttonClass}
-          >
-            Add sender
-          </button>
+          <div className="flex gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) void importCsv(file)
+              }}
+            />
+            <button
+              type="button"
+              disabled={importBusy}
+              onClick={() => fileInputRef.current?.click()}
+              className={buttonClass}
+            >
+              {importBusy ? 'Importing…' : 'Import CSV'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditing(emptyDraft())}
+              className={buttonClass}
+            >
+              Add sender
+            </button>
+          </div>
         )}
       </div>
       <p className="mt-1 text-xs text-[var(--theme-muted)]">
@@ -172,6 +259,23 @@ export function KnownSendersCard() {
         tried automatically to unlock an encrypted PDF from that sender
         before it falls back to manual review.
       </p>
+      <p className="mt-1 text-xs text-[var(--theme-muted)]">
+        Bulk-add several senders at once: a CSV with a{' '}
+        <code>label</code> column plus <code>matchDomain</code> and/or{' '}
+        <code>matchAddress</code> (optional <code>passwordScheme</code>) — no
+        password column, passwords are always set one at a time below, never
+        imported in bulk.
+      </p>
+      {importResult && (
+        <p className={`mt-1 text-xs ${importResult.skipped.length > 0 ? warningTone : positiveTone}`}>
+          Imported {importResult.imported} sender
+          {importResult.imported === 1 ? '' : 's'}.
+          {importResult.skipped.length > 0 &&
+            ` Skipped ${importResult.skipped.length} row(s): ${importResult.skipped
+              .map((s) => `row ${s.row + 1} (${s.reason})`)
+              .join(', ')}.`}
+        </p>
+      )}
 
       {editing && (
         <div className="mt-3 rounded-xl border border-[var(--theme-border)]/60 p-3">
