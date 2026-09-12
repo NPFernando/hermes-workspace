@@ -2988,6 +2988,86 @@ export function recordNetWorthSnapshot(
   return { db, snapshot }
 }
 
+/**
+ * Ties tax_records to the income already logged, instead of leaving tax
+ * tracking fully manual and disconnected from it. Deliberately never
+ * estimates an actual tax liability — real bracket/rate math varies by
+ * jurisdiction and this app doesn't encode tax law, so getting that wrong
+ * would be worse than not showing it. This only ever flags a *completeness*
+ * gap: taxable income came in with nothing logged in tax_records to show
+ * for it, either for the whole year or (more urgently) within the current
+ * calendar quarter as it's about to close.
+ */
+function getTaxRecordAlerts(
+  db: FinanceDatabase,
+): Array<{ level: 'info' | 'warning' | 'critical'; title: string; detail: string }> {
+  const alerts: Array<{
+    level: 'info' | 'warning' | 'critical'
+    title: string
+    detail: string
+  }> = []
+  const now = new Date()
+  const currentYear = String(now.getFullYear())
+  const lkr = (n: number) => `LKR ${Math.round(n).toLocaleString('en-LK')}`
+
+  let taxableThisYear = 0
+  for (const inc of db.income_records) {
+    if (!inc.taxable) continue
+    const d = parseDate(inc.dateReceived)
+    if (!d || String(d.year) !== currentYear) continue
+    taxableThisYear += inc.convertedLkrAmount
+  }
+  const hasRecordThisYear = db.tax_records.some(
+    (r) => r.taxYear === currentYear,
+  )
+  if (taxableThisYear > 0 && !hasRecordThisYear) {
+    alerts.push({
+      level: 'info',
+      title: `No tax record for ${currentYear} yet`,
+      detail: `${lkr(taxableThisYear)} in taxable income logged for ${currentYear} so far, with no tax record on file yet.`,
+    })
+  }
+
+  // Quarterly nudge — only in a quarter's final stretch (last 20 days), and
+  // only if taxable income actually landed this quarter with nothing
+  // created/updated in tax_records during it. "Quarterly" here means plain
+  // calendar quarters (Jan-Mar, Apr-Jun, …), not a specific country's actual
+  // filing deadline, which this app has no business asserting.
+  const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3
+  const quarterEnd = new Date(now.getFullYear(), quarterStartMonth + 3, 0)
+  const daysLeftInQuarter = Math.ceil(
+    (quarterEnd.getTime() - now.getTime()) / 86_400_000,
+  )
+  if (daysLeftInQuarter <= 20) {
+    const quarterIndex = Math.floor(quarterStartMonth / 3) + 1
+    let taxableThisQuarter = 0
+    for (const inc of db.income_records) {
+      if (!inc.taxable) continue
+      const d = parseDate(inc.dateReceived)
+      if (!d || d.year !== now.getFullYear()) continue
+      if (Math.floor((d.month - 1) / 3) !== quarterStartMonth / 3) continue
+      taxableThisQuarter += inc.convertedLkrAmount
+    }
+    const loggedThisQuarter = db.tax_records.some((r) => {
+      const updated = new Date(r.updatedAt)
+      return (
+        !Number.isNaN(updated.getTime()) &&
+        updated.getFullYear() === now.getFullYear() &&
+        Math.floor(updated.getMonth() / 3) === quarterStartMonth / 3
+      )
+    })
+    if (taxableThisQuarter > 0 && !loggedThisQuarter) {
+      alerts.push({
+        level: 'info',
+        title: `Q${quarterIndex} tax record not yet logged`,
+        detail: `${lkr(taxableThisQuarter)} in taxable income received this quarter (Q${quarterIndex} ${now.getFullYear()}, ${daysLeftInQuarter} days left) with nothing logged in tax records yet.`,
+      })
+    }
+  }
+
+  return alerts
+}
+
 export function financeAlerts(db: FinanceDatabase): Array<{
   level: 'info' | 'warning' | 'critical'
   title: string
@@ -3071,6 +3151,7 @@ export function financeAlerts(db: FinanceDatabase): Array<{
       })
     }
   }
+  alerts.push(...getTaxRecordAlerts(db))
   return alerts
 }
 
