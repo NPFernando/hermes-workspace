@@ -3055,6 +3055,7 @@ export function financeAlerts(db: FinanceDatabase): Array<{
   ).getDate()
   const daysLeft = daysInMonth - now.getDate()
   const lkr = (n: number) => `LKR ${Math.round(n).toLocaleString('en-LK')}`
+  const daysElapsed = now.getDate()
   for (const row of budgetVsActualSummary(db)) {
     if (row.budget <= 0) continue
     if (row.overBudget) {
@@ -3063,12 +3064,35 @@ export function financeAlerts(db: FinanceDatabase): Array<{
         title: `Over budget: ${row.category}`,
         detail: `Spent ${lkr(row.actual)} of a ${lkr(row.budget)} budget this month (${Math.round(row.percentUsed)}%).`,
       })
-    } else if (row.percentUsed >= 90 && daysLeft >= 3) {
+      continue
+    }
+    if (row.percentUsed >= 90 && daysLeft >= 3) {
       alerts.push({
         level: 'warning',
         title: `Budget nearly spent: ${row.category}`,
         detail: `${Math.round(row.percentUsed)}% of the ${row.category} budget used with ${daysLeft} days left in the month.`,
       })
+      continue
+    }
+    // Pace-based early warning — catches a category on track to go over
+    // budget well before percentUsed crosses the 90% cutoff above (e.g.
+    // 60% spent after only a third of the month is a faster burn rate than
+    // the budget allows for, but the flat threshold wouldn't fire until
+    // much later, if the pace holds). Needs a handful of days of data
+    // before trusting the daily rate (`daysElapsed >= 5`), a 10% buffer over
+    // the projection so an incidental one-off purchase early in the month
+    // doesn't false-positive, and the same "don't nag near month end"
+    // days-left gate the nearly-spent alert above uses.
+    if (daysElapsed >= 5 && daysLeft >= 3) {
+      const dailyRate = row.actual / daysElapsed
+      const projectedTotal = dailyRate * daysInMonth
+      if (projectedTotal > row.budget * 1.1) {
+        alerts.push({
+          level: 'warning',
+          title: `On pace to exceed budget: ${row.category}`,
+          detail: `Spending ${lkr(row.actual)} in the first ${daysElapsed} days puts you on pace for ~${lkr(projectedTotal)} this month, vs a ${lkr(row.budget)} budget.`,
+        })
+      }
     }
   }
   return alerts
@@ -4322,7 +4346,7 @@ export function budgetVsActualSummary(
         category: b.category,
         month: b.month,
         // PF-201: budget/actual/variance below are all LKR-normalised.
-        currency: 'LKR' as CurrencyCode,
+        currency: 'LKR',
         budget,
         actual,
         variance: result?.variance ?? budget,
