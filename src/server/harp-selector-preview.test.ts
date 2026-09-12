@@ -36,8 +36,10 @@ describe('HARP selector preview', () => {
   })
 
   it('uses only the local fixed preview endpoint with no-store and a bounded timeout', async () => {
-    const fetcher = vi.fn(async () => Response.json(previewFixture()))
-    const result = await loadHarpSelectorPreview(fetcher as typeof fetch)
+    const fetcher = vi.fn(() =>
+      Promise.resolve(Response.json(previewFixture())),
+    )
+    const result = await loadHarpSelectorPreview(fetcher)
 
     expect(result.matrix).toHaveLength(2)
     expect(fetcher).toHaveBeenCalledWith(
@@ -52,10 +54,14 @@ describe('HARP selector preview', () => {
 
   it('rejects non-success and malformed upstream responses', async () => {
     await expect(
-      loadHarpSelectorPreview(async () => new Response('{}', { status: 503 })),
+      loadHarpSelectorPreview(() =>
+        Promise.resolve(new Response('{}', { status: 503 })),
+      ),
     ).rejects.toThrow(/unavailable/i)
     await expect(
-      loadHarpSelectorPreview(async () => Response.json({ matrix: [] })),
+      loadHarpSelectorPreview(() =>
+        Promise.resolve(Response.json({ matrix: [] })),
+      ),
     ).rejects.toThrow(/invalid matrix/i)
   })
 })
