@@ -1003,6 +1003,7 @@ describe('import_transactions_csv', () => {
       vendorOrSource: 'Cargills',
       date: '2026-01-01',
       amount: 1500,
+      confidence: 'exact',
     })
 
     const response = await (
@@ -1042,6 +1043,7 @@ describe('import_transactions_csv', () => {
       vendorOrSource: 'Cargills',
       date: '2026-01-01',
       amount: 1500,
+      confidence: 'exact',
     })
 
     const response = await (

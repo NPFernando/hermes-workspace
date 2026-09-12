@@ -818,7 +818,7 @@ describe('findPossibleDuplicate', () => {
     fs.rmSync(tmp, { recursive: true, force: true })
   })
 
-  it('finds a same-day/vendor/amount expense match, case-insensitive on vendor', async () => {
+  it('finds a same-day/vendor/amount expense match, case-insensitive on vendor, marked exact', async () => {
     const store = await freshFinanceStore()
     store.addFinanceRecord('expense', {
       date: '2026-03-01',
@@ -837,6 +837,7 @@ describe('findPossibleDuplicate', () => {
       vendorOrSource: 'Cafe Nero',
       date: '2026-03-01',
       amount: 500,
+      confidence: 'exact',
     })
   })
 
@@ -853,7 +854,7 @@ describe('findPossibleDuplicate', () => {
     ).not.toBeNull()
   })
 
-  it('does not match a different date, vendor, or amount beyond tolerance', async () => {
+  it('matches a date one day either side as "likely" — the common card-settlement-lag case', async () => {
     const store = await freshFinanceStore()
     store.addFinanceRecord('expense', {
       date: '2026-03-01',
@@ -864,6 +865,23 @@ describe('findPossibleDuplicate', () => {
 
     expect(
       store.findPossibleDuplicate('expense', 'Cafe Nero', '2026-03-02', 500),
+    ).toMatchObject({ confidence: 'likely', date: '2026-03-01' })
+    expect(
+      store.findPossibleDuplicate('expense', 'Cafe Nero', '2026-02-28', 500),
+    ).toMatchObject({ confidence: 'likely', date: '2026-03-01' })
+  })
+
+  it('does not match a date more than a day away, a different vendor, or an amount beyond tolerance', async () => {
+    const store = await freshFinanceStore()
+    store.addFinanceRecord('expense', {
+      date: '2026-03-01',
+      vendor: 'Cafe Nero',
+      category: 'Dining',
+      amount: 500,
+    })
+
+    expect(
+      store.findPossibleDuplicate('expense', 'Cafe Nero', '2026-03-03', 500),
     ).toBeNull()
     expect(
       store.findPossibleDuplicate(
@@ -876,6 +894,30 @@ describe('findPossibleDuplicate', () => {
     expect(
       store.findPossibleDuplicate('expense', 'Cafe Nero', '2026-03-01', 600),
     ).toBeNull()
+  })
+
+  it('prefers the exact-day match over a one-day-off match when both exist', async () => {
+    const store = await freshFinanceStore()
+    store.addFinanceRecord('expense', {
+      date: '2026-03-02',
+      vendor: 'Cafe Nero',
+      category: 'Dining',
+      amount: 500,
+    })
+    store.addFinanceRecord('expense', {
+      date: '2026-03-01',
+      vendor: 'Cafe Nero',
+      category: 'Dining',
+      amount: 500,
+    })
+
+    const match = store.findPossibleDuplicate(
+      'expense',
+      'Cafe Nero',
+      '2026-03-01',
+      500,
+    )
+    expect(match).toMatchObject({ confidence: 'exact', date: '2026-03-01' })
   })
 
   it('checks income and expense collections independently', async () => {
