@@ -24,6 +24,12 @@ afterEach(() => {
 })
 
 describe('harp-memory-client — disabled (no token)', () => {
+  beforeEach(() => {
+    delete process.env.HARP_MEMORY_API_TOKEN
+    delete process.env.HARP_MEMORY_API_URL
+    __resetHarpMemoryClient()
+  })
+
   it('proposeCategoryPreference is a no-op and never calls fetch', async () => {
     const spy = vi.fn()
     globalThis.fetch = spy as unknown as typeof fetch
