@@ -3681,6 +3681,117 @@ describe('financeAlerts — category budget thresholds', () => {
   })
 })
 
+describe('financeAlerts — tax record completeness (getTaxRecordAlerts)', () => {
+  function taxableIncome(dateReceived: string, amount: number) {
+    return {
+      id: `inc-${dateReceived}-${amount}`,
+      dateReceived,
+      sourceName: 'Job',
+      incomeType: 'Salary',
+      originalCurrency: 'LKR' as const,
+      originalAmount: amount,
+      exchangeRateUsed: 1,
+      convertedLkrAmount: amount,
+      taxable: true,
+      source: 't',
+      createdAt: `${dateReceived}T00:00:00.000Z`,
+      updatedAt: `${dateReceived}T00:00:00.000Z`,
+    }
+  }
+  function taxRecord(over: Partial<Record<string, unknown>> = {}) {
+    return {
+      id: `tax-${Math.random()}`,
+      taxYear: String(new Date().getFullYear()),
+      incomeType: 'Salary',
+      amount: 0,
+      currency: 'LKR' as const,
+      convertedLkrAmount: 0,
+      exchangeRateSource: 'manual',
+      estimatedTaxableAmount: 0,
+      taxPaid: 0,
+      taxDue: 0,
+      requiresConfirmation: false,
+      source: 't',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      ...over,
+    }
+  }
+
+  it('flags no tax record for the current year when taxable income was received', () => {
+    const db = createEmptyFinanceDatabase()
+    const year = new Date().getFullYear()
+    db.income_records.push(taxableIncome(`${year}-01-15`, 100_000))
+    const alert = financeAlerts(db).find(
+      (a) => a.title === `No tax record for ${year} yet`,
+    )
+    expect(alert).toBeDefined()
+    expect(alert?.level).toBe('info')
+  })
+
+  it('stays silent for the year once a tax record exists for it', () => {
+    const db = createEmptyFinanceDatabase()
+    const year = new Date().getFullYear()
+    db.income_records.push(taxableIncome(`${year}-01-15`, 100_000))
+    db.tax_records.push(taxRecord({ taxYear: String(year) }))
+    expect(
+      financeAlerts(db).some((a) => a.title === `No tax record for ${year} yet`),
+    ).toBe(false)
+  })
+
+  it('stays silent when no taxable income was received this year', () => {
+    const db = createEmptyFinanceDatabase()
+    const year = new Date().getFullYear()
+    db.income_records.push({
+      ...taxableIncome(`${year}-01-15`, 100_000),
+      taxable: false,
+    })
+    expect(
+      financeAlerts(db).some((a) => a.title === `No tax record for ${year} yet`),
+    ).toBe(false)
+  })
+
+  it('nudges for the current quarter, only in its final stretch, mirroring the source gate', () => {
+    const db = createEmptyFinanceDatabase()
+    const now = new Date()
+    const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3
+    const quarterEnd = new Date(now.getFullYear(), quarterStartMonth + 3, 0)
+    const daysLeftInQuarter = Math.ceil(
+      (quarterEnd.getTime() - now.getTime()) / 86_400_000,
+    )
+    const quarterIndex = Math.floor(quarterStartMonth / 3) + 1
+    // Dated on the 1st of the quarter's first month — always inside the
+    // current quarter regardless of today's actual date.
+    const quarterFirstMonth = String(quarterStartMonth + 1).padStart(2, '0')
+    db.income_records.push(
+      taxableIncome(`${now.getFullYear()}-${quarterFirstMonth}-01`, 200_000),
+    )
+    const has = financeAlerts(db).some(
+      (a) => a.title === `Q${quarterIndex} tax record not yet logged`,
+    )
+    expect(has).toBe(daysLeftInQuarter <= 20)
+  })
+
+  it('does not nudge for the quarter once a tax record was updated during it', () => {
+    const db = createEmptyFinanceDatabase()
+    const now = new Date()
+    const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3
+    const quarterFirstMonth = String(quarterStartMonth + 1).padStart(2, '0')
+    db.income_records.push(
+      taxableIncome(`${now.getFullYear()}-${quarterFirstMonth}-01`, 200_000),
+    )
+    db.tax_records.push(
+      taxRecord({ updatedAt: now.toISOString() }),
+    )
+    const quarterIndex = Math.floor(quarterStartMonth / 3) + 1
+    expect(
+      financeAlerts(db).some(
+        (a) => a.title === `Q${quarterIndex} tax record not yet logged`,
+      ),
+    ).toBe(false)
+  })
+})
+
 describe('scheduled_transaction (planned future income/expense)', () => {
   beforeEach(() => {
     vi.resetModules()
