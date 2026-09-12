@@ -510,10 +510,7 @@ export type Beneficiary = {
  * since a pending ingestion isn't a real finance record yet.
  */
 export type PendingIngestionStatus =
-  | 'awaiting_password'
-  | 'awaiting_review'
-  | 'confirmed'
-  | 'rejected'
+  'awaiting_password' | 'awaiting_review' | 'confirmed' | 'rejected'
 
 export type ExtractedTransaction = {
   kind: 'income' | 'expense'
@@ -713,11 +710,7 @@ export type TradingPlan = {
   status: PlanStatus
   userApprovalStatus: 'not_required' | 'pending' | 'approved' | 'rejected'
   executionStatus:
-    | 'not_executable'
-    | 'blocked'
-    | 'pending'
-    | 'executed'
-    | 'failed'
+    'not_executable' | 'blocked' | 'pending' | 'executed' | 'failed'
   actualOutcome?: string
   profitLoss?: number
   strategyUsed?: string
@@ -949,9 +942,7 @@ export type FinanceDatabase = {
  *                           dev / in-memory backend is active.
  */
 export type FinanceStorageHealthStatus =
-  | 'healthy'
-  | 'postgres_unavailable'
-  | 'json_primary'
+  'healthy' | 'postgres_unavailable' | 'json_primary'
 
 export type FinanceStorageHealth = {
   status: FinanceStorageHealthStatus
@@ -1148,9 +1139,7 @@ export function buildFinanceStorageHealth(input: {
 
   if (!input.postgres.enabled) {
     status = 'json_primary'
-    warnings.push(
-      'Postgres persistence is disabled (dev / in-memory backend).',
-    )
+    warnings.push('Postgres persistence is disabled (dev / in-memory backend).')
   } else if (
     !input.postgres.available ||
     !input.postgres.snapshotAvailable ||
@@ -1313,11 +1302,11 @@ export function setNonLiveExecutionMode(
   mode: 'observe_only' | 'paper_trade' | 'testnet_execute',
 ): FinanceDatabase {
   const db = readFinanceStore()
-  const validationRuns = (db.settings as Record<string, unknown>)
-    .validationRuns
+  const validationRuns = (db.settings as Record<string, unknown>).validationRuns
   const activeRuns =
     validationRuns && typeof validationRuns === 'object'
-      ? (validationRuns as { active?: Array<{ stage?: string }> }).active ?? []
+      ? ((validationRuns as { active?: Array<{ stage?: string }> }).active ??
+        [])
       : []
   const expectedStage =
     mode === 'paper_trade'
@@ -1624,7 +1613,8 @@ export function addFinanceRecord(
       category: stringField(payload, 'category', 'Other'),
       currency: stringField(payload, 'currency', 'LKR'),
       budgetAmount: numberField(payload, 'budgetAmount', 0),
-      rolloverEnabled: booleanField(payload, 'rolloverEnabled', false) || undefined,
+      rolloverEnabled:
+        booleanField(payload, 'rolloverEnabled', false) || undefined,
     })
   } else if (kind === 'category') {
     db.categories.push({
@@ -2105,27 +2095,71 @@ export type DuplicateMatch = {
   date: string
   amount: number
   vendorOrSource: string
-  /** 'exact' = same calendar day; 'likely' = within a day either side —
+  /** 'exact' = exact normalized vendor and same day; 'likely' = exact vendor within a day; 'possible' = a one-typo name match —
    *  added for the common case of a card's bank-settlement date landing a
    *  day or two after the receipt/email date the ingestion pipeline reads,
    *  which an exact-day match was missing entirely (a real false-negative
    *  gap, not just a hypothetical one — card transactions routinely settle
    *  1-2 days after the purchase/statement date). Callers can phrase the
-   *  warning accordingly; this is advisory either way (force:true always
+   *  warning accordingly; all matches are advisory (force:true always
    *  overrides), so the wider net costs at most one extra confirmation
    *  click, never a blocked or silently-dropped record. */
-  confidence: 'exact' | 'likely'
+  confidence: 'exact' | 'likely' | 'possible'
 }
 
 function daysBetween(a: string, b: string): number | null {
   const dateA = new Date(`${a}T00:00:00Z`)
   const dateB = new Date(`${b}T00:00:00Z`)
-  if (Number.isNaN(dateA.getTime()) || Number.isNaN(dateB.getTime())) return null
+  if (Number.isNaN(dateA.getTime()) || Number.isNaN(dateB.getTime()))
+    return null
   return Math.round(Math.abs(dateA.getTime() - dateB.getTime()) / 86_400_000)
 }
 
+function normalizeVendorName(value: string): string {
+  return value
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+}
+
+/** Accept only one simple typo for names of at least eight characters. */
+function oneCharacterVendorTypo(a: string, b: string): boolean {
+  if (Math.min(a.length, b.length) < 8 || Math.abs(a.length - b.length) > 1) {
+    return false
+  }
+  let left = 0
+  let right = 0
+  let edits = 0
+  while (left < a.length && right < b.length) {
+    if (a[left] === b[right]) {
+      left += 1
+      right += 1
+      continue
+    }
+    edits += 1
+    if (edits > 1) return false
+    if (a.length === b.length) {
+      // A neighboring transposition is a common keyboard slip.
+      if (a[left] === b[right + 1] && a[left + 1] === b[right]) {
+        left += 2
+        right += 2
+      } else {
+        left += 1
+        right += 1
+      }
+    } else if (a.length > b.length) {
+      left += 1
+    } else {
+      right += 1
+    }
+  }
+  if (left < a.length || right < b.length) edits += 1
+  return edits === 1
+}
+
 /**
- * Same-vendor(case-insensitive), ~same-amount (within 1%) match against
+ * Same-vendor or one-character possible vendor typo, ~same-amount (within 1%) match against
  * existing records, dated the same day ('exact') or within a day either
  * side ('likely') — used by confirm_pending_ingestion to warn before
  * silently double-counting an email/upload that was already confirmed once
@@ -2142,7 +2176,8 @@ export function findPossibleDuplicate(
 ): DuplicateMatch | null {
   if (!vendorOrSource.trim() || !date || !Number.isFinite(amount)) return null
   const db = ensureFinanceStore()
-  const vendorKey = vendorOrSource.trim().toLowerCase()
+  const vendorKey = normalizeVendorName(vendorOrSource)
+  if (!vendorKey) return null
   const dateOnly = date.slice(0, 10)
   const records: Array<{
     id: string
@@ -2164,28 +2199,42 @@ export function findPossibleDuplicate(
           amount: r.amount,
         }))
 
-  let best: (DuplicateMatch & { dayDiff: number }) | null = null
+  let best: (DuplicateMatch & { dayDiff: number; nameRank: number }) | null =
+    null
   for (const r of records) {
-    const sameVendor = r.vendor.trim().toLowerCase() === vendorKey
-    if (!sameVendor) continue
+    const recordVendorKey = normalizeVendorName(r.vendor)
+    const sameVendor = recordVendorKey === vendorKey
+    const possibleVendorTypo =
+      !sameVendor && oneCharacterVendorTypo(recordVendorKey, vendorKey)
+    if (!sameVendor && !possibleVendorTypo) continue
     const sameAmount =
       Math.abs(r.amount - amount) / Math.max(Math.abs(amount), 1) < 0.01
     if (!sameAmount) continue
     const dayDiff = daysBetween(r.date.slice(0, 10), dateOnly)
     if (dayDiff === null || dayDiff > 1) continue
-    if (best === null || dayDiff < best.dayDiff) {
+    const nameRank = sameVendor ? 0 : 1
+    if (
+      best === null ||
+      nameRank < best.nameRank ||
+      (nameRank === best.nameRank && dayDiff < best.dayDiff)
+    ) {
       best = {
         id: r.id,
         date: r.date,
         amount: r.amount,
         vendorOrSource: r.vendor,
-        confidence: dayDiff === 0 ? 'exact' : 'likely',
+        confidence: possibleVendorTypo
+          ? 'possible'
+          : dayDiff === 0
+            ? 'exact'
+            : 'likely',
         dayDiff,
+        nameRank,
       }
     }
   }
   if (!best) return null
-  const { dayDiff: _dayDiff, ...match } = best
+  const { dayDiff: _dayDiff, nameRank: _nameRank, ...match } = best
   return match
 }
 
@@ -2256,7 +2305,9 @@ export function recordGmailSyncError(message: string): void {
   writeFinanceStore(db)
 }
 
-function readKnownSenders(settings: Record<string, unknown>): Array<KnownSender> {
+function readKnownSenders(
+  settings: Record<string, unknown>,
+): Array<KnownSender> {
   const gmailIngest =
     settings.gmailIngest && typeof settings.gmailIngest === 'object'
       ? (settings.gmailIngest as Record<string, unknown>)
@@ -2287,7 +2338,12 @@ export function listKnownSenders(): Array<KnownSender> {
 
 export function upsertKnownSender(
   input: Pick<KnownSender, 'label'> &
-    Partial<Pick<KnownSender, 'id' | 'matchDomain' | 'matchAddress' | 'passwordScheme' | 'accountId'>>,
+    Partial<
+      Pick<
+        KnownSender,
+        'id' | 'matchDomain' | 'matchAddress' | 'passwordScheme' | 'accountId'
+      >
+    >,
 ): KnownSender {
   if (!input.label.trim()) throw new Error('label is required')
   const db = ensureFinanceStore()
@@ -2305,7 +2361,9 @@ export function upsertKnownSender(
     passwordScheme: input.passwordScheme?.trim() || undefined,
     accountId: input.accountId || undefined,
     encryptedPassword:
-      existingIndex >= 0 ? knownSenders[existingIndex].encryptedPassword : undefined,
+      existingIndex >= 0
+        ? knownSenders[existingIndex].encryptedPassword
+        : undefined,
     createdAt: existingIndex >= 0 ? knownSenders[existingIndex].createdAt : now,
     updatedAt: now,
   }
@@ -2315,7 +2373,10 @@ export function upsertKnownSender(
       : [...knownSenders, record]
   writeKnownSenders(settings, next)
   writeFinanceStore(db)
-  appendAuditLog('known_sender_upserted', { id: record.id, label: record.label })
+  appendAuditLog('known_sender_upserted', {
+    id: record.id,
+    label: record.label,
+  })
   return record
 }
 
@@ -2323,13 +2384,19 @@ export function deleteKnownSender(id: string): void {
   const db = ensureFinanceStore()
   const settings = db.settings as Record<string, unknown>
   const knownSenders = readKnownSenders(settings)
-  writeKnownSenders(settings, knownSenders.filter((s) => s.id !== id))
+  writeKnownSenders(
+    settings,
+    knownSenders.filter((s) => s.id !== id),
+  )
   writeFinanceStore(db)
   appendAuditLog('known_sender_deleted', { id })
 }
 
 /** Encrypts server-side via secret-crypto.ts — the plaintext password never gets stored or logged as-is. */
-export function setKnownSenderPassword(id: string, password: string): KnownSender {
+export function setKnownSenderPassword(
+  id: string,
+  password: string,
+): KnownSender {
   if (!password) throw new Error('password is required')
   const db = ensureFinanceStore()
   const settings = db.settings as Record<string, unknown>
@@ -2367,7 +2434,9 @@ export function clearKnownSenderPassword(id: string): KnownSender {
 }
 
 /** Server-internal only (gmail-ingest.ts) — decrypted value must never reach an API response. */
-export function decryptKnownSenderPassword(sender: KnownSender): string | undefined {
+export function decryptKnownSenderPassword(
+  sender: KnownSender,
+): string | undefined {
   if (!sender.encryptedPassword) return undefined
   try {
     return decryptSecret(sender.encryptedPassword)
@@ -2557,9 +2626,7 @@ export function createTradeOrder(
     side: stringField(payload, 'side', 'buy') as 'buy' | 'sell',
     quantity: numberField(payload, 'quantity', 0),
     orderType: stringField(payload, 'orderType', 'market') as
-      | 'market'
-      | 'limit'
-      | 'stop_limit',
+      'market' | 'limit' | 'stop_limit',
     ...(optionalNumber(payload, 'price') !== undefined
       ? { price: optionalNumber(payload, 'price') }
       : {}),
@@ -2828,7 +2895,10 @@ export function financeSummary(db: FinanceDatabase) {
   const latestRate = (from: string, to: string): number | undefined =>
     latestRateFromDb(db, from, to)
   /** Convert an amount in `currency` to LKR. */
-  const toLkr = (amount: number, currency: CurrencyCode | undefined): number => {
+  const toLkr = (
+    amount: number,
+    currency: CurrencyCode | undefined,
+  ): number => {
     if (!currency || currency === 'LKR') return amount
     const direct = latestRate(currency, 'LKR')
     if (direct !== undefined) return amount * direct
@@ -3026,9 +3096,11 @@ export function recordNetWorthSnapshot(
  * for it, either for the whole year or (more urgently) within the current
  * calendar quarter as it's about to close.
  */
-function getTaxRecordAlerts(
-  db: FinanceDatabase,
-): Array<{ level: 'info' | 'warning' | 'critical'; title: string; detail: string }> {
+function getTaxRecordAlerts(db: FinanceDatabase): Array<{
+  level: 'info' | 'warning' | 'critical'
+  title: string
+  detail: string
+}> {
   const alerts: Array<{
     level: 'info' | 'warning' | 'critical'
     title: string
@@ -3288,7 +3360,9 @@ function optionalNumber(payload: AddPayload, key: string): number | undefined {
  * `undefined` when absent/empty. `null` / `[]` are treated as an explicit
  * "clear the splits" on update.
  */
-function parseExpenseSplits(payload: AddPayload): Array<ExpenseSplit> | undefined {
+function parseExpenseSplits(
+  payload: AddPayload,
+): Array<ExpenseSplit> | undefined {
   const raw = payload.splits
   if (!Array.isArray(raw) || raw.length === 0) return undefined
   return raw.map((entry) => {
@@ -3839,7 +3913,8 @@ export function getRecurringBills(
     if (distinctMonths.size < 2) continue
     const amounts = bucket.entries.map((e) => e.amount)
     const avg = amounts.reduce((s, a) => s + a, 0) / amounts.length
-    if (!amounts.every((a) => avg > 0 && Math.abs(a - avg) / avg <= 0.2)) continue
+    if (!amounts.every((a) => avg > 0 && Math.abs(a - avg) / avg <= 0.2))
+      continue
     const thisMonthAmount = bucket.loggedThisMonth
       ? bucket.thisMonthAmount
       : null
@@ -3904,14 +3979,20 @@ function paydayStatusFor(
     return { state: 'not_tracked' }
   }
   const jobId = (job.id as string) || ''
-  const employer = String(job.employerName ?? '').trim().toLowerCase()
+  const employer = String(job.employerName ?? '')
+    .trim()
+    .toLowerCase()
   const now = new Date(today.getFullYear(), today.getMonth(), today.getDate())
   const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   const matches = incomeRecords.filter((r) => {
     if (String(r.dateReceived ?? '').slice(0, 7) !== monthKey) return false
     const linked = String(r.incomeSourceId ?? '')
     if (linked) return linked === jobId
-    return String(r.sourceName ?? '').trim().toLowerCase() === employer
+    return (
+      String(r.sourceName ?? '')
+        .trim()
+        .toLowerCase() === employer
+    )
   })
   if (matches.length > 0) {
     const lastPaidDate = matches
@@ -4030,7 +4111,9 @@ export interface CurrencyExposure {
   }>
 }
 
-export function getCurrencyExposure(db: FinanceDatabase): Array<CurrencyExposure> {
+export function getCurrencyExposure(
+  db: FinanceDatabase,
+): Array<CurrencyExposure> {
   // per currency → per source: { amount, count }
   const byCurrency = new Map<
     string,
@@ -4208,8 +4291,17 @@ export function getFxGainLoss(db: FinanceDatabase): {
     }
 
     const valueLkrNow = localConvertToLkr(db, valueNative, h.currency)
-    const costLkrAtBuy = localConvertToLkr(db, costNative, h.currency, h.buyDate)
-    const assetGainLkr = localConvertToLkr(db, valueNative - costNative, h.currency)
+    const costLkrAtBuy = localConvertToLkr(
+      db,
+      costNative,
+      h.currency,
+      h.buyDate,
+    )
+    const assetGainLkr = localConvertToLkr(
+      db,
+      valueNative - costNative,
+      h.currency,
+    )
     if (
       valueLkrNow === undefined ||
       costLkrAtBuy === undefined ||
@@ -4321,6 +4413,21 @@ export type NetWorthForecastPoint = {
   projectedNetWorthBase: number
 }
 
+export type NetWorthForecastAccountShare = {
+  accountId: string
+  accountName: string
+  type: string
+  currentBalanceBase: number
+  /** Equal to currentBalanceBase for every account NOT of type 'bank' or
+   *  'cash' — the forecast is a cash-flow-only model with no view of where
+   *  investment/property/debt balances go, so those are left unprojected
+   *  rather than guessed at. For 'bank'/'cash' accounts (where monthly
+   *  savings realistically accumulate), the projected total new savings at
+   *  the final forecast month is split proportionally to each account's
+   *  current balance share among bank/cash accounts (evenly if all are 0). */
+  projectedBalanceBase: number
+}
+
 export type NetWorthForecast = {
   /** False when there's no complete month of income/expense history yet —
    *  same bar as getAverageMonthlySavingsRatePct/getAverageMonthlyExpensesLkr.
@@ -4332,6 +4439,9 @@ export type NetWorthForecast = {
   monthlyDeltaBase: number
   monthsOfHistoryUsed: number
   points: Array<NetWorthForecastPoint>
+  /** Where the projected growth lands, per account — see
+   *  NetWorthForecastAccountShare's doc comment for the allocation rule. */
+  accountBreakdown: Array<NetWorthForecastAccountShare>
 }
 
 /**
@@ -4357,6 +4467,26 @@ export function getNetWorthForecast(
     (row) => `${row.year}-${row.month}` !== currentKey,
   )
   const currentNetWorthBase = financeSummary(db).netWorthBase
+  const reconcileLegs = ledgerTransactionsForDb(db)
+  // Mirrors financeSummary's own toLkr fallback: face-value amount when no
+  // exchange rate is on file, rather than dropping the account entirely.
+  const accountBalanceBase = (account: FinanceAccount): number => {
+    const balance = effectiveAccountBalance(db, account, reconcileLegs)
+    const lkr = localConvertToLkr(db, balance, account.currency) ?? balance
+    return lkrToBaseCurrency(db, lkr)
+  }
+
+  const flatAccountBreakdown = (): Array<NetWorthForecastAccountShare> =>
+    db.finance_accounts.map((account) => {
+      const currentBalanceBase = accountBalanceBase(account)
+      return {
+        accountId: account.id,
+        accountName: account.name,
+        type: account.type,
+        currentBalanceBase,
+        projectedBalanceBase: currentBalanceBase,
+      }
+    })
 
   if (complete.length === 0) {
     return {
@@ -4365,6 +4495,7 @@ export function getNetWorthForecast(
       monthlyDeltaBase: 0,
       monthsOfHistoryUsed: 0,
       points: [],
+      accountBreakdown: flatAccountBreakdown(),
     }
   }
 
@@ -4383,12 +4514,49 @@ export function getNetWorthForecast(
     })
   }
 
+  const totalNewSavingsBase = monthlyDeltaBase * monthsAhead
+  const cashAccounts = db.finance_accounts.filter(
+    (a) => a.type === 'bank' || a.type === 'cash',
+  )
+  const totalCashBalanceBase = cashAccounts.reduce(
+    (sum, account) => sum + accountBalanceBase(account),
+    0,
+  )
+  const accountBreakdown: Array<NetWorthForecastAccountShare> =
+    db.finance_accounts.map((account) => {
+      const currentBalanceBase = accountBalanceBase(account)
+      const isCash = account.type === 'bank' || account.type === 'cash'
+      if (!isCash) {
+        return {
+          accountId: account.id,
+          accountName: account.name,
+          type: account.type,
+          currentBalanceBase,
+          projectedBalanceBase: currentBalanceBase,
+        }
+      }
+      const share =
+        totalCashBalanceBase > 0
+          ? currentBalanceBase / totalCashBalanceBase
+          : cashAccounts.length > 0
+            ? 1 / cashAccounts.length
+            : 0
+      return {
+        accountId: account.id,
+        accountName: account.name,
+        type: account.type,
+        currentBalanceBase,
+        projectedBalanceBase: currentBalanceBase + totalNewSavingsBase * share,
+      }
+    })
+
   return {
     hasData: true,
     currentNetWorthBase,
     monthlyDeltaBase,
     monthsOfHistoryUsed: trailing.length,
     points,
+    accountBreakdown,
   }
 }
 
@@ -4579,7 +4747,9 @@ export function copyBudgetsToMonth(
   targetMonth: string,
 ): { copied: number; skippedExisting: number } {
   const existingCategories = new Set(
-    db.budget_categories.filter((b) => b.month === targetMonth).map((b) => b.category),
+    db.budget_categories
+      .filter((b) => b.month === targetMonth)
+      .map((b) => b.category),
   )
   // The most recent month strictly before targetMonth, per category — a
   // plain string comparison works because month keys are YYYY-MM.

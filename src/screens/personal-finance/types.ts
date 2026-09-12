@@ -136,6 +136,13 @@ export type PersonalFinancePayload = {
     monthlyDeltaBase: number
     monthsOfHistoryUsed: number
     points: Array<{ month: string; projectedNetWorthBase: number }>
+    accountBreakdown: Array<{
+      accountId: string
+      accountName: string
+      type: string
+      currentBalanceBase: number
+      projectedBalanceBase: number
+    }>
   }
   /** PF review item 1: `data.income_records` / `data.expense_records` carry
    * only the trailing N months. Older rows: `list_transactions` + JSON export. */

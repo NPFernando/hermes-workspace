@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { buttonClass, confirmButtonClassLarge, dangerButtonClassLarge, dangerTone, infoTone, inputClass, positiveTone, warningTone } from '../shared-styles'
+import {
+  buttonClass,
+  confirmButtonClassLarge,
+  dangerButtonClassLarge,
+  dangerTone,
+  infoTone,
+  inputClass,
+  positiveTone,
+  warningTone,
+} from '../shared-styles'
 import type {
   ExtractedContract,
   ExtractedTransaction,
@@ -11,7 +20,7 @@ type DuplicateWarning = {
   date: string
   amount: number
   vendorOrSource: string
-  confidence: 'exact' | 'likely'
+  confidence: 'exact' | 'likely' | 'possible'
 }
 
 const confidenceTone: Record<ExtractedTransaction['confidence'], string> = {
@@ -288,7 +297,7 @@ export function PendingIngestionPanel({
           date: string
           amount: number
           vendorOrSource: string
-          confidence: 'exact' | 'likely'
+          confidence: 'exact' | 'likely' | 'possible'
         }
       }
       if (data.ok === false) {
@@ -444,7 +453,9 @@ export function PendingIngestionPanel({
         </div>
       )}
 
-      {note && <p className="mt-2 text-xs text-[var(--theme-danger)]">{note}</p>}
+      {note && (
+        <p className="mt-2 text-xs text-[var(--theme-danger)]">{note}</p>
+      )}
 
       {items.length === 0 ? (
         <p className="mt-3 text-sm text-[var(--theme-muted)]">
@@ -492,7 +503,9 @@ export function PendingIngestionPanel({
                     {item.matchedSenderLabel && (
                       <>
                         <span>·</span>
-                        <span className={`rounded-lg border px-1.5 py-0.5 text-[10px] ${infoTone}`}>
+                        <span
+                          className={`rounded-lg border px-1.5 py-0.5 text-[10px] ${infoTone}`}
+                        >
                           {item.matchedSenderLabel}
                         </span>
                       </>
@@ -822,9 +835,11 @@ export function PendingIngestionPanel({
                         </div>
                         {hasDuplicateWarning && (
                           <p className="mt-2 text-xs text-[var(--theme-warning)]">
-                            {duplicateWarning.confidence === 'exact'
-                              ? 'Possible duplicate: an'
-                              : 'Possible duplicate (close match, different day): an'}{' '}
+                            {duplicateWarning.confidence === 'possible'
+                              ? 'Possible duplicate (vendor name is a close typo match): an'
+                              : duplicateWarning.confidence === 'exact'
+                                ? 'Possible duplicate: an'
+                                : 'Possible duplicate (close match, different day): an'}{' '}
                             existing record for "
                             {duplicateWarning.vendorOrSource}" on{' '}
                             {duplicateWarning.date} for{' '}

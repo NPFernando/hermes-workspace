@@ -2644,6 +2644,16 @@ export const Route = createFileRoute('/api/finance')({
             const force = body.force === true
             let created = 0
             let skippedDuplicates = 0
+            const possibleDuplicates: Array<{
+              index: number
+              match: {
+                id: string
+                date: string
+                amount: number
+                vendorOrSource: string
+                confidence: 'possible'
+              }
+            }> = []
             const errors: Array<{ index: number; reason: string }> = []
             rows.forEach((row: unknown, index: number) => {
               const r = (row && typeof row === 'object' ? row : {}) as Record<
@@ -2680,7 +2690,14 @@ export const Route = createFileRoute('/api/finance')({
                   amount,
                 )
                 if (duplicate) {
-                  skippedDuplicates += 1
+                  if (duplicate.confidence === 'possible') {
+                    possibleDuplicates.push({
+                      index,
+                      match: { ...duplicate, confidence: 'possible' },
+                    })
+                  } else {
+                    skippedDuplicates += 1
+                  }
                   return
                 }
               }
@@ -2710,12 +2727,14 @@ export const Route = createFileRoute('/api/finance')({
               rows: rows.length,
               created,
               skippedDuplicates,
+              possibleDuplicateCount: possibleDuplicates.length,
               errorCount: errors.length,
             })
             return json({
               ...financePayload(),
               created,
               skippedDuplicates,
+              possibleDuplicates,
               errors,
             })
           }

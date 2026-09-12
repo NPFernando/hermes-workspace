@@ -203,13 +203,62 @@ export function NetWorthHistoryCard({
         </ResponsiveContainer>
       </div>
       {view === 'total' && forecast.hasData && (
-        <p className="mt-2 text-xs text-[var(--theme-muted)]">
-          Dashed line: projected {forecast.points.length} months ahead at{' '}
-          {formatLkr(forecast.monthlyDeltaBase, base)}/month (avg. of the last{' '}
-          {forecast.monthsOfHistoryUsed} complete month
-          {forecast.monthsOfHistoryUsed === 1 ? '' : 's'} of savings) — cash
-          flow only, doesn't project market/property/interest growth.
-        </p>
+        <>
+          <p className="mt-2 text-xs text-[var(--theme-muted)]">
+            Dashed line: projected {forecast.points.length} months ahead at{' '}
+            {formatLkr(forecast.monthlyDeltaBase, base)}/month (avg. of the last{' '}
+            {forecast.monthsOfHistoryUsed} complete month
+            {forecast.monthsOfHistoryUsed === 1 ? '' : 's'} of savings) — cash
+            flow only, doesn't project market/property/interest growth.
+          </p>
+          {forecast.accountBreakdown.length > 0 && (
+            <div className="mt-3 overflow-x-auto">
+              <p className="text-xs font-medium text-[var(--theme-text)]">
+                Where the projected growth lands
+              </p>
+              <table className="mt-1 w-full text-xs">
+                <thead>
+                  <tr className="text-[var(--theme-muted)]">
+                    <th className="text-left font-normal">Account</th>
+                    <th className="text-right font-normal">Now</th>
+                    <th className="text-right font-normal">
+                      At +{forecast.points.length}mo
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {forecast.accountBreakdown.map((a) => {
+                    const projected = a.type === 'bank' || a.type === 'cash'
+                    return (
+                      <tr key={a.accountId}>
+                        <td className="text-[var(--theme-text)]">
+                          {a.accountName}
+                          {!projected && (
+                            <span className="ml-1 text-[var(--theme-muted)]">
+                              (not projected)
+                            </span>
+                          )}
+                        </td>
+                        <td className="text-right text-[var(--theme-muted)]">
+                          {formatLkr(a.currentBalanceBase, base)}
+                        </td>
+                        <td className="text-right text-[var(--theme-text)]">
+                          {formatLkr(a.projectedBalanceBase, base)}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              <p className="mt-1 text-xs text-[var(--theme-muted)]">
+                New savings are assumed to land in bank/cash accounts,
+                split by their current balance share — everything else stays
+                at today's balance since this model doesn't project market,
+                property, or debt movement.
+              </p>
+            </div>
+          )}
+        </>
       )}
     </section>
   )

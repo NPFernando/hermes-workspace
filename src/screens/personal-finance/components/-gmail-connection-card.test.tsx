@@ -88,7 +88,7 @@ describe('GmailConnectionCard', () => {
     await unmount()
   })
 
-  it('shows the connected email and last-synced time when healthy', async () => {
+  it('shows the connected email and marks an old successful sync as stale', async () => {
     mockCheckResponse(
       status({
         connected: true,
@@ -98,7 +98,8 @@ describe('GmailConnectionCard', () => {
     )
     const { container, unmount } = await render()
     expect(container.textContent).toContain('Connected as fernandonaveen2000@gmail.com')
-    expect(container.textContent).toContain('Last synced')
+    expect(container.textContent).toContain('Stale')
+    expect(container.textContent).toContain('Last successful sync')
     const link = container.querySelector('a')
     expect(link?.textContent).toBe('Reconnect Gmail')
     await unmount()
