@@ -128,6 +128,15 @@ export type PersonalFinancePayload = {
     investmentsBase: number
     debtBase: number
   }>
+  /** Linear savings-rate projection — see getNetWorthForecast()'s doc comment
+   *  for why this deliberately doesn't model market returns. */
+  netWorthForecast: {
+    hasData: boolean
+    currentNetWorthBase: number
+    monthlyDeltaBase: number
+    monthsOfHistoryUsed: number
+    points: Array<{ month: string; projectedNetWorthBase: number }>
+  }
   /** PF review item 1: `data.income_records` / `data.expense_records` carry
    * only the trailing N months. Older rows: `list_transactions` + JSON export. */
   transactionsWindowMonths: number

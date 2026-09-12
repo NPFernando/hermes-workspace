@@ -4168,6 +4168,97 @@ export function getAverageMonthlySavingsRatePct(
   return { actualPct: (sumSavings / sumIncome) * 100, hasData: true }
 }
 
+/** Mirrors financeSummary()'s local `toBase` closure — duplicated rather than
+ *  exported from there because financeSummary computes several `fxUnconverted`
+ *  side effects inline that a standalone converter has no reason to repeat
+ *  (same pattern as getFxGainLoss's localConvertToLkr just above). */
+function lkrToBaseCurrency(db: FinanceDatabase, lkrAmount: number): number {
+  const base = db.settings.baseCurrency || 'LKR'
+  if (base === 'LKR') return lkrAmount
+  const direct = latestRateFromDb(db, 'LKR', base)
+  if (direct !== undefined) return lkrAmount * direct
+  const inverse = latestRateFromDb(db, base, 'LKR')
+  if (inverse) return lkrAmount / inverse
+  return lkrAmount
+}
+
+export type NetWorthForecastPoint = {
+  /** YYYY-MM, always in the future relative to when this was computed. */
+  month: string
+  projectedNetWorthBase: number
+}
+
+export type NetWorthForecast = {
+  /** False when there's no complete month of income/expense history yet —
+   *  same bar as getAverageMonthlySavingsRatePct/getAverageMonthlyExpensesLkr.
+   *  `points` is empty in that case; nothing to draw a projection from. */
+  hasData: boolean
+  currentNetWorthBase: number
+  /** Trailing average of (income - expense) per complete month, in
+   *  baseCurrency — the flat monthly rate the projection compounds by. */
+  monthlyDeltaBase: number
+  monthsOfHistoryUsed: number
+  points: Array<NetWorthForecastPoint>
+}
+
+/**
+ * Projects net worth forward `monthsAhead` months using a *linear* extension
+ * of the trailing average monthly savings rate (income - expense over the
+ * last `trailingMonths` complete calendar months, same window
+ * getAverageMonthlySavingsRatePct uses) — deliberately not a compounding
+ * growth model. It only accounts for cash actually saved each month; it does
+ * NOT project market appreciation on stock holdings, FD interest accrual, or
+ * property value changes, so it will understate net worth growth for anyone
+ * with meaningful invested assets. That's an intentional, conservative
+ * simplification (a savings-driven floor, not a full wealth forecast) rather
+ * than trying to model market returns no one can predict.
+ */
+export function getNetWorthForecast(
+  db: FinanceDatabase,
+  monthsAhead = 6,
+  trailingMonths = 3,
+): NetWorthForecast {
+  const now = new Date()
+  const currentKey = `${now.getUTCFullYear()}-${now.getUTCMonth() + 1}`
+  const complete = getMonthlySummary(db).filter(
+    (row) => `${row.year}-${row.month}` !== currentKey,
+  )
+  const currentNetWorthBase = financeSummary(db).netWorthBase
+
+  if (complete.length === 0) {
+    return {
+      hasData: false,
+      currentNetWorthBase,
+      monthlyDeltaBase: 0,
+      monthsOfHistoryUsed: 0,
+      points: [],
+    }
+  }
+
+  const trailing = complete.slice(-trailingMonths)
+  const avgMonthlySavingsLkr =
+    trailing.reduce((sum, row) => sum + row.savings, 0) / trailing.length
+  const monthlyDeltaBase = lkrToBaseCurrency(db, avgMonthlySavingsLkr)
+
+  const points: Array<NetWorthForecastPoint> = []
+  for (let i = 1; i <= monthsAhead; i++) {
+    const future = new Date(now.getUTCFullYear(), now.getUTCMonth() + i, 1)
+    const month = `${future.getUTCFullYear()}-${String(future.getUTCMonth() + 1).padStart(2, '0')}`
+    points.push({
+      month,
+      projectedNetWorthBase: currentNetWorthBase + monthlyDeltaBase * i,
+    })
+  }
+
+  return {
+    hasData: true,
+    currentNetWorthBase,
+    monthlyDeltaBase,
+    monthsOfHistoryUsed: trailing.length,
+    points,
+  }
+}
+
 /**
  * Phase 24 (AI-200/201): bounded, pre-aggregated context for the Finance
  * Analyst LLM call — not a raw transaction dump (unbounded prompt size,
@@ -4322,7 +4413,7 @@ export function budgetVsActualSummary(
         category: b.category,
         month: b.month,
         // PF-201: budget/actual/variance below are all LKR-normalised.
-        currency: 'LKR' as CurrencyCode,
+        currency: 'LKR',
         budget,
         actual,
         variance: result?.variance ?? budget,

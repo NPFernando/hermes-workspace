@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
+import type * as DemoTradingEngineModule from '../../server/demo-trading-engine'
+import type * as ConnectivityBreakerModule from '../../server/connectivity-breaker'
+import type * as ValidationRunModule from '../../server/validation-run'
 
 vi.mock('@tanstack/react-router', () => ({
   createFileRoute: () => (options: unknown) => options,
@@ -134,6 +137,13 @@ vi.mock('../../server/finance-store', () => ({
   getCategoryCorrections: vi.fn(() => ({})),
   findPossibleDuplicate: vi.fn(() => null),
   copyBudgetsToMonth: vi.fn(() => ({ copied: 0, skippedExisting: 0 })),
+  getNetWorthForecast: vi.fn(() => ({
+    hasData: false,
+    currentNetWorthBase: 0,
+    monthlyDeltaBase: 0,
+    monthsOfHistoryUsed: 0,
+    points: [],
+  })),
 }))
 // Neither of these was mocked before (the pending_ingestions actions —
 // submit_ingestion_password, confirm_pending_ingestion, and now
@@ -160,7 +170,7 @@ vi.mock('../../server/binance-market.service', () => ({
 }))
 vi.mock('../../server/trading-strategies', () => ({ STRATEGIES: [] }))
 vi.mock('../../server/demo-trading-engine', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../server/demo-trading-engine')>()
+  const actual = await importOriginal<typeof DemoTradingEngineModule>()
   return {
     ...actual,
     applyLearningCandidate: vi.fn(),
@@ -210,7 +220,7 @@ vi.mock('../../server/demo-trading-engine', async (importOriginal) => {
   }
 })
 vi.mock('../../server/connectivity-breaker', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../server/connectivity-breaker')>()
+  const actual = await importOriginal<typeof ConnectivityBreakerModule>()
   return {
     ...actual,
     isConnectivityBreakerTripped: vi.fn(() => false),
@@ -221,7 +231,7 @@ vi.mock('../../server/rate-limit', () => ({
   safeErrorMessage: (error: unknown) => String(error),
 }))
 vi.mock('../../server/validation-run', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../server/validation-run')>()
+  const actual = await importOriginal<typeof ValidationRunModule>()
   return {
     ...actual,
     ensureValidationRunAutomation: vi.fn(),
