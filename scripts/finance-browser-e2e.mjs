@@ -14,7 +14,6 @@ const bundledChromium = chromium.executablePath()
 const browserExecutable =
   process.env.FINANCE_E2E_CHROMIUM_PATH ||
   (existsSync(bundledChromium) ? bundledChromium : '/usr/bin/chromium-browser')
-const testPassword = 'finance-e2e-only-password'
 const financePayload = {
   ok: true,
   checkedAt: Date.now(),
@@ -206,7 +205,6 @@ async function startServer() {
       env: {
         ...process.env,
         HERMES_HOME: hermesHome,
-        HERMES_PASSWORD: testPassword,
         VITEST: 'true',
       },
     },
@@ -250,14 +248,6 @@ try {
     localStorage.setItem('claude-onboarding-complete', 'true')
   })
   page.on('pageerror', (error) => pageErrors.push(error.message))
-  page.on('response', async (response) => {
-    if (new URL(response.url()).pathname === '/api/auth') {
-      const result = await response.json().catch(() => ({}))
-      console.log(
-        `Test login response: HTTP ${response.status()} ok=${result.ok === true}`,
-      )
-    }
-  })
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text())
   })
@@ -269,9 +259,8 @@ try {
     const url = new URL(request.url())
     let body = { ok: false, error: 'unmocked_test_endpoint' }
 
-    if (url.pathname === '/api/auth' || url.pathname === '/api/auth-check') {
-      await route.continue()
-      return
+    if (url.pathname === '/api/auth-check') {
+      body = { authenticated: true, authRequired: true }
     } else if (url.pathname === '/api/connection-status') {
       body = { ok: true, chatReady: true, modelConfigured: true }
     } else if (url.pathname === '/api/sessions') {
@@ -337,10 +326,6 @@ try {
   })
 
   await page.goto(`${baseUrl}/personal-finance`)
-  const login = page.locator('#lp-pw')
-  await login.waitFor({ state: 'visible', timeout: 15_000 })
-  await login.fill(testPassword)
-  await page.getByRole('button', { name: 'Sign In', exact: true }).click()
   try {
     await page
       .getByRole('heading', { name: 'Your money at a glance' })
