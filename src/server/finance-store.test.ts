@@ -3610,6 +3610,75 @@ describe('financeAlerts — category budget thresholds', () => {
       financeAlerts(db).some((a) => a.title.startsWith('Over budget')),
     ).toBe(false)
   })
+
+  describe('pace-based early warning ("on pace to exceed")', () => {
+    // Mirrors the exact gate/formula in financeAlerts so the expectation is
+    // correct regardless of which day of the month the suite runs on — same
+    // adaptive style as the "warning near the limit" test above.
+    function expectedPaceAlert(budget: number, spent: number): boolean {
+      const now = new Date()
+      const daysInMonth = new Date(
+        now.getFullYear(),
+        now.getMonth() + 1,
+        0,
+      ).getDate()
+      const daysElapsed = now.getDate()
+      const daysLeft = daysInMonth - daysElapsed
+      if (!(daysElapsed >= 5 && daysLeft >= 3)) return false
+      const projectedTotal = (spent / daysElapsed) * daysInMonth
+      return projectedTotal > budget * 1.1
+    }
+
+    it('fires when the spending pace projects well past the budget, before the 90% threshold', () => {
+      const db = createEmptyFinanceDatabase()
+      // 80% used — comfortably under the 90% "nearly spent" cutoff, so only
+      // the pace projection could explain the alert firing.
+      seedBudget(db, { budget: 10_000, spent: 8_000 })
+      const has = financeAlerts(db).some(
+        (a) => a.title === 'On pace to exceed budget: Groceries',
+      )
+      expect(has).toBe(expectedPaceAlert(10_000, 8_000))
+    })
+
+    it('stays silent for a low, sustainable spending pace', () => {
+      const db = createEmptyFinanceDatabase()
+      // 10% used — even in the earliest days the >=5-days guard allows
+      // (daysElapsed=5), the projected pace (10,000*30/5*0.1 = 6,000) stays
+      // under the budget, so this never fires regardless of today's date.
+      seedBudget(db, { budget: 10_000, spent: 1_000 })
+      expect(
+        financeAlerts(db).some(
+          (a) => a.title === 'On pace to exceed budget: Groceries',
+        ),
+      ).toBe(false)
+    })
+
+    it('does not also fire once a category already crossed the 90% "nearly spent" threshold', () => {
+      const db = createEmptyFinanceDatabase()
+      seedBudget(db, { budget: 10_000, spent: 9_500 })
+      const alerts = financeAlerts(db)
+      const hasNearlySpent = alerts.some(
+        (a) => a.title === 'Budget nearly spent: Groceries',
+      )
+      const hasPaceAlert = alerts.some(
+        (a) => a.title === 'On pace to exceed budget: Groceries',
+      )
+      // Whichever alert applies (nearly-spent depends on the days-left gate
+      // same as the earlier test), the pace alert never fires alongside it.
+      expect(hasPaceAlert).toBe(false)
+      void hasNearlySpent
+    })
+
+    it('does not also fire for a category already over budget', () => {
+      const db = createEmptyFinanceDatabase()
+      seedBudget(db, { budget: 10_000, spent: 12_000 })
+      expect(
+        financeAlerts(db).some(
+          (a) => a.title === 'On pace to exceed budget: Groceries',
+        ),
+      ).toBe(false)
+    })
+  })
 })
 
 describe('scheduled_transaction (planned future income/expense)', () => {
