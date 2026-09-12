@@ -133,6 +133,7 @@ import { Route as ApiHermesTasksAssigneesRouteImport } from './routes/api/hermes
 import { Route as ApiHermesTasksRouteImport } from './routes/api/hermes-tasks'
 import { Route as ApiHermesConfigRouteImport } from './routes/api/hermes-config'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as ApiHarpSelectorPreviewRouteImport } from './routes/api/harp-selector-preview'
 import { Route as ApiHarpObservabilityRouteImport } from './routes/api/harp-observability'
 import { Route as ApiHarpConfigRouteImport } from './routes/api/harp-config'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-status'
@@ -878,6 +879,11 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiHarpSelectorPreviewRoute = ApiHarpSelectorPreviewRouteImport.update({
+  id: '/api/harp-selector-preview',
+  path: '/api/harp-selector-preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiHarpObservabilityRoute = ApiHarpObservabilityRouteImport.update({
   id: '/api/harp-observability',
   path: '/api/harp-observability',
@@ -1573,6 +1579,7 @@ export interface FileRoutesByFullPath {
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/harp-config': typeof ApiHarpConfigRoute
   '/api/harp-observability': typeof ApiHarpObservabilityRoute
+  '/api/harp-selector-preview': typeof ApiHarpSelectorPreviewRoute
   '/api/health': typeof ApiHealthRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/hermes-tasks': typeof ApiHermesTasksRouteWithChildren
@@ -1821,6 +1828,7 @@ export interface FileRoutesByTo {
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/harp-config': typeof ApiHarpConfigRoute
   '/api/harp-observability': typeof ApiHarpObservabilityRoute
+  '/api/harp-selector-preview': typeof ApiHarpSelectorPreviewRoute
   '/api/health': typeof ApiHealthRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/hermes-tasks': typeof ApiHermesTasksRouteWithChildren
@@ -2071,6 +2079,7 @@ export interface FileRoutesById {
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/harp-config': typeof ApiHarpConfigRoute
   '/api/harp-observability': typeof ApiHarpObservabilityRoute
+  '/api/harp-selector-preview': typeof ApiHarpSelectorPreviewRoute
   '/api/health': typeof ApiHealthRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/hermes-tasks': typeof ApiHermesTasksRouteWithChildren
@@ -2322,6 +2331,7 @@ export interface FileRouteTypes {
     | '/api/gateway-status'
     | '/api/harp-config'
     | '/api/harp-observability'
+    | '/api/harp-selector-preview'
     | '/api/health'
     | '/api/hermes-config'
     | '/api/hermes-tasks'
@@ -2570,6 +2580,7 @@ export interface FileRouteTypes {
     | '/api/gateway-status'
     | '/api/harp-config'
     | '/api/harp-observability'
+    | '/api/harp-selector-preview'
     | '/api/health'
     | '/api/hermes-config'
     | '/api/hermes-tasks'
@@ -2819,6 +2830,7 @@ export interface FileRouteTypes {
     | '/api/gateway-status'
     | '/api/harp-config'
     | '/api/harp-observability'
+    | '/api/harp-selector-preview'
     | '/api/health'
     | '/api/hermes-config'
     | '/api/hermes-tasks'
@@ -3069,6 +3081,7 @@ export interface RootRouteChildren {
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
   ApiHarpConfigRoute: typeof ApiHarpConfigRoute
   ApiHarpObservabilityRoute: typeof ApiHarpObservabilityRoute
+  ApiHarpSelectorPreviewRoute: typeof ApiHarpSelectorPreviewRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiHermesConfigRoute: typeof ApiHermesConfigRoute
   ApiHermesTasksRoute: typeof ApiHermesTasksRouteWithChildren
@@ -4076,6 +4089,13 @@ declare module '@tanstack/react-router' {
       path: '/api/health'
       fullPath: '/api/health'
       preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/harp-selector-preview': {
+      id: '/api/harp-selector-preview'
+      path: '/api/harp-selector-preview'
+      fullPath: '/api/harp-selector-preview'
+      preLoaderRoute: typeof ApiHarpSelectorPreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/harp-observability': {
@@ -5269,6 +5289,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
   ApiHarpConfigRoute: ApiHarpConfigRoute,
   ApiHarpObservabilityRoute: ApiHarpObservabilityRoute,
+  ApiHarpSelectorPreviewRoute: ApiHarpSelectorPreviewRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiHermesConfigRoute: ApiHermesConfigRoute,
   ApiHermesTasksRoute: ApiHermesTasksRouteWithChildren,

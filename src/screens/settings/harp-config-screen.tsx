@@ -25,6 +25,7 @@ import type {
   HarpTierModel,
 } from '@/server/harp-config-store'
 import type { HarpObservabilityView } from '@/server/harp-observability'
+import type { HarpSelectorPreview } from '@/server/harp-selector-preview'
 import { cn } from '@/lib/utils'
 
 // Kept in sync with harp-select-route.py (TASK_MAP keys / RISK_LEVELS).
@@ -67,6 +68,20 @@ async function fetchHarpObservability(): Promise<HarpObservabilityView> {
   const data = (await res.json()) as HarpObsApiResponse
   if (!data.ok) throw new Error(data.error ?? 'Failed to load HARP observability')
   return data as HarpObservabilityView
+}
+
+type HarpSelectorApiResponse = {
+  ok: boolean
+  error?: string
+} & Partial<HarpSelectorPreview>
+
+async function fetchHarpSelectorPreview(): Promise<HarpSelectorPreview> {
+  const res = await fetch('/api/harp-selector-preview', { cache: 'no-store' })
+  const data = (await res.json()) as HarpSelectorApiResponse
+  if (!res.ok || !data.ok) {
+    throw new Error(data.error ?? 'Failed to load selector preview')
+  }
+  return data as HarpSelectorPreview
 }
 
 // ── Small primitives ───────────────────────────────────────────────────────
@@ -526,6 +541,104 @@ function HarpObservabilityPanel({
           </div>
         </div>
       </div>
+    </SectionCard>
+  )
+}
+
+function HarpSelectorPreviewPanel({
+  view,
+  isLoading,
+  error,
+  onRefresh,
+  isRefreshing,
+}: {
+  view?: HarpSelectorPreview
+  isLoading: boolean
+  error: unknown
+  onRefresh: () => void
+  isRefreshing: boolean
+}) {
+  const availableCount = view?.matrix.reduce(
+    (total, row) => total + row.cells.filter((cell) => cell.available).length,
+    0,
+  )
+
+  return (
+    <SectionCard
+      title="Selector Preview Matrix"
+      description="Fixed task/risk cases evaluated by the live selector; preview only, with no task execution or shadow-log writes."
+      icon={FlowCircleIcon}
+    >
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] text-[var(--theme-muted)]" aria-live="polite">
+          {view
+            ? `${availableCount}/${view.tasks.length * view.risks.length} routes available · updated ${compactDateTime(view.generated_at)}`
+            : isLoading
+              ? 'Loading fixed preview cases…'
+              : error instanceof Error
+                ? error.message
+                : 'Preview unavailable.'}
+        </p>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={isRefreshing}
+          className="rounded-lg border border-[var(--theme-border)] px-3 py-1.5 text-xs text-[var(--theme-text)] transition-colors hover:bg-[var(--theme-hover)] disabled:opacity-50"
+        >
+          {isRefreshing ? 'Refreshing…' : 'Refresh preview'}
+        </button>
+      </div>
+      {view && (
+        <div className="overflow-x-auto rounded-xl border border-[var(--theme-border)]">
+          <table className="w-full min-w-[900px] border-collapse text-left">
+            <thead className="bg-[var(--theme-hover)]">
+              <tr>
+                <th className="sticky left-0 z-10 border-b border-[var(--theme-border)] bg-[var(--theme-hover)] px-2 py-2 text-[10px] font-semibold uppercase text-[var(--theme-muted)]">
+                  Risk / task
+                </th>
+                {view.tasks.map((task) => (
+                  <th
+                    key={task}
+                    className="border-b border-[var(--theme-border)] px-2 py-2 text-[10px] font-semibold text-[var(--theme-muted)]"
+                  >
+                    {task.replace(/_/g, ' ')}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {view.matrix.map((row) => (
+                <tr key={row.risk}>
+                  <th className="sticky left-0 border-b border-[var(--theme-border)] bg-[var(--theme-panel)] px-2 py-2 text-xs font-semibold text-[var(--theme-text)]">
+                    {row.risk.replace(/_/g, ' ')}
+                  </th>
+                  {row.cells.map((cell, index) => (
+                    <td
+                      key={`${row.risk}:${view.tasks[index]}`}
+                      className="max-w-52 border-b border-l border-[var(--theme-border)] px-2 py-2 align-top"
+                    >
+                      {cell.available ? (
+                        <>
+                          <p className="truncate font-mono text-[10px] text-[var(--theme-text)]">
+                            {cell.provider}/{cell.model}
+                          </p>
+                          <p className="mt-1 text-[10px] text-[var(--theme-muted)]">
+                            {cell.tier} · {cell.decision}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-[10px] text-amber-600 dark:text-amber-400">
+                          {cell.error ?? 'Unavailable'}
+                        </p>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </SectionCard>
   )
 }
@@ -1242,6 +1355,13 @@ export function HarpConfigScreen() {
     refetchOnWindowFocus: true,
   })
 
+  const selectorPreview = useQuery({
+    queryKey: ['harp-selector-preview'],
+    queryFn: fetchHarpSelectorPreview,
+    retry: 1,
+    refetchOnWindowFocus: true,
+  })
+
   const mutation = useMutation({
     mutationFn: patchHarpConfig,
     onSuccess: (updated) => {
@@ -1349,6 +1469,14 @@ export function HarpConfigScreen() {
         view={observability.data}
         isLoading={observability.isLoading}
         error={observability.error}
+      />
+
+      <HarpSelectorPreviewPanel
+        view={selectorPreview.data}
+        isLoading={selectorPreview.isLoading}
+        error={selectorPreview.error}
+        onRefresh={() => void selectorPreview.refetch()}
+        isRefreshing={selectorPreview.isFetching}
       />
 
       {/* Global settings */}
