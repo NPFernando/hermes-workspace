@@ -87,5 +87,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
+      - name: Install Chromium for finance browser journey
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Run tests
         run: pnpm test
+
+      - name: Run finance browser journey
+        run: pnpm run test:e2e:finance
