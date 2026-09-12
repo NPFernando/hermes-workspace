@@ -4413,7 +4413,7 @@ export function budgetVsActualSummary(
         category: b.category,
         month: b.month,
         // PF-201: budget/actual/variance below are all LKR-normalised.
-        currency: 'LKR' as CurrencyCode,
+        currency: 'LKR',
         budget,
         actual,
         variance: result?.variance ?? budget,
