@@ -1,8 +1,13 @@
 // @vitest-environment jsdom
-import React from 'react'
-import { act } from 'react'
+import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { CsvImportPanel } from './csv-import-panel'
+import { FxGainLossCard } from './fx-gain-loss-card'
+import { GmailConnectionCard } from './gmail-connection-card'
+import { NetWorthHistoryCard } from './net-worth-history-card'
+import { SavingsGoalsPanel } from './savings-goals-panel'
+import type { PersonalFinancePayload } from '../types'
 
 vi.mock('recharts', () => {
   const passthrough = (props: { children?: React.ReactNode }) => props.children
@@ -17,13 +22,6 @@ vi.mock('recharts', () => {
     YAxis: () => null,
   }
 })
-
-import type { PersonalFinancePayload } from '../types'
-import { CsvImportPanel } from './csv-import-panel'
-import { FxGainLossCard } from './fx-gain-loss-card'
-import { GmailConnectionCard } from './gmail-connection-card'
-import { NetWorthHistoryCard } from './net-worth-history-card'
-import { SavingsGoalsPanel } from './savings-goals-panel'
 
 const payload = {
   ok: true,
@@ -188,7 +186,7 @@ describe('personal finance dashboard journey', () => {
     })
     expect(container.textContent).toContain('1 row(s) found')
 
-    const importButton = [...container.querySelectorAll('button')].find((button) => button.textContent?.startsWith('Import 1 row'))
+    const importButton = [...container.querySelectorAll('button')].find((button) => button.textContent.startsWith('Import 1 row'))
     expect(importButton).toBeDefined()
     await act(async () => importButton?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
     await act(async () => { await Promise.resolve(); await Promise.resolve() })
@@ -197,7 +195,7 @@ describe('personal finance dashboard journey', () => {
     expect(postBodies).toHaveLength(1)
     expect(postBodies[0].force).toBeUndefined()
 
-    const reviewedImport = [...container.querySelectorAll('button')].find((button) => button.textContent?.includes('reviewed row(s) anyway'))
+    const reviewedImport = [...container.querySelectorAll('button')].find((button) => button.textContent.includes('reviewed row(s) anyway'))
     expect(reviewedImport).toBeDefined()
     await act(async () => reviewedImport?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
     await act(async () => { await Promise.resolve(); await Promise.resolve() })
