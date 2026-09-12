@@ -1045,6 +1045,49 @@ describe('import_transactions_csv', () => {
     expect(vi.mocked(store.addFinanceRecord)).not.toHaveBeenCalled()
   })
 
+  it('holds low-confidence vendor typo matches for review instead of silently skipping them', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    vi.mocked(store.addFinanceRecord).mockClear()
+    vi.mocked(store.findPossibleDuplicate).mockReturnValueOnce({
+      id: 'existing-typo-candidate',
+      vendorOrSource: 'Cafe Nero',
+      date: '2026-01-01',
+      amount: 1500,
+      confidence: 'possible',
+    })
+
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'import_transactions_csv',
+          rows: [
+            {
+              kind: 'expense',
+              date: '2026-01-01',
+              amount: 1500,
+              vendorOrSource: 'Cafe Nreo',
+            },
+          ],
+        }),
+      }),
+    })
+
+    const body = (await response.json()) as {
+      created: number
+      skippedDuplicates: number
+      possibleDuplicates: Array<{ index: number; match: { confidence: string } }>
+    }
+    expect(body.created).toBe(0)
+    expect(body.skippedDuplicates).toBe(0)
+    expect(body.possibleDuplicates).toHaveLength(1)
+    expect(body.possibleDuplicates[0].match.confidence).toBe('possible')
+    expect(vi.mocked(store.addFinanceRecord)).not.toHaveBeenCalled()
+  })
+
   it('force:true bypasses the duplicate check', async () => {
     state.authenticated = true
     const store = await import('../../server/finance-store')

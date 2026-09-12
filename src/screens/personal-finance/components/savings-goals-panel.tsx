@@ -9,6 +9,7 @@ import {
   inputClass,
 } from '../shared-styles'
 import { numberField, stringField } from '../field-helpers'
+import { savingsGoalTimeline } from './savings-goal-timeline'
 import type { PersonalFinancePayload } from '../types'
 
 const STATUSES = ['active', 'paused', 'achieved', 'abandoned']
@@ -140,7 +141,9 @@ export function SavingsGoalsPanel({
 
   return (
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
-      <h2 className="text-lg font-semibold">Savings goals &amp; sinking funds</h2>
+      <h2 className="text-lg font-semibold">
+        Savings goals &amp; sinking funds
+      </h2>
       <p className="text-xs text-[var(--theme-muted)]">
         Every field for a goal — the Overview shows progress; this is the
         editor.
@@ -166,11 +169,13 @@ export function SavingsGoalsPanel({
           onChange={(e) => setCurrency(e.target.value)}
           className={inputClass}
         >
-          {[...new Set([payload.baseCurrency, 'LKR', 'USD', 'AUD'])].map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
+          {[...new Set([payload.baseCurrency, 'LKR', 'USD', 'AUD'])].map(
+            (c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ),
+          )}
         </select>
         <select
           value={goalKind}
@@ -203,6 +208,13 @@ export function SavingsGoalsPanel({
           const id = stringField(g, 'id') || String(index)
           const isEditing = editOpenId === id
           const cur = stringField(g, 'currency') || 'LKR'
+          const timeline = savingsGoalTimeline({
+            currentAmount: numberField(g, 'currentAmount'),
+            targetAmount: numberField(g, 'targetAmount'),
+            monthlyContribution: numberField(g, 'monthlyContribution'),
+            targetDate: stringField(g, 'targetDate'),
+            status: stringField(g, 'status'),
+          })
           return (
             <div
               key={id}
@@ -350,7 +362,9 @@ export function SavingsGoalsPanel({
               ) : (
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-sm text-[var(--theme-text)]">
-                    <span className="font-medium">{stringField(g, 'name')}</span>{' '}
+                    <span className="font-medium">
+                      {stringField(g, 'name')}
+                    </span>{' '}
                     <span className="text-xs text-[var(--theme-muted)]">
                       · {stringField(g, 'goalKind') || 'general'} ·{' '}
                       {formatLkr(numberField(g, 'currentAmount'), cur)} /{' '}
@@ -378,6 +392,23 @@ export function SavingsGoalsPanel({
                     </button>
                   </div>
                 </div>
+              )}
+              {!isEditing && timeline.state !== 'paused' && (
+                <p className="mt-2 text-xs text-[var(--theme-muted)]">
+                  {timeline.state === 'achieved'
+                    ? 'Goal reached.'
+                    : timeline.state === 'no_target'
+                      ? 'Set a target amount to estimate when you’ll reach this goal.'
+                      : timeline.state === 'no_contribution'
+                        ? 'Add a monthly contribution to estimate when you’ll reach this goal.'
+                        : `At ${formatLkr(numberField(g, 'monthlyContribution'), cur)}/month: about ${timeline.monthsRemaining} month${timeline.monthsRemaining === 1 ? '' : 's'} — ${timeline.projectedDate}. No interest or investment growth assumed.`}
+                  {timeline.state === 'projected' &&
+                    timeline.requiredMonthlyContribution !== null &&
+                    timeline.targetDateMonths !== null &&
+                    timeline.requiredMonthlyContribution >
+                      numberField(g, 'monthlyContribution') &&
+                    ` To reach the target date, about ${formatLkr(timeline.requiredMonthlyContribution, cur)}/month is needed.`}
+                </p>
               )}
             </div>
           )

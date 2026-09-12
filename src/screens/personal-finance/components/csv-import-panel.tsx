@@ -216,6 +216,11 @@ export function CsvImportPanel({
   const [result, setResult] = useState<{
     created: number
     skippedDuplicates: number
+    possibleDuplicates: Array<{
+      index: number
+      row: Normalized
+      match: { vendorOrSource: string; date: string; amount: number }
+    }>
     errors: Array<{ index: number; reason: string }>
   } | null>(null)
 
@@ -267,9 +272,7 @@ export function CsvImportPanel({
           defaultAccountId || undefined,
         ),
       )
-      const rows = normalized.filter(
-        (r): r is Normalized => !('error' in r),
-      )
+      const rows = normalized.filter((r): r is Normalized => !('error' in r))
       const rowErrors = normalized
         .map((r, i) => ('error' in r ? { index: i, reason: r.error } : null))
         .filter((e): e is { index: number; reason: string } => e !== null)
@@ -287,15 +290,24 @@ export function CsvImportPanel({
         error?: string
         created?: number
         skippedDuplicates?: number
+        possibleDuplicates?: Array<{
+          index: number
+          match: { vendorOrSource: string; date: string; amount: number }
+        }>
         errors?: Array<{ index: number; reason: string }>
       }
       if (!data.ok) {
         setNote(data.error || 'Import failed')
         return
       }
+      const rowsByIndex = new Map(rows.map((row, index) => [index, row]))
       setResult({
         created: data.created ?? 0,
         skippedDuplicates: data.skippedDuplicates ?? 0,
+        possibleDuplicates: (data.possibleDuplicates ?? []).flatMap((candidate) => {
+          const row = rowsByIndex.get(candidate.index)
+          return row ? [{ ...candidate, row }] : []
+        }),
         // Row indices from client-side validation come first, then the
         // server's own — kept separate arrays would double-count indices,
         // so just report the total distinct failure count via length sum.
@@ -305,6 +317,48 @@ export function CsvImportPanel({
       setParsed(null)
       setMapping(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  async function importPossibleRows() {
+    if (!result || result.possibleDuplicates.length === 0) return
+    setImporting(true)
+    setNote(null)
+    try {
+      const rows = result.possibleDuplicates.map((candidate) => candidate.row)
+      const res = await fetch('/api/finance', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'import_transactions_csv', rows, force: true }),
+      })
+      const data = (await res.json()) as {
+        ok: boolean
+        error?: string
+        created?: number
+        skippedDuplicates?: number
+        errors?: Array<{ index: number; reason: string }>
+      }
+      if (!data.ok) {
+        setNote(data.error || 'Import failed')
+        return
+      }
+      setResult((previous) =>
+        previous
+          ? {
+              ...previous,
+              created: previous.created + (data.created ?? 0),
+              skippedDuplicates:
+                previous.skippedDuplicates + (data.skippedDuplicates ?? 0),
+              possibleDuplicates: [],
+              errors: [...previous.errors, ...(data.errors ?? [])],
+            }
+          : previous,
+      )
+      onPayload(data as unknown as PersonalFinancePayload)
+    } catch (error) {
+      setNote(error instanceof Error ? error.message : 'Import failed')
     } finally {
       setImporting(false)
     }
@@ -472,7 +526,9 @@ export function CsvImportPanel({
                 {normalizedPreview.map((r, i) =>
                   'error' in r ? (
                     <tr key={i} className={dangerTone}>
-                      <td colSpan={7}>Row {i + 1}: {r.error}</td>
+                      <td colSpan={7}>
+                        Row {i + 1}: {r.error}
+                      </td>
                     </tr>
                   ) : (
                     <tr key={i}>
@@ -524,9 +580,41 @@ export function CsvImportPanel({
           <p className={positiveTone}>{result.created} record(s) created.</p>
           {result.skippedDuplicates > 0 && (
             <p className={warningTone}>
-              {result.skippedDuplicates} row(s) skipped as likely duplicates
-              (same vendor/date/amount already on record).
+              {result.skippedDuplicates} row(s) skipped because they may match
+              existing records. Review these rows before importing again. (same
+              vendor/date/amount already on record).
             </p>
+          )}
+          {result.possibleDuplicates.length > 0 && (
+            <div className={`mt-2 ${warningTone}`}>
+              <p>
+                {result.possibleDuplicates.length} row(s) held for review: the
+                vendor differs by one likely typo, so this is not treated as a
+                confirmed duplicate.
+              </p>
+              <details open className="mt-1">
+                <summary className="cursor-pointer">
+                  Review all {result.possibleDuplicates.length} candidate matches
+                </summary>
+                <ul className="ml-4 max-h-40 list-disc overflow-y-auto">
+                  {result.possibleDuplicates.map((candidate) => (
+                    <li key={candidate.index}>
+                      Row {candidate.index + 1}: “{candidate.row.vendorOrSource}”
+                      may match “{candidate.match.vendorOrSource}” on{' '}
+                      {candidate.match.date} for {candidate.match.amount}.
+                    </li>
+                  ))}
+                </ul>
+              </details>
+              <button
+                type="button"
+                disabled={importing}
+                onClick={() => void importPossibleRows()}
+                className={`${buttonClass} mt-2`}
+              >
+                Import these {result.possibleDuplicates.length} reviewed row(s) anyway
+              </button>
+            </div>
           )}
           {result.errors.length > 0 && (
             <div className={`mt-1 ${dangerTone}`}>

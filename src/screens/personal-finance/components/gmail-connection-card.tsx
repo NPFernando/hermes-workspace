@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import {
-  buttonClass,
-  dangerTone,
-  positiveTone,
-} from '../shared-styles'
+import { buttonClass, dangerTone, positiveTone } from '../shared-styles'
+import { formatSyncAge, gmailSyncHealth } from './gmail-sync-health'
 
 type GmailConnectionStatus = {
   enabled: boolean
@@ -73,6 +70,22 @@ export function GmailConnectionCard() {
   }
 
   const needsReconnect = status.connected && Boolean(status.lastError)
+  const syncHealth = gmailSyncHealth(
+    status.lastSyncedAtSeconds,
+    status.lastError?.at ?? null,
+  )
+  const syncTone =
+    syncHealth === 'healthy'
+      ? positiveTone
+      : syncHealth === 'failed' || syncHealth === 'stale'
+        ? dangerTone
+        : 'text-[var(--theme-muted)]'
+  const syncLabel = {
+    healthy: 'Fresh',
+    stale: 'Stale',
+    failed: 'Last attempt failed',
+    never: 'Never synced',
+  }[syncHealth]
 
   return (
     <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_6%,transparent)] p-4">
@@ -82,7 +95,9 @@ export function GmailConnectionCard() {
             Gmail connection
           </h3>
           {status.connected ? (
-            <p className={`mt-1 text-xs ${needsReconnect ? dangerTone : positiveTone}`}>
+            <p
+              className={`mt-1 text-xs ${needsReconnect ? dangerTone : positiveTone}`}
+            >
               {needsReconnect
                 ? `Connected as ${status.email ?? 'unknown'}, but the last sync failed — reconnect below.`
                 : `Connected as ${status.email ?? 'unknown'}`}
@@ -97,18 +112,27 @@ export function GmailConnectionCard() {
       </div>
 
       {status.connected && (
-        <p className="mt-2 text-xs text-[var(--theme-muted)]">
-          {status.lastSyncedAtSeconds
-            ? `Last synced ${new Date(status.lastSyncedAtSeconds * 1000).toLocaleString()}`
-            : 'Never synced'}
-          {status.connectedAt &&
-            ` · connected ${new Date(status.connectedAt).toLocaleDateString()}`}
+        <p className="mt-2 flex flex-wrap items-center gap-x-2 text-xs">
+          <span className={syncTone} role="status">
+            {syncLabel}
+          </span>
+          <span className="text-[var(--theme-muted)]">
+            {status.lastSyncedAtSeconds
+              ? `Last successful sync ${formatSyncAge(status.lastSyncedAtSeconds)}`
+              : 'No successful sync yet'}
+          </span>
+          {status.connectedAt && (
+            <span className="text-[var(--theme-muted)]">
+              Connected {new Date(status.connectedAt).toLocaleDateString()}
+            </span>
+          )}
         </p>
       )}
 
       {status.lastError && (
         <p className={`mt-1 text-xs ${dangerTone}`}>
-          Last sync error ({new Date(status.lastError.at * 1000).toLocaleString()}):{' '}
+          Last sync error (
+          {new Date(status.lastError.at * 1000).toLocaleString()}):{' '}
           {status.lastError.message}
         </p>
       )}

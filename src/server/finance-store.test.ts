@@ -422,7 +422,11 @@ describe('budget-vs-actual normalises a non-LKR budget to LKR (PF-201)', () => {
 
   it('leaves an all-LKR budget untouched', () => {
     const db = createEmptyFinanceDatabase()
-    db.budget_categories.push({ ...usdBudget, currency: 'LKR', budgetAmount: 50_000 })
+    db.budget_categories.push({
+      ...usdBudget,
+      currency: 'LKR',
+      budgetAmount: 50_000,
+    })
     expect(getBudgetVsActual(db, 'Software', 2026, 7)).toEqual({
       budget: 50_000,
       actual: 0,
@@ -935,6 +939,63 @@ describe('findPossibleDuplicate', () => {
       store.findPossibleDuplicate('expense', 'Client A', '2026-03-01', 1000),
     ).toBeNull()
   })
+
+  it('flags a one-character vendor typo as a low-confidence possible duplicate', async () => {
+    const store = await freshFinanceStore()
+    store.addFinanceRecord('expense', {
+      date: '2026-03-01',
+      vendor: 'Cafe Nero',
+      category: 'Dining',
+      amount: 500,
+    })
+
+    expect(
+      store.findPossibleDuplicate('expense', 'Cafe Nreo', '2026-03-01', 500),
+    ).toMatchObject({ confidence: 'possible', vendorOrSource: 'Cafe Nero' })
+  })
+
+  it('limits fuzzy candidates to one typo, a close date, and a close amount', async () => {
+    const store = await freshFinanceStore()
+    store.addFinanceRecord('expense', {
+      date: '2026-03-01',
+      vendor: 'Cafe Nero',
+      category: 'Dining',
+      amount: 500,
+    })
+
+    expect(
+      store.findPossibleDuplicate('expense', 'Cafe Nexq', '2026-03-01', 500),
+    ).toBeNull()
+    expect(
+      store.findPossibleDuplicate('expense', 'Cafe Nreo', '2026-03-04', 500),
+    ).toBeNull()
+    expect(
+      store.findPossibleDuplicate('expense', 'Cafe Nreo', '2026-03-01', 600),
+    ).toBeNull()
+    expect(
+      store.findPossibleDuplicate('expense', 'Cafe', '2026-03-01', 500),
+    ).toBeNull()
+  })
+
+  it('prefers an exact vendor candidate over a typo candidate', async () => {
+    const store = await freshFinanceStore()
+    store.addFinanceRecord('expense', {
+      date: '2026-03-01',
+      vendor: 'Cafe Nreo',
+      category: 'Dining',
+      amount: 500,
+    })
+    store.addFinanceRecord('expense', {
+      date: '2026-03-02',
+      vendor: 'Cafe Nero',
+      category: 'Dining',
+      amount: 500,
+    })
+
+    expect(
+      store.findPossibleDuplicate('expense', 'Cafe Nero', '2026-03-01', 500),
+    ).toMatchObject({ confidence: 'likely', vendorOrSource: 'Cafe Nero' })
+  })
 })
 
 describe('recordCategoryCorrection / getCategoryCorrections', () => {
@@ -1030,10 +1091,15 @@ describe('knownSenders (upsert/list/delete + password encryption)', () => {
   it('sets, decrypts, and clears a sender password without ever storing it as plaintext', async () => {
     const store = await freshFinanceStore()
     const sender = store.upsertKnownSender({ label: 'Dialog Finance' })
-    const withPassword = store.setKnownSenderPassword(sender.id, 'real-secret-pw')
+    const withPassword = store.setKnownSenderPassword(
+      sender.id,
+      'real-secret-pw',
+    )
     expect(withPassword.encryptedPassword).toBeDefined()
     expect(withPassword.encryptedPassword).not.toContain('real-secret-pw')
-    expect(store.decryptKnownSenderPassword(withPassword)).toBe('real-secret-pw')
+    expect(store.decryptKnownSenderPassword(withPassword)).toBe(
+      'real-secret-pw',
+    )
 
     const cleared = store.clearKnownSenderPassword(sender.id)
     expect(cleared.encryptedPassword).toBeUndefined()
@@ -1060,9 +1126,12 @@ describe('knownSenders (upsert/list/delete + password encryption)', () => {
 describe('recordGmailSyncError', () => {
   it('stores the failure onto settings.gmailIngest.lastError', async () => {
     const store = await freshFinanceStore()
-    store.recordGmailSyncError('invalid_grant: Token has been expired or revoked.')
+    store.recordGmailSyncError(
+      'invalid_grant: Token has been expired or revoked.',
+    )
     const db = store.readFinanceStore()
-    const gmailIngest = (db.settings as Record<string, unknown>).gmailIngest as {
+    const gmailIngest = (db.settings as Record<string, unknown>)
+      .gmailIngest as {
       lastError?: { at: number; message: string }
     }
     expect(gmailIngest.lastError?.message).toBe(
@@ -1080,7 +1149,8 @@ describe('recordGmailSyncError', () => {
     store.writeFinanceStore(db)
     store.recordGmailSyncError('boom')
     const after = store.readFinanceStore()
-    const gmailIngest = (after.settings as Record<string, unknown>).gmailIngest as {
+    const gmailIngest = (after.settings as Record<string, unknown>)
+      .gmailIngest as {
       syncHistory?: Array<unknown>
       lastError?: { message: string }
     }
@@ -1774,14 +1844,48 @@ describe('reconciliation status gates aggregate money figures (PF-113)', () => {
       updatedAt: '2026-06-05T00:00:00.000Z',
     }
     db.income_records.push(
-      { ...baseInc, id: 'i-cleared', originalAmount: 100_000, convertedLkrAmount: 100_000, status: 'cleared' },
-      { ...baseInc, id: 'i-pending', originalAmount: 50_000, convertedLkrAmount: 50_000, status: 'pending' },
-      { ...baseInc, id: 'i-nostatus', originalAmount: 10_000, convertedLkrAmount: 10_000 },
+      {
+        ...baseInc,
+        id: 'i-cleared',
+        originalAmount: 100_000,
+        convertedLkrAmount: 100_000,
+        status: 'cleared',
+      },
+      {
+        ...baseInc,
+        id: 'i-pending',
+        originalAmount: 50_000,
+        convertedLkrAmount: 50_000,
+        status: 'pending',
+      },
+      {
+        ...baseInc,
+        id: 'i-nostatus',
+        originalAmount: 10_000,
+        convertedLkrAmount: 10_000,
+      },
     )
     db.expense_records.push(
-      { ...baseExp, id: 'e-cleared', amount: 30_000, convertedLkrAmount: 30_000, status: 'cleared' },
-      { ...baseExp, id: 'e-pending', amount: 20_000, convertedLkrAmount: 20_000, status: 'pending' },
-      { ...baseExp, id: 'e-nostatus', amount: 5_000, convertedLkrAmount: 5_000 },
+      {
+        ...baseExp,
+        id: 'e-cleared',
+        amount: 30_000,
+        convertedLkrAmount: 30_000,
+        status: 'cleared',
+      },
+      {
+        ...baseExp,
+        id: 'e-pending',
+        amount: 20_000,
+        convertedLkrAmount: 20_000,
+        status: 'pending',
+      },
+      {
+        ...baseExp,
+        id: 'e-nostatus',
+        amount: 5_000,
+        convertedLkrAmount: 5_000,
+      },
     )
     return db
   }
@@ -1797,7 +1901,11 @@ describe('reconciliation status gates aggregate money figures (PF-113)', () => {
 
   it('getMonthlySummary excludes pending rows', () => {
     const row = getMonthlySummary(seed(), 2026, 6)[0]
-    expect(row).toMatchObject({ income: 110_000, expense: 35_000, savings: 75_000 })
+    expect(row).toMatchObject({
+      income: 110_000,
+      expense: 35_000,
+      savings: 75_000,
+    })
   })
 
   it('getBudgetVsActual counts only non-pending expenses', () => {
@@ -2988,12 +3096,90 @@ describe('getNetWorthForecast', () => {
     }
   }
 
+  function accountRow(
+    id: string,
+    name: string,
+    type: 'bank' | 'cash' | 'broker',
+    balance: number,
+  ) {
+    return {
+      id,
+      name,
+      type,
+      currency: 'LKR',
+      balance,
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    } as const
+  }
+
   it('reports hasData: false with an empty points array when there is no complete month of history', () => {
     const db = createEmptyFinanceDatabase()
+    db.finance_accounts.push(accountRow('bank', 'Everyday', 'bank', 20_000))
     const forecast = getNetWorthForecast(db)
     expect(forecast.hasData).toBe(false)
     expect(forecast.points).toEqual([])
     expect(forecast.monthlyDeltaBase).toBe(0)
+    expect(forecast.accountBreakdown).toMatchObject([
+      {
+        accountId: 'bank',
+        currentBalanceBase: 20_000,
+        projectedBalanceBase: 20_000,
+      },
+    ])
+  })
+
+  it('allocates projected savings across cash accounts and leaves broker balances unprojected', () => {
+    const db = createEmptyFinanceDatabase()
+    const previousMonth = new Date()
+    previousMonth.setUTCMonth(previousMonth.getUTCMonth() - 1)
+    const date = new Date(
+      Date.UTC(previousMonth.getUTCFullYear(), previousMonth.getUTCMonth(), 15),
+    )
+      .toISOString()
+      .slice(0, 10)
+    db.income_records.push(
+      incomeRow({
+        dateReceived: date,
+        originalAmount: 100_000,
+        convertedLkrAmount: 100_000,
+      }),
+    )
+    db.expense_records.push(
+      expenseRow({ date, amount: 60_000, convertedLkrAmount: 60_000 }),
+    )
+    db.finance_accounts.push(
+      accountRow('bank', 'Everyday', 'bank', 10_000),
+      accountRow('cash', 'Reserve', 'cash', 30_000),
+      accountRow('broker', 'Investments', 'broker', 50_000),
+    )
+
+    const forecast = getNetWorthForecast(db, 2)
+
+    expect(forecast.accountBreakdown).toEqual([
+      {
+        accountId: 'bank',
+        accountName: 'Everyday',
+        type: 'bank',
+        currentBalanceBase: 10_000,
+        projectedBalanceBase: 30_000,
+      },
+      {
+        accountId: 'cash',
+        accountName: 'Reserve',
+        type: 'cash',
+        currentBalanceBase: 30_000,
+        projectedBalanceBase: 90_000,
+      },
+      {
+        accountId: 'broker',
+        accountName: 'Investments',
+        type: 'broker',
+        currentBalanceBase: 50_000,
+        projectedBalanceBase: 50_000,
+      },
+    ])
   })
 
   it('projects forward using the trailing average monthly savings, excluding the current in-progress month', () => {
@@ -3051,12 +3237,14 @@ describe('getNetWorthForecast', () => {
     db.income_records.push(
       incomeRow({ dateReceived: d.toISOString().slice(0, 10) }),
     )
-    db.expense_records.push(
-      expenseRow({ date: d.toISOString().slice(0, 10) }),
-    )
+    db.expense_records.push(expenseRow({ date: d.toISOString().slice(0, 10) }))
 
     const forecast = getNetWorthForecast(db, 2)
-    const expectedFirst = new Date(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)
+    const expectedFirst = new Date(
+      now.getUTCFullYear(),
+      now.getUTCMonth() + 1,
+      1,
+    )
     const expectedKey = `${expectedFirst.getUTCFullYear()}-${String(expectedFirst.getUTCMonth() + 1).padStart(2, '0')}`
     expect(forecast.points[0].month).toBe(expectedKey)
   })
@@ -3066,10 +3254,18 @@ describe('getNetWorthForecast', () => {
     const now = new Date()
     const d = new Date(now.getUTCFullYear(), now.getUTCMonth() - 1, 10)
     db.income_records.push(
-      incomeRow({ dateReceived: d.toISOString().slice(0, 10), originalAmount: 50_000, convertedLkrAmount: 50_000 }),
+      incomeRow({
+        dateReceived: d.toISOString().slice(0, 10),
+        originalAmount: 50_000,
+        convertedLkrAmount: 50_000,
+      }),
     )
     db.expense_records.push(
-      expenseRow({ date: d.toISOString().slice(0, 10), amount: 90_000, convertedLkrAmount: 90_000 }),
+      expenseRow({
+        date: d.toISOString().slice(0, 10),
+        amount: 90_000,
+        convertedLkrAmount: 90_000,
+      }),
     )
 
     const forecast = getNetWorthForecast(db, 1)
@@ -3172,7 +3368,9 @@ describe('copyBudgetsToMonth', () => {
 
   it('never subtracts an overspend — rollover only ever adds unspent room', () => {
     const db = createEmptyFinanceDatabase()
-    db.budget_categories.push(budgetRow({ rolloverEnabled: true, budgetAmount: 20_000 }))
+    db.budget_categories.push(
+      budgetRow({ rolloverEnabled: true, budgetAmount: 20_000 }),
+    )
     db.expense_records.push({
       id: 'e-1',
       date: '2026-07-05',
@@ -3220,7 +3418,10 @@ describe('copyBudgetsToMonth', () => {
 
   it('returns copied: 0, skippedExisting: 0 when there is nothing to copy', () => {
     const db = createEmptyFinanceDatabase()
-    expect(copyBudgetsToMonth(db, '2026-08')).toEqual({ copied: 0, skippedExisting: 0 })
+    expect(copyBudgetsToMonth(db, '2026-08')).toEqual({
+      copied: 0,
+      skippedExisting: 0,
+    })
   })
 })
 
@@ -3297,7 +3498,9 @@ describe('getFxGainLoss', () => {
     const result = getFxGainLoss(db)
     expect(result.entries[0].fxGainLkr).toBe(0)
     expect(result.entries[0].assetGainLkr).toBe(2 * (150 - 100) * 300)
-    expect(result.entries[0].assetGainLkr).toBe(result.entries[0].totalReturnLkr)
+    expect(result.entries[0].assetGainLkr).toBe(
+      result.entries[0].totalReturnLkr,
+    )
   })
 
   it('an LKR-denominated holding has zero fxGainLkr by construction, no rate lookup needed', () => {
@@ -3396,9 +3599,24 @@ describe('ledger-derived account balances (item 3 + 4)', () => {
       computeAccountLedgerBalance(db, { id: 'a1', currency: 'LKR' }, []),
     ).toBeNull()
     const legs = [
-      { accountId: 'a1', currency: 'LKR', amount: 5_000, kind: 'income' as const },
-      { accountId: 'a1', currency: 'LKR', amount: 2_000, kind: 'expense' as const },
-      { accountId: 'a2', currency: 'LKR', amount: 9_999, kind: 'income' as const },
+      {
+        accountId: 'a1',
+        currency: 'LKR',
+        amount: 5_000,
+        kind: 'income' as const,
+      },
+      {
+        accountId: 'a1',
+        currency: 'LKR',
+        amount: 2_000,
+        kind: 'expense' as const,
+      },
+      {
+        accountId: 'a2',
+        currency: 'LKR',
+        amount: 9_999,
+        kind: 'income' as const,
+      },
     ]
     expect(
       computeAccountLedgerBalance(
@@ -3423,7 +3641,12 @@ describe('ledger-derived account balances (item 3 + 4)', () => {
     })
     // LKR account, a USD 100 income leg → +30_000 LKR
     const legs = [
-      { accountId: 'a1', currency: 'USD', amount: 100, kind: 'income' as const },
+      {
+        accountId: 'a1',
+        currency: 'USD',
+        amount: 100,
+        kind: 'income' as const,
+      },
     ]
     expect(
       computeAccountLedgerBalance(
@@ -3434,7 +3657,12 @@ describe('ledger-derived account balances (item 3 + 4)', () => {
     ).toBe(30_000)
     // still excluded when there is no rate on file
     const noRate = [
-      { accountId: 'a1', currency: 'AUD', amount: 100, kind: 'income' as const },
+      {
+        accountId: 'a1',
+        currency: 'AUD',
+        amount: 100,
+        kind: 'income' as const,
+      },
     ]
     expect(
       computeAccountLedgerBalance(
@@ -3485,17 +3713,26 @@ describe('ledger-derived account balances (item 3 + 4)', () => {
   it('effectiveAccountBalance: opt-in uses ledger, off uses manual, fails closed when null', () => {
     const db = createEmptyFinanceDatabase()
     const legs = [
-      { accountId: 'a1', currency: 'LKR', amount: 500, kind: 'expense' as const },
+      {
+        accountId: 'a1',
+        currency: 'LKR',
+        amount: 500,
+        kind: 'expense' as const,
+      },
     ]
     // opt-out → manual balance
-    expect(
-      effectiveAccountBalance(db, acc({ balance: 7_777 }), legs),
-    ).toBe(7_777)
+    expect(effectiveAccountBalance(db, acc({ balance: 7_777 }), legs)).toBe(
+      7_777,
+    )
     // opt-in with opening balance → derived
     expect(
       effectiveAccountBalance(
         db,
-        acc({ balance: 7_777, openingBalance: 1_000, deriveBalanceFromLedger: true }),
+        acc({
+          balance: 7_777,
+          openingBalance: 1_000,
+          deriveBalanceFromLedger: true,
+        }),
         legs,
       ),
     ).toBe(500)
@@ -3512,7 +3749,12 @@ describe('ledger-derived account balances (item 3 + 4)', () => {
   it('financeSummary cash/net-worth honour an opted-in account, and fall back when not computable', () => {
     const db = createEmptyFinanceDatabase()
     db.finance_accounts.push(
-      acc({ id: 'led', balance: 999, openingBalance: 1_000, deriveBalanceFromLedger: true }),
+      acc({
+        id: 'led',
+        balance: 999,
+        openingBalance: 1_000,
+        deriveBalanceFromLedger: true,
+      }),
       acc({ id: 'man', balance: 2_000 }),
       acc({ id: 'noOpen', balance: 3_000, deriveBalanceFromLedger: true }),
     )
@@ -3587,10 +3829,13 @@ describe('recordNetWorthSnapshot', () => {
 })
 
 describe('financeAlerts — category budget thresholds', () => {
-  function seedBudget(db: ReturnType<typeof createEmptyFinanceDatabase>, opts: {
-    budget: number
-    spent: number
-  }) {
+  function seedBudget(
+    db: ReturnType<typeof createEmptyFinanceDatabase>,
+    opts: {
+      budget: number
+      spent: number
+    },
+  ) {
     const now = new Date()
     const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     db.budget_categories.push({
@@ -3623,7 +3868,9 @@ describe('financeAlerts — category budget thresholds', () => {
   it('raises a critical alert when a category is over budget', () => {
     const db = createEmptyFinanceDatabase()
     seedBudget(db, { budget: 10_000, spent: 12_500 })
-    const alert = financeAlerts(db).find((a) => a.title === 'Over budget: Groceries')
+    const alert = financeAlerts(db).find(
+      (a) => a.title === 'Over budget: Groceries',
+    )
     expect(alert?.level).toBe('critical')
     expect(alert?.detail).toContain('125%')
   })
@@ -3645,9 +3892,9 @@ describe('financeAlerts — category budget thresholds', () => {
   it('is silent for a category comfortably under budget', () => {
     const db = createEmptyFinanceDatabase()
     seedBudget(db, { budget: 10_000, spent: 4_000 })
-    expect(
-      financeAlerts(db).some((a) => a.title.startsWith('Budget')),
-    ).toBe(false)
+    expect(financeAlerts(db).some((a) => a.title.startsWith('Budget'))).toBe(
+      false,
+    )
     expect(
       financeAlerts(db).some((a) => a.title.startsWith('Over budget')),
     ).toBe(false)
@@ -3777,7 +4024,9 @@ describe('financeAlerts — tax record completeness (getTaxRecordAlerts)', () =>
     db.income_records.push(taxableIncome(`${year}-01-15`, 100_000))
     db.tax_records.push(taxRecord({ taxYear: String(year) }))
     expect(
-      financeAlerts(db).some((a) => a.title === `No tax record for ${year} yet`),
+      financeAlerts(db).some(
+        (a) => a.title === `No tax record for ${year} yet`,
+      ),
     ).toBe(false)
   })
 
@@ -3789,7 +4038,9 @@ describe('financeAlerts — tax record completeness (getTaxRecordAlerts)', () =>
       taxable: false,
     })
     expect(
-      financeAlerts(db).some((a) => a.title === `No tax record for ${year} yet`),
+      financeAlerts(db).some(
+        (a) => a.title === `No tax record for ${year} yet`,
+      ),
     ).toBe(false)
   })
 
@@ -3822,9 +4073,7 @@ describe('financeAlerts — tax record completeness (getTaxRecordAlerts)', () =>
     db.income_records.push(
       taxableIncome(`${now.getFullYear()}-${quarterFirstMonth}-01`, 200_000),
     )
-    db.tax_records.push(
-      taxRecord({ updatedAt: now.toISOString() }),
-    )
+    db.tax_records.push(taxRecord({ updatedAt: now.toISOString() }))
     const quarterIndex = Math.floor(quarterStartMonth / 3) + 1
     expect(
       financeAlerts(db).some(
@@ -3866,9 +4115,13 @@ describe('scheduled_transaction (planned future income/expense)', () => {
     expect(store.readFinanceStore().scheduled_transactions[0].status).toBe(
       'paused',
     )
-    store.updateFinanceRecord('scheduled_transaction', id, { status: 'pending' })
+    store.updateFinanceRecord('scheduled_transaction', id, {
+      status: 'pending',
+    })
 
-    store.updateFinanceRecord('scheduled_transaction', id, { status: 'cancelled' })
+    store.updateFinanceRecord('scheduled_transaction', id, {
+      status: 'cancelled',
+    })
     expect(store.readFinanceStore().scheduled_transactions[0].status).toBe(
       'cancelled',
     )
@@ -3908,7 +4161,10 @@ describe('scheduled_transaction (planned future income/expense)', () => {
       status: 'cancelled',
     })
 
-    const { scheduled } = store.getUpcomingMoney(store.readFinanceStore(), today)
+    const { scheduled } = store.getUpcomingMoney(
+      store.readFinanceStore(),
+      today,
+    )
     expect(scheduled.map((s) => s.counterparty)).toEqual(['Overdue'])
     // 'Soon' was the one we cancelled; 'FarOut' is outside the +45d window
     expect(scheduled[0].days).toBe(-3)
