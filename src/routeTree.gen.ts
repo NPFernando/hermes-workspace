@@ -133,6 +133,7 @@ import { Route as ApiHermesTasksAssigneesRouteImport } from './routes/api/hermes
 import { Route as ApiHermesTasksRouteImport } from './routes/api/hermes-tasks'
 import { Route as ApiHermesConfigRouteImport } from './routes/api/hermes-config'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as ApiHarpObservabilityRouteImport } from './routes/api/harp-observability'
 import { Route as ApiHarpConfigRouteImport } from './routes/api/harp-config'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-status'
 import { Route as ApiGatewayReprobeRouteImport } from './routes/api/gateway-reprobe'
@@ -877,6 +878,11 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiHarpObservabilityRoute = ApiHarpObservabilityRouteImport.update({
+  id: '/api/harp-observability',
+  path: '/api/harp-observability',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiHarpConfigRoute = ApiHarpConfigRouteImport.update({
   id: '/api/harp-config',
   path: '/api/harp-config',
@@ -1566,6 +1572,7 @@ export interface FileRoutesByFullPath {
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/harp-config': typeof ApiHarpConfigRoute
+  '/api/harp-observability': typeof ApiHarpObservabilityRoute
   '/api/health': typeof ApiHealthRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/hermes-tasks': typeof ApiHermesTasksRouteWithChildren
@@ -1813,6 +1820,7 @@ export interface FileRoutesByTo {
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/harp-config': typeof ApiHarpConfigRoute
+  '/api/harp-observability': typeof ApiHarpObservabilityRoute
   '/api/health': typeof ApiHealthRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/hermes-tasks': typeof ApiHermesTasksRouteWithChildren
@@ -2062,6 +2070,7 @@ export interface FileRoutesById {
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
   '/api/harp-config': typeof ApiHarpConfigRoute
+  '/api/harp-observability': typeof ApiHarpObservabilityRoute
   '/api/health': typeof ApiHealthRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
   '/api/hermes-tasks': typeof ApiHermesTasksRouteWithChildren
@@ -2312,6 +2321,7 @@ export interface FileRouteTypes {
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
     | '/api/harp-config'
+    | '/api/harp-observability'
     | '/api/health'
     | '/api/hermes-config'
     | '/api/hermes-tasks'
@@ -2559,6 +2569,7 @@ export interface FileRouteTypes {
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
     | '/api/harp-config'
+    | '/api/harp-observability'
     | '/api/health'
     | '/api/hermes-config'
     | '/api/hermes-tasks'
@@ -2807,6 +2818,7 @@ export interface FileRouteTypes {
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
     | '/api/harp-config'
+    | '/api/harp-observability'
     | '/api/health'
     | '/api/hermes-config'
     | '/api/hermes-tasks'
@@ -3056,6 +3068,7 @@ export interface RootRouteChildren {
   ApiGatewayReprobeRoute: typeof ApiGatewayReprobeRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
   ApiHarpConfigRoute: typeof ApiHarpConfigRoute
+  ApiHarpObservabilityRoute: typeof ApiHarpObservabilityRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiHermesConfigRoute: typeof ApiHermesConfigRoute
   ApiHermesTasksRoute: typeof ApiHermesTasksRouteWithChildren
@@ -4063,6 +4076,13 @@ declare module '@tanstack/react-router' {
       path: '/api/health'
       fullPath: '/api/health'
       preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/harp-observability': {
+      id: '/api/harp-observability'
+      path: '/api/harp-observability'
+      fullPath: '/api/harp-observability'
+      preLoaderRoute: typeof ApiHarpObservabilityRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/harp-config': {
@@ -5248,6 +5268,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGatewayReprobeRoute: ApiGatewayReprobeRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
   ApiHarpConfigRoute: ApiHarpConfigRoute,
+  ApiHarpObservabilityRoute: ApiHarpObservabilityRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiHermesConfigRoute: ApiHermesConfigRoute,
   ApiHermesTasksRoute: ApiHermesTasksRouteWithChildren,
