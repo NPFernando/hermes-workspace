@@ -7,7 +7,12 @@ import type {
   PersonalFinancePayload,
 } from '../types'
 
-type DuplicateWarning = { date: string; amount: number; vendorOrSource: string }
+type DuplicateWarning = {
+  date: string
+  amount: number
+  vendorOrSource: string
+  confidence: 'exact' | 'likely'
+}
 
 const confidenceTone: Record<ExtractedTransaction['confidence'], string> = {
   high: positiveTone,
@@ -283,6 +288,7 @@ export function PendingIngestionPanel({
           date: string
           amount: number
           vendorOrSource: string
+          confidence: 'exact' | 'likely'
         }
       }
       if (data.ok === false) {
@@ -816,7 +822,10 @@ export function PendingIngestionPanel({
                         </div>
                         {hasDuplicateWarning && (
                           <p className="mt-2 text-xs text-[var(--theme-warning)]">
-                            Possible duplicate: an existing record for "
+                            {duplicateWarning.confidence === 'exact'
+                              ? 'Possible duplicate: an'
+                              : 'Possible duplicate (close match, different day): an'}{' '}
+                            existing record for "
                             {duplicateWarning.vendorOrSource}" on{' '}
                             {duplicateWarning.date} for{' '}
                             {duplicateWarning.amount} already exists.

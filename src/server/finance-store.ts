@@ -2105,14 +2105,34 @@ export type DuplicateMatch = {
   date: string
   amount: number
   vendorOrSource: string
+  /** 'exact' = same calendar day; 'likely' = within a day either side —
+   *  added for the common case of a card's bank-settlement date landing a
+   *  day or two after the receipt/email date the ingestion pipeline reads,
+   *  which an exact-day match was missing entirely (a real false-negative
+   *  gap, not just a hypothetical one — card transactions routinely settle
+   *  1-2 days after the purchase/statement date). Callers can phrase the
+   *  warning accordingly; this is advisory either way (force:true always
+   *  overrides), so the wider net costs at most one extra confirmation
+   *  click, never a blocked or silently-dropped record. */
+  confidence: 'exact' | 'likely'
+}
+
+function daysBetween(a: string, b: string): number | null {
+  const dateA = new Date(`${a}T00:00:00Z`)
+  const dateB = new Date(`${b}T00:00:00Z`)
+  if (Number.isNaN(dateA.getTime()) || Number.isNaN(dateB.getTime())) return null
+  return Math.round(Math.abs(dateA.getTime() - dateB.getTime()) / 86_400_000)
 }
 
 /**
- * Same-day, same-vendor(case-insensitive), ~same-amount (within 1%) match
- * against existing records — used by confirm_pending_ingestion to warn
- * before silently double-counting an email/upload that was already
- * confirmed once (e.g. the same bill arriving via both Gmail and a manual
- * upload). Read-only; callers decide whether to still create the record.
+ * Same-vendor(case-insensitive), ~same-amount (within 1%) match against
+ * existing records, dated the same day ('exact') or within a day either
+ * side ('likely') — used by confirm_pending_ingestion to warn before
+ * silently double-counting an email/upload that was already confirmed once
+ * (e.g. the same bill arriving via both Gmail and a manual upload).
+ * Read-only; callers decide whether to still create the record — this never
+ * blocks, only warns. Prefers the closest date match when both an exact and
+ * a likely candidate exist.
  */
 export function findPossibleDuplicate(
   kind: 'income' | 'expense',
@@ -2144,21 +2164,29 @@ export function findPossibleDuplicate(
           amount: r.amount,
         }))
 
+  let best: (DuplicateMatch & { dayDiff: number }) | null = null
   for (const r of records) {
     const sameVendor = r.vendor.trim().toLowerCase() === vendorKey
-    const sameDate = r.date.slice(0, 10) === dateOnly
+    if (!sameVendor) continue
     const sameAmount =
       Math.abs(r.amount - amount) / Math.max(Math.abs(amount), 1) < 0.01
-    if (sameVendor && sameDate && sameAmount) {
-      return {
+    if (!sameAmount) continue
+    const dayDiff = daysBetween(r.date.slice(0, 10), dateOnly)
+    if (dayDiff === null || dayDiff > 1) continue
+    if (best === null || dayDiff < best.dayDiff) {
+      best = {
         id: r.id,
         date: r.date,
         amount: r.amount,
         vendorOrSource: r.vendor,
+        confidence: dayDiff === 0 ? 'exact' : 'likely',
+        dayDiff,
       }
     }
   }
-  return null
+  if (!best) return null
+  const { dayDiff: _dayDiff, ...match } = best
+  return match
 }
 
 /**
