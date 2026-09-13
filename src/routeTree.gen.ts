@@ -53,6 +53,7 @@ import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-inpu
 import { Route as ApiTerminalCloseRouteImport } from './routes/api/terminal-close'
 import { Route as ApiTelegramTaskClarifyRouteImport } from './routes/api/telegram-task-clarify'
 import { Route as ApiTelegramFindRouteImport } from './routes/api/telegram-find'
+import { Route as ApiTelegramBoardSummaryRouteImport } from './routes/api/telegram-board-summary'
 import { Route as ApiTelegramBoardRouteImport } from './routes/api/telegram-board'
 import { Route as ApiTasksUnlockPrereqRouteImport } from './routes/api/tasks-unlock-prereq'
 import { Route as ApiTasksSweepStatsRouteImport } from './routes/api/tasks-sweep-stats'
@@ -476,6 +477,11 @@ const ApiTelegramTaskClarifyRoute = ApiTelegramTaskClarifyRouteImport.update({
 const ApiTelegramFindRoute = ApiTelegramFindRouteImport.update({
   id: '/api/telegram-find',
   path: '/api/telegram-find',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTelegramBoardSummaryRoute = ApiTelegramBoardSummaryRouteImport.update({
+  id: '/api/telegram-board-summary',
+  path: '/api/telegram-board-summary',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTelegramBoardRoute = ApiTelegramBoardRouteImport.update({
@@ -1660,6 +1666,7 @@ export interface FileRoutesByFullPath {
   '/api/tasks-sweep-stats': typeof ApiTasksSweepStatsRoute
   '/api/tasks-unlock-prereq': typeof ApiTasksUnlockPrereqRoute
   '/api/telegram-board': typeof ApiTelegramBoardRoute
+  '/api/telegram-board-summary': typeof ApiTelegramBoardSummaryRoute
   '/api/telegram-find': typeof ApiTelegramFindRoute
   '/api/telegram-task-clarify': typeof ApiTelegramTaskClarifyRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
@@ -1909,6 +1916,7 @@ export interface FileRoutesByTo {
   '/api/tasks-sweep-stats': typeof ApiTasksSweepStatsRoute
   '/api/tasks-unlock-prereq': typeof ApiTasksUnlockPrereqRoute
   '/api/telegram-board': typeof ApiTelegramBoardRoute
+  '/api/telegram-board-summary': typeof ApiTelegramBoardSummaryRoute
   '/api/telegram-find': typeof ApiTelegramFindRoute
   '/api/telegram-task-clarify': typeof ApiTelegramTaskClarifyRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
@@ -2160,6 +2168,7 @@ export interface FileRoutesById {
   '/api/tasks-sweep-stats': typeof ApiTasksSweepStatsRoute
   '/api/tasks-unlock-prereq': typeof ApiTasksUnlockPrereqRoute
   '/api/telegram-board': typeof ApiTelegramBoardRoute
+  '/api/telegram-board-summary': typeof ApiTelegramBoardSummaryRoute
   '/api/telegram-find': typeof ApiTelegramFindRoute
   '/api/telegram-task-clarify': typeof ApiTelegramTaskClarifyRoute
   '/api/terminal-close': typeof ApiTerminalCloseRoute
@@ -2412,6 +2421,7 @@ export interface FileRouteTypes {
     | '/api/tasks-sweep-stats'
     | '/api/tasks-unlock-prereq'
     | '/api/telegram-board'
+    | '/api/telegram-board-summary'
     | '/api/telegram-find'
     | '/api/telegram-task-clarify'
     | '/api/terminal-close'
@@ -2661,6 +2671,7 @@ export interface FileRouteTypes {
     | '/api/tasks-sweep-stats'
     | '/api/tasks-unlock-prereq'
     | '/api/telegram-board'
+    | '/api/telegram-board-summary'
     | '/api/telegram-find'
     | '/api/telegram-task-clarify'
     | '/api/terminal-close'
@@ -2911,6 +2922,7 @@ export interface FileRouteTypes {
     | '/api/tasks-sweep-stats'
     | '/api/tasks-unlock-prereq'
     | '/api/telegram-board'
+    | '/api/telegram-board-summary'
     | '/api/telegram-find'
     | '/api/telegram-task-clarify'
     | '/api/terminal-close'
@@ -3162,6 +3174,7 @@ export interface RootRouteChildren {
   ApiTasksSweepStatsRoute: typeof ApiTasksSweepStatsRoute
   ApiTasksUnlockPrereqRoute: typeof ApiTasksUnlockPrereqRoute
   ApiTelegramBoardRoute: typeof ApiTelegramBoardRoute
+  ApiTelegramBoardSummaryRoute: typeof ApiTelegramBoardSummaryRoute
   ApiTelegramFindRoute: typeof ApiTelegramFindRoute
   ApiTelegramTaskClarifyRoute: typeof ApiTelegramTaskClarifyRoute
   ApiTerminalCloseRoute: typeof ApiTerminalCloseRoute
@@ -3529,6 +3542,13 @@ declare module '@tanstack/react-router' {
       path: '/api/telegram-find'
       fullPath: '/api/telegram-find'
       preLoaderRoute: typeof ApiTelegramFindRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/telegram-board-summary': {
+      id: '/api/telegram-board-summary'
+      path: '/api/telegram-board-summary'
+      fullPath: '/api/telegram-board-summary'
+      preLoaderRoute: typeof ApiTelegramBoardSummaryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/telegram-board': {
@@ -5370,6 +5390,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTasksSweepStatsRoute: ApiTasksSweepStatsRoute,
   ApiTasksUnlockPrereqRoute: ApiTasksUnlockPrereqRoute,
   ApiTelegramBoardRoute: ApiTelegramBoardRoute,
+  ApiTelegramBoardSummaryRoute: ApiTelegramBoardSummaryRoute,
   ApiTelegramFindRoute: ApiTelegramFindRoute,
   ApiTelegramTaskClarifyRoute: ApiTelegramTaskClarifyRoute,
   ApiTerminalCloseRoute: ApiTerminalCloseRoute,
