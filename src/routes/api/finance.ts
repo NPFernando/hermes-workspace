@@ -607,6 +607,8 @@ function personalFinancePayload() {
           accountLedgerLegs,
         ),
       })),
+      financial_institutions: db.financial_institutions,
+      financial_branches: db.financial_branches,
       income_records: withinWindow(db.income_records, 'dateReceived'),
       expense_records: withinWindow(db.expense_records, 'date'),
       transfers: withinWindow(db.transfers, 'date'),

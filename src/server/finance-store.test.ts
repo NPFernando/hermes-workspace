@@ -1686,6 +1686,45 @@ describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)',
     db = store.readFinanceStore()
     expect(db.fixed_deposits).toHaveLength(0)
   })
+
+  it('reuses normalized institutions and links branches across accounts and deposits', async () => {
+    const store = await freshFinanceStore()
+    store.addFinanceRecord('account', {
+      name: 'Savings',
+      type: 'bank',
+      platform: '  Sampath   Bank ',
+      branchName: 'Colombo 03',
+    })
+    store.addFinanceRecord('fixed_deposit', {
+      bankName: 'sampath bank',
+      branchName: 'Colombo 03',
+      principal: 100_000,
+      maturityDate: '2027-01-01',
+    })
+
+    let db = store.readFinanceStore()
+    expect(db.financial_institutions).toHaveLength(1)
+    expect(db.financial_institutions[0].name).toBe('Sampath Bank')
+    expect(db.financial_branches).toHaveLength(1)
+    expect(db.financial_branches[0]).toMatchObject({
+      institutionId: db.financial_institutions[0].id,
+      name: 'Colombo 03',
+    })
+    expect(db.finance_accounts[0]).toMatchObject({
+      platform: 'Sampath   Bank',
+      branchName: 'Colombo 03',
+    })
+
+    store.updateFinanceRecord('fixed_deposit', db.fixed_deposits[0].id, {
+      branchName: 'Kandy',
+    })
+    db = store.readFinanceStore()
+    expect(db.financial_institutions).toHaveLength(1)
+    expect(db.financial_branches.map((branch) => branch.name)).toEqual([
+      'Colombo 03',
+      'Kandy',
+    ])
+  })
 })
 
 describe('account (PF-100 Account Model)', () => {

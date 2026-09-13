@@ -213,6 +213,8 @@ export type PersonalFinancePayload = {
   }
   data: {
     finance_accounts: Array<Record<string, unknown>>
+    financial_institutions: Array<Record<string, unknown>>
+    financial_branches: Array<Record<string, unknown>>
     income_records: Array<Record<string, unknown>>
     expense_records: Array<Record<string, unknown>>
     transfers: Array<Record<string, unknown>>
