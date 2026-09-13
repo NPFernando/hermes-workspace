@@ -5,12 +5,12 @@ import {
   formatJobActionLabel,
   formatJobFailureDetail,
   formatJobFreshnessCopy,
-  formatJobScheduleMetaLabel,
   formatJobLastRunStatus,
+  formatJobScheduleMetaLabel,
+  formatJobsResultSummary,
   getJobHealthFilterButtonLabel,
   getJobHealthFilterCounts,
   getJobsEmptyStateCopy,
-  formatJobsResultSummary,
 } from './jobs-screen'
 import type { ClaudeJob } from '@/lib/jobs-api'
 
