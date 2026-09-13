@@ -11,6 +11,7 @@ import {
   readChatQueuePaused,
   refreshChatQueueLock,
   releaseChatQueueLock,
+  replaceQueuedPrompt,
   tryAcquireChatQueueLock,
   writeChatQueue,
   writeChatQueuePaused,
@@ -63,6 +64,23 @@ describe('/queue command', () => {
         'Usage: /queue edit <number> <replacement> or /queue remove <number>',
     })
     expect(parseQueueCommand('/queued message')).toBeNull()
+  })
+
+  it('edits a pending prompt in place and rejects invalid replacements', () => {
+    const queue = [
+      { id: '1', text: 'first', createdAt: 1 },
+      { id: '2', text: 'second', createdAt: 2 },
+    ]
+    expect(replaceQueuedPrompt(queue, 1, ' updated second ')).toEqual([
+      queue[0],
+      { id: '2', text: 'updated second', createdAt: 2 },
+    ])
+    expect(queue[1].text).toBe('second')
+    expect(replaceQueuedPrompt(queue, -1, 'invalid index')).toBeNull()
+    expect(replaceQueuedPrompt(queue, 0, '   ')).toBeNull()
+    expect(
+      replaceQueuedPrompt(queue, 0, 'x'.repeat(MAX_CHAT_QUEUE_TEXT_LENGTH + 1)),
+    ).toBeNull()
   })
 
   it('persists FIFO queue entries per session and clears the storage key', () => {

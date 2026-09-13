@@ -81,6 +81,26 @@ export function parseQueueCommand(value: string): QueueCommand | null {
   return { kind: 'enqueue', text: argument }
 }
 
+/** Replace one pending prompt without changing its FIFO position or identity. */
+export function replaceQueuedPrompt(
+  queue: Array<QueuedChatPrompt>,
+  index: number,
+  text: string,
+): Array<QueuedChatPrompt> | null {
+  const normalizedText = text.trim()
+  if (
+    index < 0 ||
+    index >= queue.length ||
+    !normalizedText ||
+    normalizedText.length > MAX_CHAT_QUEUE_TEXT_LENGTH
+  ) {
+    return null
+  }
+  return queue.map((prompt, promptIndex) =>
+    promptIndex === index ? { ...prompt, text: normalizedText } : prompt,
+  )
+}
+
 export function getChatQueueStorageKey(sessionKey: string): string {
   return `${CHAT_QUEUE_STORAGE_PREFIX}${encodeURIComponent(sessionKey || 'main')}`
 }

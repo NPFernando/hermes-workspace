@@ -33,6 +33,7 @@ import {
   readChatQueuePaused,
   refreshChatQueueLock,
   releaseChatQueueLock,
+  replaceQueuedPrompt,
   tryAcquireChatQueueLock,
   writeChatQueue,
   writeChatQueuePaused,
@@ -869,9 +870,12 @@ export function ChatScreen({
         )
         return
       }
-      const nextQueue = queuedPromptsRef.current.map((prompt, promptIndex) =>
-        promptIndex === index ? { ...prompt, text: normalizedText } : prompt,
+      const nextQueue = replaceQueuedPrompt(
+        queuedPromptsRef.current,
+        index,
+        normalizedText,
       )
+      if (!nextQueue) return
       queuedPromptsRef.current = nextQueue
       setQueuedPrompts(nextQueue)
       writeChatQueue(queueSessionKey, nextQueue)
