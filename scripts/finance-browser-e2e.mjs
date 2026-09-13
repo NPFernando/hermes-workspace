@@ -14,6 +14,23 @@ const bundledChromium = chromium.executablePath()
 const browserExecutable =
   process.env.FINANCE_E2E_CHROMIUM_PATH ||
   (existsSync(bundledChromium) ? bundledChromium : '/usr/bin/chromium-browser')
+// These global workspace requests are outside the finance journey and are
+// intentionally stubbed as 404s. Keep the list explicit so a new API call
+// cannot silently become another unmocked response in this E2E test.
+const expectedUnmockedEndpoints = [
+  'GET /api/files',
+  'GET /api/gateway-status',
+  'GET /api/openrouter-credits',
+  'GET /api/provider-usage',
+  'GET /api/session-status',
+  'GET /api/system-metrics',
+  'GET /api/update/naveen-status',
+  'GET /api/update/status',
+  'GET /api/user-profile',
+  'GET /api/user-settings',
+  'POST /api/terminal-stream',
+  'PUT /api/user-settings',
+].sort()
 const financePayload = {
   ok: true,
   checkedAt: Date.now(),
@@ -407,13 +424,15 @@ try {
   assert.equal(imports[1].force, true)
 
   assert.deepEqual(pageErrors, [])
-  if (unmockedEndpoints.length > 0) {
-    console.log(
-      `Other API requests safely intercepted as 404: ${[...new Set(unmockedEndpoints)].join(', ')}`,
-    )
-  }
+  assert.deepEqual(
+    [...new Set(unmockedEndpoints)].sort(),
+    expectedUnmockedEndpoints,
+    'Review newly unmocked global API calls and explicitly mock or allowlist them',
+  )
   if (consoleErrors.length > 0) {
-    console.log(`Browser console errors (non-fatal): ${consoleErrors.length}`)
+    console.log(
+      `Browser console errors (non-fatal): ${[...new Set(consoleErrors)].join(' | ')}`,
+    )
   }
   console.log(
     'Finance browser journey passed: forecast, goal timeline, FX scenario, Gmail freshness, duplicate review.',
