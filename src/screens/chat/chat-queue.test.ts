@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 import {
   MAX_CHAT_QUEUE_ITEMS,
   MAX_CHAT_QUEUE_TEXT_LENGTH,
-  getChatQueuePausedStorageKey,
   getChatQueueLockStorageKey,
+  getChatQueuePausedStorageKey,
   getChatQueueStorageKey,
   parseQueueCommand,
   readChatQueue,
