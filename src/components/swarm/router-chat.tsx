@@ -55,11 +55,14 @@ export type DispatchResponse = {
 }
 
 type QueueStatus = {
+  mode: 'postgres'
   active: null | {
     id: string
     assignmentCount: number
     queuedAt: number
     startedAt: number | null
+    status: string
+    cancelRequestedAt: number | null
   }
   waiting: Array<{
     id: string
@@ -67,6 +70,16 @@ type QueueStatus = {
     assignmentCount: number
     queuedAt: number
     startedAt: number | null
+    status: string
+    cancelRequestedAt: number | null
+  }>
+  recent: Array<{
+    id: string
+    assignmentCount: number
+    queuedAt: number
+    startedAt: number | null
+    status: string
+    cancelRequestedAt: number | null
   }>
 }
 
@@ -135,6 +148,7 @@ export function RouterChat({
   const [serialDispatch, setSerialDispatch] = useState(false)
   const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null)
   const [dispatchError, setDispatchError] = useState<string | null>(null)
+  const [cancellingQueueId, setCancellingQueueId] = useState<string | null>(null)
   const [results, setResults] = useState<DispatchResponse | null>(null)
   const [followUp, setFollowUp] = useState<FollowUpResponse | null>(null)
   const pacingTasks =
@@ -151,10 +165,6 @@ export function RouterChat({
   const pacingPreview = buildPacingPreview(pacingTasks)
 
   useEffect(() => {
-    if (!serialDispatch || !dispatching) {
-      setQueueStatus(null)
-      return
-    }
     let disposed = false
     const refresh = async () => {
       try {
@@ -169,12 +179,12 @@ export function RouterChat({
       }
     }
     void refresh()
-    const timer = window.setInterval(() => void refresh(), 2000)
+    const timer = window.setInterval(() => void refresh(), 5000)
     return () => {
       disposed = true
       window.clearInterval(timer)
     }
-  }, [dispatching, serialDispatch])
+  }, [])
 
   useEffect(() => {
     if (!seedPrompt?.trim()) return
@@ -370,6 +380,22 @@ export function RouterChat({
       setDispatchError(err instanceof Error ? err.message : 'dispatch failed')
     } finally {
       setDispatching(false)
+    }
+  }
+
+  async function cancelQueueJob(id: string) {
+    setCancellingQueueId(id)
+    try {
+      const response = await fetch(`/api/swarm-dispatch?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      })
+      if (!response.ok) throw new Error((await response.text()) || `HTTP ${response.status}`)
+      const refreshed = await fetch('/api/swarm-dispatch', { cache: 'no-store' })
+      if (refreshed.ok) setQueueStatus((await refreshed.json()) as QueueStatus)
+    } catch (error) {
+      setDispatchError(error instanceof Error ? error.message : 'Could not cancel queued dispatch.')
+    } finally {
+      setCancellingQueueId(null)
     }
   }
 
@@ -659,32 +685,56 @@ export function RouterChat({
                     className="mt-0.5 accent-[var(--theme-accent)]"
                   />
                   <span>
-                    Queue this batch serially (one worker at a time). FIFO queue
-                    is shared by serial requests within this server process; it
-                    is in-memory, not retained across restarts or shared between
-                    server instances. Parallel requests remain unchanged.
+                    Queue this batch serially (one worker at a time). Pending
+                    batches and status are persisted in the shared Postgres queue;
+                    parallel requests remain unchanged.
                   </span>
                 </label>
-                {dispatching && serialDispatch ? (
+                {queueStatus && (queueStatus.active || queueStatus.waiting.length > 0 || queueStatus.recent.length > 0) ? (
                   <div className="mt-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1.5 text-[11px] text-[var(--theme-muted-2)]">
-                    {queueStatus ? (
-                      <>
+                    <>
                         <div>
                           {queueStatus.active
-                            ? `Server queue active · ${queueStatus.active.assignmentCount} task${queueStatus.active.assignmentCount === 1 ? '' : 's'}`
+                            ? `Shared queue active · ${queueStatus.active.assignmentCount} task${queueStatus.active.assignmentCount === 1 ? '' : 's'}${queueStatus.active.cancelRequestedAt ? ' · cancellation requested' : ''}`
                             : 'No serial batch is running right now.'}
                         </div>
+                        {queueStatus.active && !queueStatus.active.cancelRequestedAt ? (
+                          <button
+                            type="button"
+                            disabled={cancellingQueueId === queueStatus.active.id}
+                            onClick={() => queueStatus.active && void cancelQueueJob(queueStatus.active.id)}
+                            className="mt-1 text-[var(--theme-danger)] underline disabled:opacity-50"
+                          >
+                            {cancellingQueueId === queueStatus.active.id ? 'Cancelling…' : 'Cancel active batch'}
+                          </button>
+                        ) : null}
                         {queueStatus.waiting.length > 0 ? (
                           <div className="mt-0.5">
                             {queueStatus.waiting.length} batch
                             {queueStatus.waiting.length === 1 ? '' : 'es'}{' '}
-                            waiting in the server queue
+                            waiting in the shared queue
                           </div>
                         ) : null}
-                      </>
-                    ) : (
-                      'Checking serial queue status…'
-                    )}
+                        {queueStatus.waiting.map((job) => (
+                          <div key={job.id} className="mt-1 flex items-center justify-between gap-3">
+                            <span>#{job.position} · {job.assignmentCount} task{job.assignmentCount === 1 ? '' : 's'} · pending</span>
+                            <button
+                              type="button"
+                              disabled={cancellingQueueId === job.id}
+                              onClick={() => void cancelQueueJob(job.id)}
+                              className="text-[var(--theme-danger)] underline disabled:opacity-50"
+                              aria-label={`Cancel queued batch ${job.id}`}
+                            >
+                              {cancellingQueueId === job.id ? 'Cancelling…' : 'Cancel'}
+                            </button>
+                          </div>
+                        ))}
+                        {queueStatus.recent.slice(0, 3).map((job) => (
+                          <div key={job.id} className="mt-1 text-[10px] opacity-80">
+                            Recent: {job.status} · {job.assignmentCount} task{job.assignmentCount === 1 ? '' : 's'} · {job.id.slice(0, 8)}
+                          </div>
+                        ))}
+                    </>
                   </div>
                 ) : null}
               </div>

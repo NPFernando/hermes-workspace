@@ -23,7 +23,12 @@ import {
 } from '../../server/swarm-memory'
 import {
   SwarmDispatchQueueFullError,
-  swarmDispatchQueue,
+  SwarmDispatchQueueUnavailableError,
+  cancelSwarmDispatchQueueJob,
+  enqueueSwarmDispatch,
+  getSwarmDispatchQueueSnapshot,
+  startSwarmDispatchQueueWorker,
+  waitForSwarmDispatchQueueJob,
 } from '../../server/swarm-dispatch-queue'
 import { rosterByWorkerId } from '../../server/swarm-roster'
 import { publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
@@ -717,10 +722,23 @@ async function waitForFreshCheckpoint(
   baselineRuntimeSignature: string,
   dispatchedAt: number,
   timeoutMs: number,
+  signal?: AbortSignal,
 ): Promise<ParsedSwarmCheckpoint | null> {
   const started = Date.now()
   const profilePath = getProfilePath(workerId)
   while (Date.now() - started < timeoutMs) {
+    if (signal?.aborted) {
+      const tmuxBin = resolveTmuxBin()
+      if (tmuxBin) {
+        await execFileAsync(tmuxBin, [
+          'send-keys',
+          '-t',
+          sessionNameFor(workerId),
+          'C-c',
+        ])
+      }
+      return null
+    }
     const runtimeSnapshot = readRuntimeCheckpointSnapshot(profilePath)
     if (
       runtimeSnapshotIsFresh(
@@ -730,14 +748,22 @@ async function waitForFreshCheckpoint(
       )
     ) {
       const runtimeCheckpoint = checkpointFromRuntimeSnapshot(runtimeSnapshot)
-      if (runtimeCheckpoint && runtimeCheckpoint.raw !== previousRaw)
+      if (
+        runtimeCheckpoint &&
+        runtimeCheckpoint.raw !== previousRaw &&
+        runtimeCheckpoint.stateLabel !== 'IN_PROGRESS'
+      )
         return runtimeCheckpoint
     }
 
     const chat = readWorkerMessages(profilePath, 50)
     if (chat.ok) {
       const checkpoint = newestCheckpointFromMessages(chat.messages)
-      if (checkpoint && checkpoint.raw !== previousRaw) return checkpoint
+      if (
+        checkpoint &&
+        checkpoint.raw !== previousRaw &&
+        checkpoint.stateLabel !== 'IN_PROGRESS'
+      ) return checkpoint
     }
     await sleep(2_000)
   }
@@ -1128,8 +1154,20 @@ async function ensureLiveTmuxSession(
 async function sendPromptToLiveSession(
   workerId: string,
   prompt: string,
+  signal?: AbortSignal,
 ): Promise<WorkerResult | null> {
   const startedAt = Date.now()
+  if (signal?.aborted) {
+    return {
+      workerId,
+      ok: false,
+      output: '',
+      error: 'Cancelled before dispatch started.',
+      durationMs: 0,
+      exitCode: null,
+      delivery: 'tmux',
+    }
+  }
   const ensured = await ensureLiveTmuxSession(workerId)
   if (!ensured.ok) return null
 
@@ -1152,6 +1190,17 @@ async function sendPromptToLiveSession(
       ok: false,
       output: '',
       error: loaded.error,
+      durationMs: Date.now() - startedAt,
+      exitCode: null,
+      delivery: 'tmux',
+    }
+  }
+  if (signal?.aborted) {
+    return {
+      workerId,
+      ok: false,
+      output: '',
+      error: 'Cancelled before the prompt was submitted.',
       durationMs: Date.now() - startedAt,
       exitCode: null,
       delivery: 'tmux',
@@ -1204,6 +1253,17 @@ async function sendPromptToLiveSession(
   // to accept Enter; sending a confirmation Enter shortly after the first one
   // prevents the user-visible failure mode where the task sits at the prompt.
   await sleep(2000)
+  if (signal?.aborted) {
+    return {
+      workerId,
+      ok: false,
+      output: '',
+      error: 'Cancelled before the prompt was submitted.',
+      durationMs: Date.now() - startedAt,
+      exitCode: null,
+      delivery: 'tmux',
+    }
+  }
   const enter = await execFileAsync(tmuxBin, [
     'send-keys',
     '-t',
@@ -1222,6 +1282,18 @@ async function sendPromptToLiveSession(
     }
   }
   await sleep(1000)
+  if (signal?.aborted) {
+    await execFileAsync(tmuxBin, ['send-keys', '-t', sessionName, 'C-c'])
+    return {
+      workerId,
+      ok: false,
+      output: '',
+      error: 'Dispatch cancelled.',
+      durationMs: Date.now() - startedAt,
+      exitCode: null,
+      delivery: 'tmux',
+    }
+  }
   const confirmEnter = await execFileAsync(tmuxBin, [
     'send-keys',
     '-t',
@@ -1277,11 +1349,24 @@ function runWorker(
     checkpointPollMs?: number
     missionId?: string | null
     notifySessionKey?: string | null
+    signal?: AbortSignal
   },
 ): Promise<WorkerResult> {
   return new Promise((resolve) => {
-    const workerId = assignment.workerId
-    void (async () => {
+      const workerId = assignment.workerId
+      void (async () => {
+      if (options?.signal?.aborted) {
+        resolve({
+          workerId,
+          ok: false,
+          output: '',
+          error: 'Dispatch cancelled.',
+          durationMs: 0,
+          exitCode: null,
+          delivery: 'oneshot',
+        })
+        return
+      }
       const prompt = buildWorkerPrompt({
         workerId,
         task: assignment.task,
@@ -1330,9 +1415,15 @@ function runWorker(
       const wrapperPath = getWrapperPath(workerId)
 
       // Prefer the persistent live agent session when available/startable.
-      const liveResult = await sendPromptToLiveSession(workerId, prompt)
+      const liveResult = await sendPromptToLiveSession(
+        workerId,
+        prompt,
+        options?.signal,
+      )
       if (liveResult) {
-        const effectiveLiveResult = liveResult.ok
+        const effectiveLiveResult = options?.signal?.aborted
+          ? liveResult
+          : liveResult.ok
           ? liveResult
           : await tryHarpRotationAfterModelFailure({
               workerId,
@@ -1342,7 +1433,6 @@ function runWorker(
               options,
               startedAt,
             })
-        markDispatchResult(workerId, effectiveLiveResult)
         if (options?.waitForCheckpoint && effectiveLiveResult.ok) {
           const checkpoint =
             effectiveLiveResult.checkpoint ??
@@ -1352,6 +1442,7 @@ function runWorker(
               baselineRuntimeSignature,
               startedAt,
               options.checkpointPollMs ?? 90_000,
+              options.signal,
             ))
           if (checkpoint) {
             markCheckpointResult(
@@ -1411,12 +1502,19 @@ function runWorker(
             effectiveLiveResult.output = `${effectiveLiveResult.output}\nCheckpoint ${checkpoint.stateLabel}: ${checkpoint.result ?? 'no result'}`
           } else {
             effectiveLiveResult.checkpoint = null
-            effectiveLiveResult.checkpointStatus = 'timeout'
-            effectiveLiveResult.output = `${effectiveLiveResult.output}\nNo fresh checkpoint before poll timeout.`
+            if (options.signal?.aborted) {
+              effectiveLiveResult.ok = false
+              effectiveLiveResult.error = 'Dispatch cancelled by operator.'
+              effectiveLiveResult.checkpointStatus = 'timeout'
+            } else {
+              effectiveLiveResult.checkpointStatus = 'timeout'
+              effectiveLiveResult.output = `${effectiveLiveResult.output}\nNo fresh checkpoint before poll timeout.`
+            }
           }
         } else {
           effectiveLiveResult.checkpointStatus = 'not-requested'
         }
+        markDispatchResult(workerId, effectiveLiveResult)
         recordDispatchBlock(workerId, assignment, effectiveLiveResult, options)
         resolve(effectiveLiveResult)
         return
@@ -1462,6 +1560,7 @@ function runWorker(
           killSignal: 'SIGTERM',
         },
         async (error, stdout, stderr) => {
+          options?.signal?.removeEventListener('abort', abortChild)
           const durationMs = Date.now() - startedAt
           const stdoutStr = (stdout || '').toString()
           const stderrStr = (stderr || '').toString()
@@ -1480,6 +1579,13 @@ function runWorker(
               durationMs,
               exitCode: typeof code === 'number' ? code : null,
               delivery: 'oneshot',
+            }
+            if (options?.signal?.aborted) {
+              result.error = 'Dispatch cancelled by operator.'
+              markDispatchResult(workerId, result)
+              recordDispatchBlock(workerId, assignment, result, options)
+              resolve(result)
+              return
             }
             const rotatedResult = await tryHarpRotationAfterModelFailure({
               workerId,
@@ -1504,7 +1610,10 @@ function runWorker(
             exitCode: 0,
             delivery: 'oneshot',
           }
-          if (options?.waitForCheckpoint) {
+          if (options?.signal?.aborted) {
+            result.ok = false
+            result.error = 'Dispatch cancelled by operator.'
+          } else if (options?.waitForCheckpoint) {
             const checkpoint = parseSwarmCheckpoint(out)
             if (checkpoint) {
               markCheckpointResult(
@@ -1556,8 +1665,11 @@ function runWorker(
           resolve(result)
         },
       )
+      const abortChild = () => proc.kill('SIGTERM')
+      options?.signal?.addEventListener('abort', abortChild, { once: true })
 
       proc.on('error', (error) => {
+        options?.signal?.removeEventListener('abort', abortChild)
         const result: WorkerResult = {
           workerId,
           ok: false,
@@ -1598,7 +1710,16 @@ export class SwarmDispatchError extends Error {
   }
 }
 
-export async function dispatchSwarmAssignments(body: DispatchRequest) {
+type DispatchExecutionContext = {
+  queueWorker?: boolean
+  queueJobId?: string
+  signal?: AbortSignal
+}
+
+export async function dispatchSwarmAssignments(
+  body: DispatchRequest,
+  context: DispatchExecutionContext = {},
+) {
   const serialDispatch = body.dispatchMode === 'serial'
   let assignments = parseAssignments(body.assignments)
   const promptRaw = typeof body.prompt === 'string' ? body.prompt : ''
@@ -1633,8 +1754,37 @@ export async function dispatchSwarmAssignments(body: DispatchRequest) {
       `assignment task exceeds ${MAX_PROMPT_CHARS} characters`,
     )
   }
-  if (serialDispatch && !swarmDispatchQueue.canAccept()) {
-    throw new SwarmDispatchQueueFullError()
+  if (serialDispatch && !context.queueWorker) {
+    if (process.env.VITEST || process.env.NODE_ENV === 'test') {
+      throw new SwarmDispatchQueueUnavailableError(
+        'Persistent serial queue dispatch is disabled in tests; use the isolated queue-store integration tests.',
+      )
+    }
+    const queued = await enqueueSwarmDispatch(
+      body,
+      assignments.length,
+    )
+    ensureSwarmDispatchQueueWorker()
+    const job = await waitForSwarmDispatchQueueJob(queued.id)
+    if (!job) throw new SwarmDispatchError('Queued dispatch disappeared.', 500)
+    if (job.status === 'cancelled') {
+      throw new SwarmDispatchError('Serial dispatch cancelled.', 409)
+    }
+    if (job.status === 'interrupted') {
+      throw new SwarmDispatchError(
+        job.error ?? 'Dispatch interrupted; inspect the agent before retrying.',
+        409,
+      )
+    }
+    if (job.result && typeof job.result === 'object') {
+      return {
+        ...(job.result as Record<string, unknown>),
+        queueId: queued.id,
+        queuePosition: queued.position,
+        queueStatus: job.status,
+      }
+    }
+    throw new SwarmDispatchError(job.error ?? 'Queued dispatch failed.', 500)
   }
 
   const timeoutRaw =
@@ -1646,7 +1796,9 @@ export async function dispatchSwarmAssignments(body: DispatchRequest) {
     Math.min(MAX_TIMEOUT_S, Math.floor(timeoutRaw)),
   )
   const timeoutMs = timeoutSeconds * 1000
-  const waitForCheckpoint = !(
+  // Serial batches must not advance to another assignment while the current
+  // agent is still working. Parallel mode retains its explicit async option.
+  const waitForCheckpoint = serialDispatch || !(
     body.waitForCheckpoint === false && body.allowAsync === true
   )
   const pollRaw =
@@ -1708,34 +1860,40 @@ export async function dispatchSwarmAssignments(body: DispatchRequest) {
   )
   let dispatchedAt: number
   let results: Array<WorkerResult>
-  let queuePosition: number | null = null
-  let queueId: string | null = null
+  const queuePosition: number | null = null
+  const queueId: string | null = context.queueJobId ?? null
   if (serialDispatch) {
-    const queued = swarmDispatchQueue.enqueue(async () => {
-      const startedAt = Date.now()
-      const serialResults: Array<WorkerResult> = []
-      for (const assignment of assignments) {
-        serialResults.push(
-          await runWorker(
-            assignment,
-            timeoutMs,
-            roster.get(assignment.workerId),
-            {
-              waitForCheckpoint,
-              checkpointPollMs: checkpointPollSeconds * 1000,
-              missionId: mission.id,
-              notifySessionKey,
-            },
-          ),
+    dispatchedAt = Date.now()
+    results = []
+    for (const assignment of assignments) {
+      if (context.signal?.aborted) break
+      const result = await runWorker(
+          assignment,
+          timeoutMs,
+          roster.get(assignment.workerId),
+          {
+            waitForCheckpoint,
+            checkpointPollMs: checkpointPollSeconds * 1000,
+            missionId: mission.id,
+            notifySessionKey,
+            signal: context.signal,
+          },
         )
+      if (
+        result.delivery === 'tmux' &&
+        result.ok &&
+        result.checkpointStatus !== 'checkpointed'
+      ) {
+        result.ok = false
+        result.error = 'No terminal agent checkpoint was received; later serial assignments were held.'
+        markDispatchResult(assignment.workerId, result)
+        recordDispatchBlock(assignment.workerId, assignment, result, {
+          missionId: mission.id,
+        })
       }
-      return { startedAt, results: serialResults }
-    }, assignments.length)
-    queueId = queued.id
-    queuePosition = queued.position
-    const queuedResult = await queued.result
-    dispatchedAt = queuedResult.startedAt
-    results = queuedResult.results
+      results.push(result)
+      if (!result.ok) break
+    }
   } else {
     dispatchedAt = Date.now()
     results = await Promise.all(
@@ -1773,14 +1931,59 @@ export async function dispatchSwarmAssignments(body: DispatchRequest) {
   }
 }
 
+let swarmQueueProcessorRegistered = false
+function ensureSwarmDispatchQueueWorker(): void {
+  if (swarmQueueProcessorRegistered) return
+  if (process.env.VITEST || process.env.NODE_ENV === 'test') return
+  swarmQueueProcessorRegistered = true
+  startSwarmDispatchQueueWorker((payload, context) =>
+    dispatchSwarmAssignments(payload, {
+      queueWorker: true,
+      queueJobId: context.jobId,
+      signal: context.signal,
+    }),
+  )
+}
+
+// Route modules are loaded by the server at startup. The durable worker can
+// therefore resume persisted pending jobs without waiting for another POST.
+ensureSwarmDispatchQueueWorker()
+
 export const Route = createFileRoute('/api/swarm-dispatch')({
   server: {
     handlers: {
-      GET: ({ request }) => {
+      GET: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
-        return json({ mode: 'process-local', ...swarmDispatchQueue.snapshot() })
+        ensureSwarmDispatchQueueWorker()
+        try {
+          return json(await getSwarmDispatchQueueSnapshot())
+        } catch (error) {
+          return json(
+            { error: safeErrorMessage(error) },
+            { status: error instanceof SwarmDispatchQueueUnavailableError ? 503 : 500 },
+          )
+        }
+      },
+      DELETE: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        const id = new URL(request.url).searchParams.get('id')?.trim() ?? ''
+        if (!/^[0-9a-f-]{36}$/i.test(id)) {
+          return json({ error: 'A valid queue job id is required.' }, { status: 400 })
+        }
+        try {
+          const cancellation = await cancelSwarmDispatchQueueJob(id)
+          if (!cancellation.found) return json({ error: 'Queue job not found.' }, { status: 404 })
+          return json(cancellation)
+        } catch (error) {
+          return json(
+            { error: safeErrorMessage(error) },
+            { status: error instanceof SwarmDispatchQueueUnavailableError ? 503 : 500 },
+          )
+        }
       },
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
@@ -1799,6 +2002,9 @@ export const Route = createFileRoute('/api/swarm-dispatch')({
         } catch (error) {
           if (error instanceof SwarmDispatchQueueFullError) {
             return json({ error: error.message }, { status: 429 })
+          }
+          if (error instanceof SwarmDispatchQueueUnavailableError) {
+            return json({ error: error.message }, { status: 503 })
           }
           if (error instanceof SwarmDispatchError) {
             return json({ error: error.message }, { status: error.status })
