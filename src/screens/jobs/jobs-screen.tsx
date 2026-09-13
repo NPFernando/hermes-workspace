@@ -86,6 +86,31 @@ export function formatJobFreshnessCopy(
   return `${name} has not run in ${staleDays} days; check the schedule if it should be recurring.`
 }
 
+export function formatJobScheduleMetaLabel(
+  job: Pick<
+    ClaudeJob,
+    'last_run_at' | 'next_run_at' | 'profile' | 'schedule_display' | 'skills'
+  >,
+): string {
+  const parts = [
+    `Schedule: ${job.schedule_display?.trim() || 'custom'}`,
+    `Next run: ${formatNextRun(job.next_run_at)}`,
+    `Last run: ${formatRunTimestamp(job.last_run_at)}`,
+  ]
+
+  const profile = job.profile?.trim()
+  if (profile) parts.unshift(`Profile: ${profile}`)
+
+  const skillCount = job.skills?.length ?? 0
+  if (skillCount > 0) {
+    parts.push(
+      `${skillCount} ${skillCount === 1 ? 'skill' : 'skills'} attached`,
+    )
+  }
+
+  return parts.join('; ')
+}
+
 export type JobHealthFilter = 'all' | 'stale' | 'failed' | 'paused' | 'neverRun'
 
 export const JOB_HEALTH_FILTERS: Array<JobHealthFilter> = [
@@ -330,7 +355,11 @@ function JobCard({
           >
             {job.prompt}
           </p>
-          <div className="mb-2 flex flex-wrap items-center gap-3 text-[10px] text-[var(--theme-muted)]">
+          <div
+            className="mb-2 flex flex-wrap items-center gap-3 text-[10px] text-[var(--theme-muted)]"
+            title={formatJobScheduleMetaLabel(job)}
+            aria-label={formatJobScheduleMetaLabel(job)}
+          >
             {job.profile && (
               <>
                 <span className="rounded-md border border-[var(--theme-border)] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-[var(--theme-text)]">

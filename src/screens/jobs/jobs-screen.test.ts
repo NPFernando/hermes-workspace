@@ -4,6 +4,7 @@ import {
   doesJobMatchHealthFilter,
   formatJobActionLabel,
   formatJobFreshnessCopy,
+  formatJobScheduleMetaLabel,
   getJobHealthFilterButtonLabel,
   getJobHealthFilterCounts,
   getJobsEmptyStateCopy,
@@ -114,6 +115,37 @@ describe('formatJobFreshnessCopy', () => {
         now,
       ),
     ).toBeNull()
+  })
+})
+
+describe('formatJobScheduleMetaLabel', () => {
+  it('summarizes schedule metadata for assistive technology', () => {
+    const label = formatJobScheduleMetaLabel({
+      profile: 'default',
+      schedule_display: 'Every 6 hours',
+      next_run_at: '2026-07-04T12:00:00Z',
+      last_run_at: '2026-07-04T06:00:00Z',
+      skills: ['daily-monitor', 'server-ops-safety'],
+    })
+
+    expect(label).toContain(
+      'Profile: default; Schedule: Every 6 hours; Next run:',
+    )
+    expect(label).toContain('2 skills attached')
+  })
+
+  it('handles custom schedules and missing timestamps', () => {
+    expect(
+      formatJobScheduleMetaLabel({
+        profile: undefined,
+        schedule_display: '',
+        next_run_at: null,
+        last_run_at: null,
+        skills: ['daily-monitor'],
+      }),
+    ).toBe(
+      'Schedule: custom; Next run: —; Last run: Never run; 1 skill attached',
+    )
   })
 })
 
