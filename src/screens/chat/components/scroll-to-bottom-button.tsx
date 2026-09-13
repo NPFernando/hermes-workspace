@@ -6,6 +6,14 @@ import { cn } from '@/lib/utils'
 
 const MotionButton = motion.create(Button)
 
+function formatScrollToBottomLabel(unreadCount: number): string {
+  if (unreadCount <= 0) return 'Scroll to bottom'
+
+  const unreadLabel = unreadCount > 99 ? '99 or more' : unreadCount.toString()
+  const noun = unreadCount === 1 ? 'message' : 'messages'
+  return `Scroll to bottom (${unreadLabel} unread ${noun})`
+}
+
 type ScrollToBottomButtonProps = {
   className?: string
   isVisible: boolean
@@ -26,7 +34,7 @@ function ScrollToBottomButton({
           type="button"
           variant="ghost"
           size="icon-sm"
-          aria-label="Scroll to bottom"
+          aria-label={formatScrollToBottomLabel(unreadCount)}
           className={cn(
             'pointer-events-auto relative rounded-full text-white shadow-lg transition-colors hover:opacity-90',
             className,
@@ -54,4 +62,4 @@ function ScrollToBottomButton({
   )
 }
 
-export { ScrollToBottomButton }
+export { ScrollToBottomButton, formatScrollToBottomLabel }
