@@ -226,10 +226,48 @@ export function getJobsEmptyStateCopy(
   }
 }
 
+export function formatJobsResultSummary(
+  visibleCount: number,
+  totalCount: number,
+  search: string,
+  healthFilter: JobHealthFilter,
+): string {
+  const visibleLabel =
+    visibleCount === 1 ? '1 scheduled job' : `${visibleCount} scheduled jobs`
+  const totalLabel =
+    totalCount === 1 ? '1 total job' : `${totalCount} total jobs`
+  const filters: Array<string> = []
+  const trimmedSearch = search.trim()
+
+  if (trimmedSearch) {
+    filters.push(`matching “${trimmedSearch}”`)
+  }
+  if (healthFilter !== 'all') {
+    filters.push(
+      `in ${getJobHealthFilterLabel(healthFilter).toLowerCase()} health`,
+    )
+  }
+
+  if (!filters.length) {
+    return `Showing ${visibleLabel}.`
+  }
+
+  return `Showing ${visibleLabel} of ${totalLabel} ${filters.join(' and ')}.`
+}
+
 function getOutputPreview(content: string): string {
   const normalized = content.replace(/\s+/g, ' ').trim()
   if (normalized.length <= 200) return normalized
   return `${normalized.slice(0, 200).trimEnd()}…`
+}
+
+const JOB_FAILURE_DETAIL_MAX_LENGTH = 160
+
+export function formatJobFailureDetail(value?: string | null): string | null {
+  const normalized = value?.replace(/\s+/g, ' ').trim()
+  if (!normalized) return null
+  if (normalized.length <= JOB_FAILURE_DETAIL_MAX_LENGTH) return normalized
+  return `${normalized.slice(0, JOB_FAILURE_DETAIL_MAX_LENGTH).trimEnd()}…`
 }
 
 export function formatJobActionLabel(
@@ -262,31 +300,48 @@ export function formatJobActionLabel(
   }
 }
 
-function getLastRunStatus(job: ClaudeJob): {
+export function formatJobLastRunStatus(job: ClaudeJob): {
   label: string
   color: string
+  detail: string | null
+  title: string
 } {
   if (!job.last_run_at) {
     return {
       label: 'Never run',
       color: 'var(--theme-muted)',
+      detail: null,
+      title: 'This job has not produced a run yet.',
     }
   }
+
+  const errorDetail =
+    formatJobFailureDetail(job.last_run_error) ??
+    formatJobFailureDetail(job.error)
+
   if (job.last_run_success === true) {
     return {
       label: 'Last run succeeded',
       color: 'var(--theme-success)',
+      detail: null,
+      title: 'The most recent job run completed successfully.',
     }
   }
   if (job.last_run_success === false) {
     return {
       label: 'Last run failed',
       color: 'var(--theme-danger)',
+      detail: errorDetail ? `Failure: ${errorDetail}` : null,
+      title: errorDetail
+        ? `The most recent job run failed: ${errorDetail}`
+        : 'The most recent job run failed.',
     }
   }
   return {
     label: 'Last run unknown',
     color: 'var(--theme-muted)',
+    detail: null,
+    title: 'The most recent job run did not report a success or failure state.',
   }
 }
 
@@ -308,7 +363,7 @@ function JobCard({
   const [expanded, setExpanded] = useState(false)
   const isPaused = job.state === 'paused' || !job.enabled
   const isCompleted = job.state === 'completed'
-  const lastRunStatus = getLastRunStatus(job)
+  const lastRunStatus = formatJobLastRunStatus(job)
   const freshnessCopy = formatJobFreshnessCopy(job)
   const outputQuery = useQuery({
     queryKey: ['claude', 'jobs', job.id, 'output'],
@@ -382,13 +437,22 @@ function JobCard({
               </>
             )}
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-[var(--theme-muted)]">
+          <div
+            className="flex items-center gap-2 text-[11px] text-[var(--theme-muted)]"
+            title={lastRunStatus.title}
+            aria-label={lastRunStatus.title}
+          >
             <span
               className="inline-block h-2.5 w-2.5 rounded-full"
               style={{ background: lastRunStatus.color }}
             />
             <span>{lastRunStatus.label}</span>
           </div>
+          {lastRunStatus.detail ? (
+            <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[var(--theme-danger,#ef4444)]">
+              {lastRunStatus.detail}
+            </p>
+          ) : null}
           {freshnessCopy ? (
             <p className="mt-1 text-[10px] leading-4 text-[var(--theme-warning,#f59e0b)]">
               {freshnessCopy}
@@ -751,6 +815,18 @@ export function JobsScreen() {
               )
             })}
           </div>
+          <p
+            role="status"
+            aria-live="polite"
+            className="mt-1 text-[10px] text-[var(--theme-muted)]"
+          >
+            {formatJobsResultSummary(
+              filteredJobs.length,
+              searchedJobs.length,
+              search,
+              healthFilter,
+            )}
+          </p>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
