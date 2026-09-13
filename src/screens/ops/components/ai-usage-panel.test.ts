@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { quotaAlert } from './ai-usage-panel'
+import { codexCreditsUsageLine } from '../../../server/provider-usage'
 
 describe('quotaAlert', () => {
   const line = (used: number, limit = 100) => ({
@@ -26,5 +27,16 @@ describe('quotaAlert', () => {
       quotaAlert({ type: 'text', label: 'Tokens', used: 100, limit: 100 }),
     ).toBeNull()
     expect(quotaAlert(line(10, 0))).toBeNull()
+  })
+
+  it('shows a Codex credits balance without inventing a quota ceiling', () => {
+    const credits = codexCreditsUsageLine(1250)
+
+    expect(credits).toMatchObject({
+      type: 'text',
+      label: 'Credits balance',
+      value: '1,250',
+    })
+    expect(quotaAlert(credits)).toBeNull()
   })
 })
