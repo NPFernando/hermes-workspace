@@ -6,22 +6,21 @@ import {
 } from '../routes/api/telegram-board-summary'
 import type { TaskRecord } from './tasks-store'
 
-const makeTask = (overrides: Partial<TaskRecord>): TaskRecord =>
-  ({
-    id: 'task-1',
-    title: 'Example task',
-    description: '',
-    column: 'todo',
-    priority: 'medium',
-    assignee: null,
-    tags: [],
-    due_date: null,
-    position: 0,
-    created_by: 'test',
-    created_at: '2026-09-13T00:00:00Z',
-    updated_at: '2026-09-13T00:00:00Z',
-    ...overrides,
-  }) as TaskRecord
+const makeTask = (overrides: Partial<TaskRecord>): TaskRecord => ({
+  id: 'task-1',
+  title: 'Example task',
+  description: '',
+  column: 'todo',
+  priority: 'medium',
+  assignee: null,
+  tags: [],
+  due_date: null,
+  position: 0,
+  created_by: 'test',
+  created_at: '2026-09-13T00:00:00Z',
+  updated_at: '2026-09-13T00:00:00Z',
+  ...overrides,
+})
 
 describe('summarizeTaskBoard', () => {
   it('counts running, actionable review, blocked, and dependency-waiting tasks', () => {
