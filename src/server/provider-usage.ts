@@ -50,6 +50,16 @@ export type ProviderUsageResponse = {
   error?: string
 }
 
+/** Codex reports a balance, but not a universal total against which it is a quota. */
+export function codexCreditsUsageLine(balance: number): UsageLine {
+  return {
+    type: 'text',
+    label: 'Credits balance',
+    value: balance.toLocaleString(),
+    format: 'tokens',
+  }
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function readNumber(v: unknown): number | undefined {
@@ -726,15 +736,9 @@ export async function fetchCodexUsage(): Promise<ProviderUsageResult> {
       : undefined
   const creditsRemaining = creditsHeader ?? readNumber(creditsData)
   if (creditsRemaining !== undefined) {
-    const limit = 1000
-    const used = Math.max(0, Math.min(limit, limit - creditsRemaining))
-    lines.push({
-      type: 'progress',
-      label: 'Credits',
-      used,
-      limit,
-      format: 'tokens',
-    })
+    // Show the provider's reported balance without inventing a total quota.
+    // Only provider-reported limits should drive threshold alerts.
+    lines.push(codexCreditsUsageLine(creditsRemaining))
   }
 
   // Plan
