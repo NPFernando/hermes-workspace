@@ -13,6 +13,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import type { CrewMember } from '@/hooks/use-crew-status'
 import { cn } from '@/lib/utils'
+import { buildPacingPreview } from '@/lib/swarm-dispatch-pacing'
 
 type Mode = 'auto' | 'manual' | 'broadcast'
 
@@ -47,7 +48,26 @@ type DispatchResult = {
 export type DispatchResponse = {
   dispatchedAt: number
   completedAt: number
+  dispatchMode?: 'serial' | 'parallel'
+  queueId?: string | null
+  queuePosition?: number | null
   results: Array<DispatchResult>
+}
+
+type QueueStatus = {
+  active: null | {
+    id: string
+    assignmentCount: number
+    queuedAt: number
+    startedAt: number | null
+  }
+  waiting: Array<{
+    id: string
+    position: number
+    assignmentCount: number
+    queuedAt: number
+    startedAt: number | null
+  }>
 }
 
 type FollowUpResponse = {
@@ -112,9 +132,49 @@ export function RouterChat({
   const [assignments, setAssignments] = useState<Array<Assignment>>([])
   const [unassigned, setUnassigned] = useState<Array<string>>([])
   const [dispatching, setDispatching] = useState(false)
+  const [serialDispatch, setSerialDispatch] = useState(false)
+  const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null)
   const [dispatchError, setDispatchError] = useState<string | null>(null)
   const [results, setResults] = useState<DispatchResponse | null>(null)
   const [followUp, setFollowUp] = useState<FollowUpResponse | null>(null)
+  const pacingTasks =
+    mode === 'auto'
+      ? assignments
+      : mode === 'manual'
+        ? selectedId && prompt.trim()
+          ? [{ workerId: selectedId, task: prompt }]
+          : []
+        : (roomIds.length > 0
+            ? roomIds
+            : members.map((member) => member.id)
+          ).map((workerId) => ({ workerId, task: prompt }))
+  const pacingPreview = buildPacingPreview(pacingTasks)
+
+  useEffect(() => {
+    if (!serialDispatch || !dispatching) {
+      setQueueStatus(null)
+      return
+    }
+    let disposed = false
+    const refresh = async () => {
+      try {
+        const response = await fetch('/api/swarm-dispatch', {
+          cache: 'no-store',
+        })
+        if (!response.ok) return
+        const data = (await response.json()) as QueueStatus
+        if (!disposed) setQueueStatus(data)
+      } catch {
+        // Queue status is best-effort; it must not interrupt dispatch.
+      }
+    }
+    void refresh()
+    const timer = window.setInterval(() => void refresh(), 2000)
+    return () => {
+      disposed = true
+      window.clearInterval(timer)
+    }
+  }, [dispatching, serialDispatch])
 
   useEffect(() => {
     if (!seedPrompt?.trim()) return
@@ -258,10 +318,11 @@ export function RouterChat({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           assignments: plan,
+          dispatchMode: serialDispatch ? 'serial' : 'parallel',
           timeoutSeconds: 300,
           waitForCheckpoint: false,
         }),
-        signal: AbortSignal.timeout(60_000),
+        signal: AbortSignal.timeout(serialDispatch ? 3_600_000 : 60_000),
       })
       if (!res.ok) {
         const text = await res.text()
@@ -296,6 +357,7 @@ export function RouterChat({
             staleMinutes: 3,
             autoContinue: true,
             allowExecution: false,
+            dispatchMode: serialDispatch ? 'serial' : 'parallel',
             reviewWorkerId: reviewer?.id,
           }),
         })
@@ -560,6 +622,72 @@ export function RouterChat({
                   </ul>
                 </div>
               ) : null}
+              <div className="rounded-xl border border-[var(--theme-warning-border)] bg-[var(--theme-warning-soft)] px-2.5 py-2">
+                <div className="flex items-center justify-between gap-2 text-[10px] uppercase tracking-[0.16em] text-[var(--theme-muted)]">
+                  <span>One-at-a-time pacing preview</span>
+                  <span>Advisory only</span>
+                </div>
+                <p className="mt-1 text-[11px] text-[var(--theme-text)]">
+                  {pacingPreview.length
+                    ? `${pacingPreview.length} task${pacingPreview.length === 1 ? '' : 's'} · suggested max concurrency 1 · provider cost unknown`
+                    : 'Add or route work to preview a serial queue.'}
+                </p>
+                {pacingPreview.length > 0 ? (
+                  <ol className="mt-1 space-y-0.5 text-[11px] text-[var(--theme-muted-2)]">
+                    {pacingPreview.map((item) => (
+                      <li key={`${item.position}-${item.workerId}`}>
+                        {item.position}/{item.total} · {item.workerId} ·{' '}
+                        {item.task.slice(0, 90)}
+                        {item.task.length > 90 ? '…' : ''}
+                      </li>
+                    ))}
+                  </ol>
+                ) : null}
+                <p className="mt-1 text-[10px] text-[var(--theme-muted-2)]">
+                  {serialDispatch
+                    ? 'Serial mode is selected for the next dispatch. Unchecked requests keep the existing parallel behavior.'
+                    : 'Recommendation only until serial mode is selected; the existing dispatch behavior is parallel.'}
+                </p>
+                <label className="mt-2 flex items-start gap-2 text-[11px] text-[var(--theme-text)]">
+                  <input
+                    type="checkbox"
+                    checked={serialDispatch}
+                    disabled={dispatching}
+                    onChange={(event) =>
+                      setSerialDispatch(event.target.checked)
+                    }
+                    className="mt-0.5 accent-[var(--theme-accent)]"
+                  />
+                  <span>
+                    Queue this batch serially (one worker at a time). FIFO queue
+                    is shared by serial requests within this server process; it
+                    is in-memory, not retained across restarts or shared between
+                    server instances. Parallel requests remain unchanged.
+                  </span>
+                </label>
+                {dispatching && serialDispatch ? (
+                  <div className="mt-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1.5 text-[11px] text-[var(--theme-muted-2)]">
+                    {queueStatus ? (
+                      <>
+                        <div>
+                          {queueStatus.active
+                            ? `Server queue active · ${queueStatus.active.assignmentCount} task${queueStatus.active.assignmentCount === 1 ? '' : 's'}`
+                            : 'No serial batch is running right now.'}
+                        </div>
+                        {queueStatus.waiting.length > 0 ? (
+                          <div className="mt-0.5">
+                            {queueStatus.waiting.length} batch
+                            {queueStatus.waiting.length === 1 ? '' : 'es'}{' '}
+                            waiting in the server queue
+                          </div>
+                        ) : null}
+                      </>
+                    ) : (
+                      'Checking serial queue status…'
+                    )}
+                  </div>
+                ) : null}
+              </div>
             </div>
           ) : null}
         </div>
