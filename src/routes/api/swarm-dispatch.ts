@@ -21,6 +21,10 @@ import {
   appendSwarmMemoryEvent,
   buildSwarmStartupSnapshot,
 } from '../../server/swarm-memory'
+import {
+  SwarmDispatchQueueFullError,
+  swarmDispatchQueue,
+} from '../../server/swarm-dispatch-queue'
 import { rosterByWorkerId } from '../../server/swarm-roster'
 import { publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
 import { ensureSwarmProfileConfig } from '../../server/swarm-profile-config'
@@ -68,6 +72,7 @@ type DispatchRequest = {
   missionTitle?: unknown
   direct?: unknown
   notifySessionKey?: unknown
+  dispatchMode?: unknown
 }
 
 type WorkerResult = {
@@ -84,12 +89,7 @@ type WorkerResult = {
 
 type RuntimeCheckpointSnapshot = {
   checkpointStatus:
-    | 'none'
-    | 'in_progress'
-    | 'done'
-    | 'blocked'
-    | 'handoff'
-    | 'needs_input'
+    'none' | 'in_progress' | 'done' | 'blocked' | 'handoff' | 'needs_input'
   state: string | null
   lastSummary: string | null
   lastResult: string | null
@@ -1599,6 +1599,7 @@ export class SwarmDispatchError extends Error {
 }
 
 export async function dispatchSwarmAssignments(body: DispatchRequest) {
+  const serialDispatch = body.dispatchMode === 'serial'
   let assignments = parseAssignments(body.assignments)
   const promptRaw = typeof body.prompt === 'string' ? body.prompt : ''
   const prompt = promptRaw.trim()
@@ -1631,6 +1632,9 @@ export async function dispatchSwarmAssignments(body: DispatchRequest) {
     throw new SwarmDispatchError(
       `assignment task exceeds ${MAX_PROMPT_CHARS} characters`,
     )
+  }
+  if (serialDispatch && !swarmDispatchQueue.canAccept()) {
+    throw new SwarmDispatchQueueFullError()
   }
 
   const timeoutRaw =
@@ -1699,20 +1703,52 @@ export async function dispatchSwarmAssignments(body: DispatchRequest) {
     ),
   }))
 
-  const dispatchedAt = Date.now()
   const roster = rosterByWorkerId(
     assignments.map((assignment) => assignment.workerId),
   )
-  const results = await Promise.all(
-    assignments.map((assignment) =>
-      runWorker(assignment, timeoutMs, roster.get(assignment.workerId), {
-        waitForCheckpoint,
-        checkpointPollMs: checkpointPollSeconds * 1000,
-        missionId: mission.id,
-        notifySessionKey,
-      }),
-    ),
-  )
+  let dispatchedAt: number
+  let results: Array<WorkerResult>
+  let queuePosition: number | null = null
+  let queueId: string | null = null
+  if (serialDispatch) {
+    const queued = swarmDispatchQueue.enqueue(async () => {
+      const startedAt = Date.now()
+      const serialResults: Array<WorkerResult> = []
+      for (const assignment of assignments) {
+        serialResults.push(
+          await runWorker(
+            assignment,
+            timeoutMs,
+            roster.get(assignment.workerId),
+            {
+              waitForCheckpoint,
+              checkpointPollMs: checkpointPollSeconds * 1000,
+              missionId: mission.id,
+              notifySessionKey,
+            },
+          ),
+        )
+      }
+      return { startedAt, results: serialResults }
+    }, assignments.length)
+    queueId = queued.id
+    queuePosition = queued.position
+    const queuedResult = await queued.result
+    dispatchedAt = queuedResult.startedAt
+    results = queuedResult.results
+  } else {
+    dispatchedAt = Date.now()
+    results = await Promise.all(
+      assignments.map((assignment) =>
+        runWorker(assignment, timeoutMs, roster.get(assignment.workerId), {
+          waitForCheckpoint,
+          checkpointPollMs: checkpointPollSeconds * 1000,
+          missionId: mission.id,
+          notifySessionKey,
+        }),
+      ),
+    )
+  }
 
   const latestMission = getSwarmMission(mission.id) ?? mission
 
@@ -1730,6 +1766,9 @@ export async function dispatchSwarmAssignments(body: DispatchRequest) {
     waitForCheckpoint,
     checkpointPollSeconds,
     notifySessionKey,
+    dispatchMode: serialDispatch ? 'serial' : 'parallel',
+    queueId,
+    queuePosition,
     results,
   }
 }
@@ -1737,6 +1776,12 @@ export async function dispatchSwarmAssignments(body: DispatchRequest) {
 export const Route = createFileRoute('/api/swarm-dispatch')({
   server: {
     handlers: {
+      GET: ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        return json({ mode: 'process-local', ...swarmDispatchQueue.snapshot() })
+      },
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
@@ -1752,6 +1797,9 @@ export const Route = createFileRoute('/api/swarm-dispatch')({
         try {
           return json(await dispatchSwarmAssignments(body))
         } catch (error) {
+          if (error instanceof SwarmDispatchQueueFullError) {
+            return json({ error: error.message }, { status: 429 })
+          }
           if (error instanceof SwarmDispatchError) {
             return json({ error: error.message }, { status: error.status })
           }
