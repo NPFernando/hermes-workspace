@@ -214,6 +214,59 @@ export interface ModelUsageRow {
   tokens: number
 }
 
+export interface CopilotUsageSummary {
+  requests24h: number
+  requests7d: number
+  sessions7d: number
+  inputTokens7d: number
+  outputTokens7d: number
+  aiu7d: number
+  lastEventAt: string | null
+}
+
+/** Read Copilot CLI usage counters only; never reads prompts or responses. */
+export async function getCopilotUsageSummary(
+  dbPath = join(homedir(), '.copilot', 'session-store.db'),
+): Promise<CopilotUsageSummary | null> {
+  const rows = await sqliteJson<
+    Array<{
+      requests_24h: number | null
+      requests_7d: number | null
+      sessions_7d: number | null
+      input_tokens_7d: number | null
+      output_tokens_7d: number | null
+      aiu_7d: number | null
+      last_event_at: string | null
+    }>
+  >(
+    dbPath,
+    `SELECT
+       SUM(CASE WHEN datetime(created_at) >= datetime('now','-24 hours') THEN 1 ELSE 0 END) AS requests_24h,
+       COUNT(*) AS requests_7d,
+       COUNT(DISTINCT session_id) AS sessions_7d,
+       SUM(COALESCE(input_tokens, 0)) AS input_tokens_7d,
+       SUM(COALESCE(output_tokens, 0)) AS output_tokens_7d,
+       ROUND(SUM(COALESCE(total_nano_aiu, 0)) / 1000000000.0, 6) AS aiu_7d,
+       MAX(created_at) AS last_event_at
+     FROM assistant_usage_events
+     WHERE datetime(created_at) >= datetime('now','-7 days')`,
+  )
+  const row = rows?.[0]
+  if (!row) return null
+
+  const count = (value: number | null) =>
+    typeof value === 'number' && Number.isFinite(value) ? value : 0
+  return {
+    requests24h: count(row.requests_24h),
+    requests7d: count(row.requests_7d),
+    sessions7d: count(row.sessions_7d),
+    inputTokens7d: count(row.input_tokens_7d),
+    outputTokens7d: count(row.output_tokens_7d),
+    aiu7d: count(row.aiu_7d),
+    lastEventAt: row.last_event_at,
+  }
+}
+
 async function getSessionModelCosts(
   days = 7,
 ): Promise<Array<ModelUsageRow> | null> {
@@ -509,6 +562,7 @@ export interface OpsObservability {
   cost: CostSummary | null
   liveness: ModelLiveness | null
   modelUsage7d: Array<ModelUsageRow> | null
+  copilotUsage7d: CopilotUsageSummary | null
   escalation: EscalationStats | null
   cronJobs: Array<OpsCronJob> | null
   financeStorageMonitor: FinanceStorageMonitorSummary | null
@@ -518,17 +572,20 @@ export interface OpsObservability {
 }
 
 export async function getOpsObservability(): Promise<OpsObservability> {
-  const [cost, liveness, modelUsage7d, headroom] = await Promise.all([
-    getCostSummary().catch(() => null),
-    getModelLiveness().catch(() => null),
-    getSessionModelCosts(7).catch(() => null),
-    getHeadroomStats().catch(() => null),
-  ])
+  const [cost, liveness, modelUsage7d, copilotUsage7d, headroom] =
+    await Promise.all([
+      getCostSummary().catch(() => null),
+      getModelLiveness().catch(() => null),
+      getSessionModelCosts(7).catch(() => null),
+      getCopilotUsageSummary().catch(() => null),
+      getHeadroomStats().catch(() => null),
+    ])
   return {
     generatedAt: new Date().toISOString(),
     cost,
     liveness,
     modelUsage7d,
+    copilotUsage7d,
     escalation: getEscalationStats(),
     cronJobs: getOpsCronJobs(),
     financeStorageMonitor: getFinanceStorageMonitorSummary(),

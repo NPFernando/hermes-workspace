@@ -1,8 +1,10 @@
+import { execFileSync } from 'node:child_process'
 import { mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  getCopilotUsageSummary,
   getFinanceStorageMonitorSummary,
   getFinanceStorageSmokeCronSummary,
 } from './ops-observability'
@@ -30,6 +32,36 @@ function makeTempDir(): string {
   mkdirSync(dir, { recursive: true })
   return dir
 }
+
+describe('ops-observability Copilot usage', () => {
+  it('aggregates local usage counters without reading conversation content', async () => {
+    const dir = makeTempDir()
+    const dbPath = join(dir, 'copilot.db')
+    execFileSync('/usr/bin/sqlite3', [dbPath], {
+      input: [
+        'CREATE TABLE assistant_usage_events (session_id TEXT, input_tokens INTEGER, output_tokens INTEGER, total_nano_aiu INTEGER, created_at TEXT);',
+        "INSERT INTO assistant_usage_events VALUES ('session-a', 100, 25, 1000000000, datetime('now','-2 hours'));",
+        "INSERT INTO assistant_usage_events VALUES ('session-b', 200, 50, 2000000000, datetime('now','-2 days'));",
+        "INSERT INTO assistant_usage_events VALUES ('old-session', 1000, 1000, 9000000000, datetime('now','-9 days'));",
+      ].join('\n'),
+    })
+
+    await expect(getCopilotUsageSummary(dbPath)).resolves.toMatchObject({
+      requests24h: 1,
+      requests7d: 2,
+      sessions7d: 2,
+      inputTokens7d: 300,
+      outputTokens7d: 75,
+      aiu7d: 3,
+    })
+  })
+
+  it('returns null when the local Copilot telemetry database is absent', async () => {
+    await expect(
+      getCopilotUsageSummary(join(tmpdir(), 'missing-copilot-usage.db')),
+    ).resolves.toBeNull()
+  })
+})
 
 describe('ops-observability finance storage monitor', () => {
   it('summarises monitor state and flags stale heartbeats', () => {
