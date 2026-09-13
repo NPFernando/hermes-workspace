@@ -49,6 +49,10 @@ export const DEFAULT_SLASH_COMMANDS: Array<SlashCommandDefinition> = [
     command: '/queue remove <number>',
     description: 'Remove one queued message',
   },
+  {
+    command: '/queue edit <number> <replacement>',
+    description: 'Edit one queued message before it runs',
+  },
 
   // Persistent goals (Ralph loop)
   { command: '/goal <text>', description: 'Set standing goal across turns' },

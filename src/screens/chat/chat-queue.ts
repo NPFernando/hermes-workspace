@@ -10,6 +10,8 @@ export type QueueCommand =
   | { kind: 'clear' }
   | { kind: 'resume' }
   | { kind: 'remove'; index: number }
+  | { kind: 'edit'; index: number; text: string }
+  | { kind: 'invalid'; message: string }
 
 export const CHAT_QUEUE_STORAGE_PREFIX = 'claude.chat-queue.v1.'
 export const MAX_CHAT_QUEUE_ITEMS = 50
@@ -60,6 +62,21 @@ export function parseQueueCommand(value: string): QueueCommand | null {
   const removeMatch = /^remove\s+(\d+)$/i.exec(argument)
   if (removeMatch) {
     return { kind: 'remove', index: Number(removeMatch[1]) - 1 }
+  }
+  const editMatch = /^edit\s+(\d+)\s+([\s\S]+)$/i.exec(argument)
+  if (editMatch) {
+    return {
+      kind: 'edit',
+      index: Number(editMatch[1]) - 1,
+      text: editMatch[2].trim(),
+    }
+  }
+  if (/^(edit|remove)\b/i.test(argument)) {
+    return {
+      kind: 'invalid',
+      message:
+        'Usage: /queue edit <number> <replacement> or /queue remove <number>',
+    }
   }
   return { kind: 'enqueue', text: argument }
 }
@@ -268,4 +285,3 @@ export function createQueuedChatPrompt(text: string): QueuedChatPrompt {
     createdAt: Date.now(),
   }
 }
-

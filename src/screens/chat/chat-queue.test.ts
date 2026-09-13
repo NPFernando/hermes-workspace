@@ -52,6 +52,16 @@ describe('/queue command', () => {
       kind: 'remove',
       index: 1,
     })
+    expect(parseQueueCommand('/queue edit 2 revised follow-up')).toEqual({
+      kind: 'edit',
+      index: 1,
+      text: 'revised follow-up',
+    })
+    expect(parseQueueCommand('/queue edit 2')).toEqual({
+      kind: 'invalid',
+      message:
+        'Usage: /queue edit <number> <replacement> or /queue remove <number>',
+    })
     expect(parseQueueCommand('/queued message')).toBeNull()
   })
 
@@ -172,4 +182,3 @@ describe('/queue command', () => {
     ).toBe(false)
   })
 })
-
