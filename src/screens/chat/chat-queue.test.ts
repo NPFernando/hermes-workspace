@@ -3,14 +3,15 @@ import { describe, expect, it } from 'vitest'
 import {
   MAX_CHAT_QUEUE_ITEMS,
   MAX_CHAT_QUEUE_TEXT_LENGTH,
-  getChatQueuePausedStorageKey,
   getChatQueueLockStorageKey,
+  getChatQueuePausedStorageKey,
   getChatQueueStorageKey,
   parseQueueCommand,
   readChatQueue,
   readChatQueuePaused,
   refreshChatQueueLock,
   releaseChatQueueLock,
+  replaceQueuedPrompt,
   tryAcquireChatQueueLock,
   writeChatQueue,
   writeChatQueuePaused,
@@ -52,7 +53,34 @@ describe('/queue command', () => {
       kind: 'remove',
       index: 1,
     })
+    expect(parseQueueCommand('/queue edit 2 revised follow-up')).toEqual({
+      kind: 'edit',
+      index: 1,
+      text: 'revised follow-up',
+    })
+    expect(parseQueueCommand('/queue edit 2')).toEqual({
+      kind: 'invalid',
+      message:
+        'Usage: /queue edit <number> <replacement> or /queue remove <number>',
+    })
     expect(parseQueueCommand('/queued message')).toBeNull()
+  })
+
+  it('edits a pending prompt in place and rejects invalid replacements', () => {
+    const queue = [
+      { id: '1', text: 'first', createdAt: 1 },
+      { id: '2', text: 'second', createdAt: 2 },
+    ]
+    expect(replaceQueuedPrompt(queue, 1, ' updated second ')).toEqual([
+      queue[0],
+      { id: '2', text: 'updated second', createdAt: 2 },
+    ])
+    expect(queue[1].text).toBe('second')
+    expect(replaceQueuedPrompt(queue, -1, 'invalid index')).toBeNull()
+    expect(replaceQueuedPrompt(queue, 0, '   ')).toBeNull()
+    expect(
+      replaceQueuedPrompt(queue, 0, 'x'.repeat(MAX_CHAT_QUEUE_TEXT_LENGTH + 1)),
+    ).toBeNull()
   })
 
   it('persists FIFO queue entries per session and clears the storage key', () => {
@@ -172,4 +200,3 @@ describe('/queue command', () => {
     ).toBe(false)
   })
 })
-

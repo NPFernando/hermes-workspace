@@ -33,6 +33,7 @@ import {
   readChatQueuePaused,
   refreshChatQueueLock,
   releaseChatQueueLock,
+  replaceQueuedPrompt,
   tryAcquireChatQueueLock,
   writeChatQueue,
   writeChatQueuePaused,
@@ -847,6 +848,38 @@ export function ChatScreen({
       toast(`Removed queued message: ${removed.text.slice(0, 60)}`, {
         type: 'success',
       })
+    },
+    [queueSessionKey],
+  )
+
+  const editQueuedPrompt = useCallback(
+    (index: number, text: string) => {
+      const normalizedText = text.trim()
+      if (index < 0 || index >= queuedPromptsRef.current.length) {
+        toast('That queued message number does not exist', { type: 'error' })
+        return
+      }
+      if (!normalizedText) {
+        toast('Replacement message cannot be empty', { type: 'error' })
+        return
+      }
+      if (normalizedText.length > MAX_CHAT_QUEUE_TEXT_LENGTH) {
+        toast(
+          `Queued messages are limited to ${MAX_CHAT_QUEUE_TEXT_LENGTH.toLocaleString()} characters`,
+          { type: 'error' },
+        )
+        return
+      }
+      const nextQueue = replaceQueuedPrompt(
+        queuedPromptsRef.current,
+        index,
+        normalizedText,
+      )
+      if (!nextQueue) return
+      queuedPromptsRef.current = nextQueue
+      setQueuedPrompts(nextQueue)
+      writeChatQueue(queueSessionKey, nextQueue)
+      toast(`Updated queued message ${index + 1}`, { type: 'success' })
     },
     [queueSessionKey],
   )
@@ -2756,6 +2789,10 @@ export function ChatScreen({
           resumeQueuedPrompts()
         } else if (queueCommand.kind === 'remove') {
           removeQueuedPrompt(queueCommand.index)
+        } else if (queueCommand.kind === 'edit') {
+          editQueuedPrompt(queueCommand.index, queueCommand.text)
+        } else if (queueCommand.kind === 'invalid') {
+          toast(queueCommand.message, { type: 'error' })
         } else if (queuedPromptsRef.current.length === 0) {
           toast('No messages are queued', { type: 'info' })
         } else {
@@ -2869,6 +2906,7 @@ export function ChatScreen({
       activeSessionKey,
       clearQueuedPrompts,
       enqueueQueuedPrompt,
+      editQueuedPrompt,
       finalDisplayMessages,
       forcedSessionKey,
       navigate,
