@@ -118,6 +118,7 @@ export type FinanceAccount = {
   deriveBalanceFromLedger?: boolean
   maskedIdentifier?: string
   platform?: string
+  branchName?: string
   source: string
   createdAt: string
   updatedAt: string
@@ -443,6 +444,7 @@ export type StockHolding = {
 export type FixedDeposit = {
   id: string
   bankName: string
+  branchName?: string
   principal: number
   currency: CurrencyCode
   interestRatePct: number
@@ -451,6 +453,27 @@ export type FixedDeposit = {
   maturityDate: string
   status: 'active' | 'matured' | 'withdrawn'
   notes?: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** User-entered financial institutions; no external enrichment is performed. */
+export type FinancialInstitution = {
+  id: string
+  name: string
+  normalizedName: string
+  source: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** Branches are scoped to an institution and deduplicated by normalized name. */
+export type FinancialBranch = {
+  id: string
+  institutionId: string
+  name: string
+  normalizedName: string
   source: string
   createdAt: string
   updatedAt: string
@@ -887,6 +910,8 @@ export type FinanceDatabase = {
   updatedAt: string
   settings: FinanceSettings
   finance_accounts: Array<FinanceAccount>
+  financial_institutions: Array<FinancialInstitution>
+  financial_branches: Array<FinancialBranch>
   income_records: Array<IncomeRecord>
   expense_records: Array<ExpenseRecord>
   transfers: Array<Transfer>
@@ -959,6 +984,52 @@ function nowIso(): string {
   return new Date().toISOString()
 }
 
+function normalizedInstitutionName(value: string): string {
+  return value.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase()
+}
+
+function rememberInstitution(
+  db: FinanceDatabase,
+  institutionName: string | undefined,
+  branchName: string | undefined,
+  source: string,
+  at: string,
+): void {
+  const name = institutionName?.trim().replace(/\s+/g, ' ')
+  if (!name) return
+  const normalizedName = normalizedInstitutionName(name)
+  let institution = db.financial_institutions.find(
+    (item) => item.normalizedName === normalizedName,
+  )
+  if (!institution) {
+    institution = {
+      id: `institution-${createHash('sha256').update(normalizedName).digest('hex').slice(0, 24)}`,
+      name,
+      normalizedName,
+      source,
+      createdAt: at,
+      updatedAt: at,
+    }
+    db.financial_institutions.push(institution)
+  }
+
+  const branch = branchName?.trim().replace(/\s+/g, ' ')
+  if (!branch) return
+  const normalizedBranchName = normalizedInstitutionName(branch)
+  if (db.financial_branches.some(
+    (item) => item.institutionId === institution.id && item.normalizedName === normalizedBranchName,
+  )) return
+  db.financial_branches.push({
+    id: `branch-${createHash('sha256').update(`${institution.id}:${normalizedBranchName}`).digest('hex').slice(0, 24)}`,
+    institutionId: institution.id,
+    name: branch,
+    normalizedName: normalizedBranchName,
+    source,
+    createdAt: at,
+    updatedAt: at,
+  })
+}
+
 function defaultSettings(): FinanceSettings {
   return {
     baseCurrency: 'LKR',
@@ -986,6 +1057,8 @@ export function createEmptyFinanceDatabase(): FinanceDatabase {
     updatedAt: createdAt,
     settings: defaultSettings(),
     finance_accounts: [],
+    financial_institutions: [],
+    financial_branches: [],
     income_records: [],
     expense_records: [],
     transfers: [],
@@ -1554,10 +1627,13 @@ export function addFinanceRecord(
       status: reconciliationStatus(payload.status),
     })
   } else if (kind === 'account') {
+    const accountKind = accountType(payload.type)
+    const platform = optionalString(payload, 'platform')
+    const branchName = optionalString(payload, 'branchName')
     db.finance_accounts.push({
       ...base,
       name: stringField(payload, 'name', 'Account'),
-      type: accountType(payload.type),
+      type: accountKind,
       currency: stringField(payload, 'currency', 'LKR'),
       balance: numberField(payload, 'balance', 0),
       openingBalance: optionalNumber(payload, 'openingBalance'),
@@ -1565,8 +1641,10 @@ export function addFinanceRecord(
       deriveBalanceFromLedger:
         payload.deriveBalanceFromLedger === true ? true : undefined,
       maskedIdentifier: optionalString(payload, 'maskedIdentifier'),
-      platform: optionalString(payload, 'platform'),
+      platform,
+      branchName,
     })
+    if (accountKind === 'bank') rememberInstitution(db, platform, branchName, base.source, createdAt)
   } else if (kind === 'goal') {
     db.savings_goals.push({
       ...base,
@@ -1680,9 +1758,12 @@ export function addFinanceRecord(
       notes: optionalString(payload, 'notes'),
     })
   } else if (kind === 'fixed_deposit') {
+    const bankName = stringField(payload, 'bankName', 'Bank')
+    const branchName = optionalString(payload, 'branchName')
     db.fixed_deposits.push({
       ...base,
-      bankName: stringField(payload, 'bankName', 'Bank'),
+      bankName,
+      branchName,
       principal: numberField(payload, 'principal', 0),
       currency: stringField(payload, 'currency', 'LKR'),
       interestRatePct: numberField(payload, 'interestRatePct', 0),
@@ -1696,6 +1777,7 @@ export function addFinanceRecord(
       status: fixedDepositStatusField(payload.status),
       notes: optionalString(payload, 'notes'),
     })
+    rememberInstitution(db, bankName, branchName, base.source, createdAt)
   } else if (kind === 'loan') {
     db.loans.push({
       ...base,
@@ -1820,11 +1902,13 @@ export function updateFinanceRecord(
   } else if (kind === 'account') {
     const index = db.finance_accounts.findIndex((r) => r.id === id)
     if (index !== -1) {
-      db.finance_accounts[index] = {
+      const merged = {
         ...db.finance_accounts[index],
         ...payload,
         updatedAt: nowIso(),
       }
+      db.finance_accounts[index] = merged
+      if (merged.type === 'bank') rememberInstitution(db, merged.platform, merged.branchName, merged.source, merged.updatedAt)
       updated = true
     }
   } else if (kind === 'goal') {
@@ -1927,6 +2011,8 @@ export function updateFinanceRecord(
         ...payload,
         updatedAt: nowIso(),
       }
+      const merged = db.fixed_deposits[index]
+      rememberInstitution(db, merged.bankName, merged.branchName, merged.source, merged.updatedAt)
       updated = true
     }
   } else if (kind === 'loan') {

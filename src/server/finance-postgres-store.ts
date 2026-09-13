@@ -40,6 +40,8 @@ export interface FinanceAuditEntry {
 
 const FINANCE_COLLECTIONS = [
   'finance_accounts',
+  'financial_institutions',
+  'financial_branches',
   'income_records',
   'expense_records',
   'transfers',

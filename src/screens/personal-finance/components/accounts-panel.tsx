@@ -31,6 +31,7 @@ type EditDraft = {
   deriveBalanceFromLedger: boolean
   maskedIdentifier: string
   platform: string
+  branchName: string
 }
 
 /**
@@ -67,6 +68,40 @@ export function AccountsPanel({
   const [openingBalanceDate, setOpeningBalanceDate] = useState('')
   const [maskedIdentifier, setMaskedIdentifier] = useState('')
   const [platform, setPlatform] = useState('')
+  const [branchName, setBranchName] = useState('')
+  const institutionNames = [
+    ...payload.data.financial_institutions.map((item) => stringField(item, 'name')),
+    ...payload.data.finance_accounts
+      .filter((item) => stringField(item, 'type') === 'bank')
+      .map((item) => stringField(item, 'platform')),
+    ...payload.data.fixed_deposits.map((item) => stringField(item, 'bankName')),
+  ].filter(Boolean)
+  const uniqueInstitutionNames = [...new Map(
+    institutionNames.map((value) => [value.trim().replace(/\s+/g, ' ').toLocaleLowerCase(), value.trim()]),
+  ).values()]
+
+  function branchesFor(institutionName: string): Array<string> {
+    const normalized = institutionName.trim().replace(/\s+/g, ' ').toLocaleLowerCase()
+    const institution = payload.data.financial_institutions.find(
+      (item) => stringField(item, 'normalizedName') === normalized,
+    )
+    const institutionId = institution ? stringField(institution, 'id') : ''
+    const catalogBranches = institution
+      ? payload.data.financial_branches
+          .filter((item) => stringField(item, 'institutionId') === institutionId)
+          .map((item) => stringField(item, 'name'))
+          .filter(Boolean)
+      : []
+    const legacyBranches = [
+      ...payload.data.finance_accounts
+        .filter((item) => stringField(item, 'platform').trim().replace(/\s+/g, ' ').toLocaleLowerCase() === normalized)
+        .map((item) => stringField(item, 'branchName')),
+      ...payload.data.fixed_deposits
+        .filter((item) => stringField(item, 'bankName').trim().replace(/\s+/g, ' ').toLocaleLowerCase() === normalized)
+        .map((item) => stringField(item, 'branchName')),
+    ].filter(Boolean)
+    return [...new Set([...catalogBranches, ...legacyBranches])]
+  }
 
   async function submitAccount() {
     if (!name.trim()) {
@@ -88,6 +123,7 @@ export function AccountsPanel({
           openingBalanceDate: openingBalanceDate || undefined,
           maskedIdentifier: maskedIdentifier.trim() || undefined,
           platform: platform.trim() || undefined,
+          branchName: branchName.trim() || undefined,
         },
       },
       'account',
@@ -99,6 +135,7 @@ export function AccountsPanel({
       setOpeningBalanceDate('')
       setMaskedIdentifier('')
       setPlatform('')
+      setBranchName('')
     }
   }
 
@@ -117,6 +154,7 @@ export function AccountsPanel({
         deriveBalanceFromLedger: account.deriveBalanceFromLedger === true,
         maskedIdentifier: stringField(account, 'maskedIdentifier'),
         platform: stringField(account, 'platform'),
+        branchName: stringField(account, 'branchName'),
       },
     }))
     setEditOpenId(id)
@@ -149,6 +187,7 @@ export function AccountsPanel({
           deriveBalanceFromLedger: draft.deriveBalanceFromLedger,
           maskedIdentifier: draft.maskedIdentifier.trim() || undefined,
           platform: draft.platform.trim() || undefined,
+          branchName: draft.branchName.trim() || undefined,
         },
       },
       `edit-${id}`,
@@ -255,8 +294,23 @@ export function AccountsPanel({
           placeholder="Institution / platform (optional)"
           value={platform}
           onChange={(e) => setPlatform(e.target.value)}
+          list="finance-institution-options"
           className={inputClass}
         />
+        <datalist id="finance-institution-options">
+          {uniqueInstitutionNames.map((institution) => <option key={institution} value={institution} />)}
+        </datalist>
+        <input
+          type="text"
+          placeholder="Branch (optional)"
+          value={branchName}
+          onChange={(e) => setBranchName(e.target.value)}
+          list="finance-account-branch-options"
+          className={inputClass}
+        />
+        <datalist id="finance-account-branch-options">
+          {branchesFor(platform).map((branch) => <option key={branch} value={branch} />)}
+        </datalist>
         <button
           type="button"
           disabled={busy === 'account'}
@@ -421,6 +475,7 @@ export function AccountsPanel({
                     type="text"
                     placeholder="Institution / platform"
                     value={editDrafts[id].platform}
+                    list="finance-edit-institution-options"
                     onChange={(e) =>
                       setEditDrafts((prev) => ({
                         ...prev,
@@ -429,6 +484,25 @@ export function AccountsPanel({
                     }
                     className={inputClass}
                   />
+                  <datalist id="finance-edit-institution-options">
+                    {uniqueInstitutionNames.map((institution) => <option key={institution} value={institution} />)}
+                  </datalist>
+                  <input
+                    type="text"
+                    placeholder="Branch"
+                    value={editDrafts[id].branchName}
+                    onChange={(e) =>
+                      setEditDrafts((prev) => ({
+                        ...prev,
+                        [id]: { ...prev[id], branchName: e.target.value },
+                      }))
+                    }
+                    list={`finance-edit-branch-options-${id}`}
+                    className={inputClass}
+                  />
+                  <datalist id={`finance-edit-branch-options-${id}`}>
+                    {branchesFor(editDrafts[id].platform).map((branch) => <option key={branch} value={branch} />)}
+                  </datalist>
                   <button
                     type="button"
                     disabled={busy === `edit-${id}`}
@@ -473,6 +547,8 @@ export function AccountsPanel({
                       )}
                       {maskedIdentifierValue && ` · ${maskedIdentifierValue}`}
                       {platformValue && ` · ${platformValue}`}
+                      {stringField(account, 'branchName') &&
+                        ` · ${stringField(account, 'branchName')} branch`}
                     </span>
                     {openingBalanceValue !== undefined && (
                       <p className="mt-1 text-[10px] text-[var(--theme-muted)]">
