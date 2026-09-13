@@ -10,6 +10,10 @@ import {
   RefreshIcon,
   Tick01Icon,
 } from '@hugeicons/core-free-icons'
+import {
+  formatBlockerGroupToggleAriaLabel,
+  formatBlockerRefreshAriaLabel,
+} from '../format-utils'
 import type { ClaudeTask } from '@/lib/tasks-api'
 import {
   autoResumeBlocked,
@@ -22,18 +26,22 @@ import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/toast'
 
 const BLOCKER_COLORS: Record<string, string> = {
-  credential: 'border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_5%,transparent)]',
+  credential:
+    'border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_5%,transparent)]',
   dependency: 'border-blue-500/30 bg-blue-500/5',
-  execution: 'border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_5%,transparent)]',
+  execution:
+    'border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_5%,transparent)]',
   input: 'border-purple-500/30 bg-purple-500/5',
   environment: 'border-cyan-500/30 bg-cyan-500/5',
   unknown: 'border-gray-500/30 bg-gray-500/5',
 }
 
 const BLOCKER_BADGE_COLORS: Record<string, string> = {
-  credential: 'text-[var(--theme-warning)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)]',
+  credential:
+    'text-[var(--theme-warning)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)]',
   dependency: 'text-blue-400 bg-blue-500/10 border-blue-500/30',
-  execution: 'text-[var(--theme-danger)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)]',
+  execution:
+    'text-[var(--theme-danger)] bg-[color-mix(in_srgb,var(--theme-danger)_10%,transparent)] border-[color-mix(in_srgb,var(--theme-danger)_30%,transparent)]',
   input: 'text-purple-400 bg-purple-500/10 border-purple-500/30',
   environment: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30',
   unknown: 'text-gray-400 bg-gray-500/10 border-gray-500/30',
@@ -64,7 +72,7 @@ export function BlockerPanel() {
     useState<CredentialFormState | null>(null)
 
   // ── Queries ──────────────────────────────────────────────────────────────
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: QUERY_KEY,
     queryFn: fetchBlockers,
     refetchInterval: 30_000,
@@ -358,7 +366,10 @@ export function BlockerPanel() {
   if (error) {
     return (
       <div className="flex flex-col items-center gap-3 py-8">
-        <HugeiconsIcon icon={Alert02Icon} className="w-5 h-5 text-[var(--theme-danger)]" />
+        <HugeiconsIcon
+          icon={Alert02Icon}
+          className="w-5 h-5 text-[var(--theme-danger)]"
+        />
         <p className="text-xs text-[var(--theme-muted)]">
           Failed to load blockers
         </p>
@@ -389,7 +400,10 @@ export function BlockerPanel() {
       {/* Header */}
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
-          <HugeiconsIcon icon={LockIcon} className="w-4 h-4 text-[var(--theme-danger)]" />
+          <HugeiconsIcon
+            icon={LockIcon}
+            className="w-4 h-4 text-[var(--theme-danger)]"
+          />
           <span className="text-xs font-semibold text-[var(--theme-text)]">
             {data.count} Blocker{data.count !== 1 ? 's' : ''}
           </span>
@@ -411,7 +425,8 @@ export function BlockerPanel() {
             type="button"
             onClick={() => refetch()}
             className="p-1 rounded hover:bg-[var(--theme-hover)] transition-colors"
-            title="Refresh blockers"
+            aria-label={formatBlockerRefreshAriaLabel(isFetching)}
+            title={formatBlockerRefreshAriaLabel(isFetching)}
           >
             <HugeiconsIcon
               icon={RefreshIcon}
@@ -434,6 +449,12 @@ export function BlockerPanel() {
                 )
               }
               className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[var(--theme-hover)] transition-colors"
+              aria-expanded={expandedGroup === group.type}
+              aria-label={formatBlockerGroupToggleAriaLabel(
+                group.label,
+                group.tasks.length,
+                expandedGroup === group.type,
+              )}
             >
               <span className="text-xs">
                 {BLOCKER_ICONS[group.type] ?? '🚫'}

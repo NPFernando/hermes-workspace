@@ -9,6 +9,8 @@ import {
   TASKS_BOARD_HELP_TEXT,
   TASK_STATS_ROW_CLASS,
   countExecutableReviewTasks,
+  formatBlockerGroupToggleAriaLabel,
+  formatBlockerRefreshAriaLabel,
   formatCompactTaskColumnActionLabel,
   formatBlockedTaskBreakdownLabel,
   formatBlockedTaskBreakdownTitle,
@@ -97,6 +99,17 @@ describe('tasks UX copy', () => {
     )
     expect(formatCompactTaskColumnActionLabel('Review')).toBe(
       'Add a task to the Review column',
+    )
+  })
+
+  it('formats blocker panel control labels for icon-only actions', () => {
+    expect(formatBlockerRefreshAriaLabel(false)).toBe('Refresh blockers')
+    expect(formatBlockerRefreshAriaLabel(true)).toBe('Refreshing blockers')
+    expect(formatBlockerGroupToggleAriaLabel('Input Required', 1, false)).toBe(
+      'Expand input required blocker group with 1 task',
+    )
+    expect(formatBlockerGroupToggleAriaLabel('Execution', 3, true)).toBe(
+      'Collapse execution blocker group with 3 tasks',
     )
   })
 
