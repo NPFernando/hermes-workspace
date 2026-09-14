@@ -58,6 +58,19 @@ export function formatCompactTaskColumnActionLabel(label: string) {
   return `Add a task to the ${label} column`
 }
 
+export function formatBlockerRefreshAriaLabel(isFetching: boolean) {
+  return isFetching ? 'Refreshing blockers' : 'Refresh blockers'
+}
+
+export function formatBlockerGroupToggleAriaLabel(
+  label: string,
+  taskCount: number,
+  expanded: boolean,
+) {
+  const action = expanded ? 'Collapse' : 'Expand'
+  return `${action} ${label.toLowerCase()} blocker group with ${taskCount} ${pluralizeTask(taskCount)}`
+}
+
 export function formatBlockedTaskBreakdownLabel(
   waitingForInput: number,
   executionFailures: number,
@@ -101,4 +114,3 @@ export function formatBlockedTaskBreakdownTitle(
     .filter(Boolean)
     .join(', ')
 }
-

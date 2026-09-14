@@ -3,8 +3,11 @@ import { describe, expect, it } from 'vitest'
 import {
   doesJobMatchHealthFilter,
   formatJobActionLabel,
+  formatJobFailureDetail,
   formatJobFreshnessCopy,
+  formatJobLastRunStatus,
   formatJobScheduleMetaLabel,
+  formatJobsResultSummary,
   getJobHealthFilterButtonLabel,
   getJobHealthFilterCounts,
   getJobsEmptyStateCopy,
@@ -31,6 +34,80 @@ describe('formatJobActionLabel', () => {
     expect(formatJobActionLabel(undefined, 'delete')).toBe(
       'Delete job: unnamed job',
     )
+  })
+})
+
+describe('formatJobFailureDetail', () => {
+  it('normalizes noisy whitespace before display', () => {
+    expect(formatJobFailureDetail('  Timed out\n after   300s  ')).toBe(
+      'Timed out after 300s',
+    )
+  })
+
+  it('caps very long failure details for compact cards and tooltips', () => {
+    const detail = formatJobFailureDetail(`failure ${'x'.repeat(220)}`)
+
+    expect(detail?.length).toBeLessThanOrEqual(161)
+    expect(detail?.endsWith('…')).toBe(true)
+  })
+
+  it('returns null for blank details', () => {
+    expect(formatJobFailureDetail('   ')).toBeNull()
+    expect(formatJobFailureDetail(null)).toBeNull()
+  })
+})
+
+describe('formatJobLastRunStatus', () => {
+  const baseJob = {
+    id: 'job-1',
+    name: 'Daily monitor',
+    prompt: 'Run daily checks',
+    schedule: {},
+    enabled: true,
+    state: 'active',
+  } satisfies ClaudeJob
+
+  it('surfaces normalized failure details when the API provides an error message', () => {
+    expect(
+      formatJobLastRunStatus({
+        ...baseJob,
+        last_run_at: '2026-07-04T08:00:00Z',
+        last_run_success: false,
+        last_run_error: 'Timed out\n after   300s',
+      }),
+    ).toMatchObject({
+      label: 'Last run failed',
+      detail: 'Failure: Timed out after 300s',
+      title: 'The most recent job run failed: Timed out after 300s',
+    })
+  })
+
+  it('falls back to the legacy error field for failed jobs', () => {
+    expect(
+      formatJobLastRunStatus({
+        ...baseJob,
+        last_run_at: '2026-07-04T08:00:00Z',
+        last_run_success: false,
+        last_run_error: '   ',
+        error: 'Process exited with code 1',
+      }).detail,
+    ).toBe('Failure: Process exited with code 1')
+  })
+
+  it('keeps successful and never-run jobs concise', () => {
+    expect(
+      formatJobLastRunStatus({
+        ...baseJob,
+        last_run_at: '2026-07-04T08:00:00Z',
+        last_run_success: true,
+      }).detail,
+    ).toBeNull()
+    expect(
+      formatJobLastRunStatus({ ...baseJob, last_run_at: null }),
+    ).toMatchObject({
+      label: 'Never run',
+      detail: null,
+    })
   })
 })
 
@@ -223,5 +300,17 @@ describe('job health filters', () => {
       description:
         'No scheduled jobs match both the search text and selected health filter.',
     })
+  })
+
+  it('summarizes visible job counts for assistive technology', () => {
+    expect(formatJobsResultSummary(4, 4, '', 'all')).toBe(
+      'Showing 4 scheduled jobs.',
+    )
+    expect(formatJobsResultSummary(1, 3, 'monitor', 'failed')).toBe(
+      'Showing 1 scheduled job of 3 total jobs matching “monitor” and in failed health.',
+    )
+    expect(formatJobsResultSummary(0, 2, 'backup', 'stale')).toBe(
+      'Showing 0 scheduled jobs of 2 total jobs matching “backup” and in stale health.',
+    )
   })
 })
