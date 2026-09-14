@@ -4039,6 +4039,68 @@ describe('financeAlerts — category budget thresholds', () => {
         ),
       ).toBe(false)
     })
+
+    // Item #5 from the 2026-09-14 goal review: this alert reads `row.actual`
+    // / `row.budget` off budgetVsActualSummary(), which already runs
+    // budgetAmount through amountToLkr() before it ever reaches this code —
+    // the pace math itself never touches budgetEntry.currency. Verifying
+    // that end to end here rather than trusting it by inspection, since a
+    // regression (e.g. someone bypassing budgetVsActualSummary to read
+    // budgetAmount directly) would silently compare a small foreign-currency
+    // number against a large LKR spend and misfire on every non-LKR budget.
+    it('converts a non-LKR budget before running the pace comparison', () => {
+      const db = createEmptyFinanceDatabase()
+      db.exchange_rates.push({
+        base: 'USD',
+        target: 'LKR',
+        rate: 300,
+        date: '2026-01-01',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      })
+      const now = new Date()
+      const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      // 100 USD budget -> 30,000 LKR once converted. If the pace check ever
+      // compared against the raw 100 instead, an LKR expense in the
+      // thousands would look absurdly over pace regardless of the date.
+      db.budget_categories.push({
+        id: 'b-software',
+        month,
+        category: 'Software',
+        currency: 'USD',
+        budgetAmount: 100,
+        source: 't',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      })
+      db.expense_records.push({
+        id: 'e-software',
+        date: `${month}-01`,
+        vendor: 'SaaS Co',
+        category: 'Software',
+        currency: 'LKR',
+        amount: 24_000, // 80% of the converted 30,000 LKR budget
+        convertedLkrAmount: 24_000,
+        recurring: false,
+        workRelated: false,
+        taxDeductiblePossible: false,
+        source: 't',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      })
+
+      // Confirms the conversion actually happened, independent of today's
+      // date: a bug that skipped amountToLkr would show budget: 100 here.
+      const [row] = budgetVsActualSummary(db)
+      expect(row.budget).toBe(30_000)
+      expect(row.actual).toBe(24_000)
+
+      // And that the alert pipeline reads the same converted figures — same
+      // date-adaptive expectation the LKR-native version of this test uses.
+      const has = financeAlerts(db).some(
+        (a) => a.title === 'On pace to exceed budget: Software',
+      )
+      expect(has).toBe(expectedPaceAlert(30_000, 24_000))
+    })
   })
 })
 
