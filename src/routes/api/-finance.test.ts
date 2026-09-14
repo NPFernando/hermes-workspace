@@ -153,6 +153,7 @@ vi.mock('../../server/finance-store', () => ({
     points: [],
   })),
   listKnownSenders: vi.fn(() => []),
+  getUnregisteredSenderCandidates: vi.fn(() => []),
   upsertKnownSender: vi.fn((input: Record<string, unknown>) => ({
     id: 'sender-1',
     label: '',

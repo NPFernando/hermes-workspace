@@ -558,6 +558,11 @@ export type PendingIngestion = {
   /** Set when the Gmail sender matched a registered gmailIngest.knownSenders entry — lets the UI show "Example Bank" instead of a raw grep hint. */
   matchedSenderId?: string
   matchedSenderLabel?: string
+  /** The raw From-header email address, gmail-sourced items only, set
+   *  regardless of whether it matched a known sender — lets
+   *  getUnregisteredSenderCandidates() spot a real biller showing up
+   *  repeatedly with nothing registered for it yet. */
+  senderAddress?: string
   extracted?: ExtractedTransaction
   extractedContract?: ExtractedContract
   rawPreviewImagePath?: string
@@ -2336,6 +2341,72 @@ export function listKnownSenders(): Array<KnownSender> {
   return readKnownSenders(settings)
 }
 
+export type UnregisteredSenderCandidate = {
+  /** The raw From-header address these pending_ingestions shared. */
+  senderAddress: string
+  /** The @domain part, suggested as the matchDomain for a one-click
+   *  registration — narrower matchAddress is still available by editing
+   *  after registering, same as a manually-added sender. */
+  domain: string
+  occurrences: number
+  /** Most recent occurrence, so the UI can show "last seen …". */
+  lastSeenAt: string
+}
+
+/**
+ * Closes the loop the bulk-CSV importer opened: right now a sender is
+ * either registered or invisible, with no middle "we keep seeing this one,
+ * want to register it?" state. Purely a read over pending_ingestions —
+ * gmail-ingest.ts already stamps senderAddress on every gmail-sourced item
+ * regardless of match status, so this needs no new sync-time tracking.
+ * Only ever surfaces a sender the registry doesn't already have — once
+ * registered, matchKnownSender() would tag future emails from it, so it
+ * naturally drops off this list on its own.
+ */
+export function getUnregisteredSenderCandidates(
+  db: FinanceDatabase,
+  minOccurrences = 2,
+): Array<UnregisteredSenderCandidate> {
+  // Reads known senders off the SAME db passed in, not the global store —
+  // listKnownSenders() would silently ignore a synthetic/test db and read
+  // the real one instead, a real correctness bug for any caller (tests
+  // included) that isn't operating on ensureFinanceStore()'s own instance.
+  const known = readKnownSenders(db.settings)
+  const isAlreadyRegistered = (address: string) =>
+    known.some(
+      (s) =>
+        (s.matchAddress && address.includes(s.matchAddress.toLowerCase())) ||
+        (s.matchDomain && address.includes(s.matchDomain.toLowerCase())),
+    )
+
+  const byAddress = new Map<
+    string,
+    { occurrences: number; lastSeenAt: string }
+  >()
+  for (const item of db.pending_ingestions) {
+    if (item.matchedSenderId || !item.senderAddress) continue
+    const address = item.senderAddress.toLowerCase()
+    if (isAlreadyRegistered(address)) continue
+    const existing = byAddress.get(address)
+    byAddress.set(address, {
+      occurrences: (existing?.occurrences ?? 0) + 1,
+      lastSeenAt:
+        existing && existing.lastSeenAt > item.createdAt
+          ? existing.lastSeenAt
+          : item.createdAt,
+    })
+  }
+
+  const results: Array<UnregisteredSenderCandidate> = []
+  for (const [senderAddress, info] of byAddress) {
+    if (info.occurrences < minOccurrences) continue
+    const domain = senderAddress.split('@')[1]
+    if (!domain) continue
+    results.push({ senderAddress, domain, ...info })
+  }
+  return results.sort((a, b) => b.occurrences - a.occurrences)
+}
+
 export function upsertKnownSender(
   input: Pick<KnownSender, 'label'> &
     Partial<
@@ -2459,6 +2530,7 @@ export function addPendingIngestion(
         | 'passwordHint'
         | 'matchedSenderId'
         | 'matchedSenderLabel'
+        | 'senderAddress'
         | 'extracted'
         | 'extractedContract'
         | 'rawPreviewImagePath'
@@ -2477,6 +2549,7 @@ export function addPendingIngestion(
     passwordHint: input.passwordHint,
     matchedSenderId: input.matchedSenderId,
     matchedSenderLabel: input.matchedSenderLabel,
+    senderAddress: input.senderAddress,
     extracted: input.extracted,
     extractedContract: input.extractedContract,
     rawPreviewImagePath: input.rawPreviewImagePath,

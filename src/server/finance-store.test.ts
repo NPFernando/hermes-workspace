@@ -25,12 +25,18 @@ import {
   getRecurringBills,
   getRecurringSpendPortfolio,
   getUnifiedTransactions,
+  getUnregisteredSenderCandidates,
   getUpcomingMoney,
   ledgerTransactionsForDb,
   maskSensitive,
   tradingPerformanceSummary,
 } from './finance-store'
-import type { BudgetCategory, FinanceAccount, RecurringBill } from './finance-store'
+import type {
+  BudgetCategory,
+  FinanceAccount,
+  PendingIngestion,
+  RecurringBill,
+} from './finance-store'
 
 /**
  * Fresh `finance-store` module instance backed by a pure in-memory store — no
@@ -1121,6 +1127,136 @@ describe('knownSenders (upsert/list/delete + password encryption)', () => {
     const store = await freshFinanceStore()
     const sender = store.upsertKnownSender({ label: 'CSE' })
     expect(store.decryptKnownSenderPassword(sender)).toBeUndefined()
+  })
+})
+
+describe('getUnregisteredSenderCandidates', () => {
+  function pendingFromGmail(
+    over: Partial<Record<string, unknown>> = {},
+  ): PendingIngestion {
+    return {
+      id: `p-${Math.random()}`,
+      status: 'awaiting_review',
+      source: 'gmail',
+      documentType: 'transaction',
+      sourceRef: 'gmail:1',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      ...over,
+    }
+  }
+
+  it('surfaces a sender seen at least minOccurrences times with nothing registered for it', () => {
+    const db = createEmptyFinanceDatabase()
+    db.pending_ingestions.push(
+      pendingFromGmail({ senderAddress: 'billing@newbiller.test' }),
+      pendingFromGmail({ senderAddress: 'billing@newbiller.test' }),
+    )
+    const candidates = getUnregisteredSenderCandidates(db)
+    expect(candidates).toEqual([
+      {
+        senderAddress: 'billing@newbiller.test',
+        domain: 'newbiller.test',
+        occurrences: 2,
+        lastSeenAt: '2026-01-01T00:00:00.000Z',
+      },
+    ])
+  })
+
+  it('does not surface a sender seen fewer than minOccurrences times', () => {
+    const db = createEmptyFinanceDatabase()
+    db.pending_ingestions.push(
+      pendingFromGmail({ senderAddress: 'billing@onceonly.test' }),
+    )
+    expect(getUnregisteredSenderCandidates(db)).toEqual([])
+  })
+
+  it('never surfaces a sender that already matched a known sender', () => {
+    const db = createEmptyFinanceDatabase()
+    db.pending_ingestions.push(
+      pendingFromGmail({
+        senderAddress: 'billing@matched.test',
+        matchedSenderId: 'existing-1',
+      }),
+      pendingFromGmail({
+        senderAddress: 'billing@matched.test',
+        matchedSenderId: 'existing-1',
+      }),
+    )
+    expect(getUnregisteredSenderCandidates(db)).toEqual([])
+  })
+
+  it('never surfaces a sender whose domain/address is already registered, even without matchedSenderId set on the row', () => {
+    const db = createEmptyFinanceDatabase()
+    ;(db.settings as Record<string, unknown>).gmailIngest = {
+      knownSenders: [
+        {
+          id: 'existing-1',
+          label: 'Already Registered',
+          matchDomain: 'registered.test',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    }
+    db.pending_ingestions.push(
+      pendingFromGmail({ senderAddress: 'billing@registered.test' }),
+      pendingFromGmail({ senderAddress: 'billing@registered.test' }),
+    )
+    expect(getUnregisteredSenderCandidates(db)).toEqual([])
+  })
+
+  it('ignores rows with no senderAddress', () => {
+    const db = createEmptyFinanceDatabase()
+    db.pending_ingestions.push(
+      pendingFromGmail(),
+      pendingFromGmail(),
+      pendingFromGmail(),
+    )
+    expect(getUnregisteredSenderCandidates(db)).toEqual([])
+  })
+
+  it('tracks the most recent createdAt as lastSeenAt', () => {
+    const db = createEmptyFinanceDatabase()
+    db.pending_ingestions.push(
+      pendingFromGmail({
+        senderAddress: 'billing@newbiller.test',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      }),
+      pendingFromGmail({
+        senderAddress: 'billing@newbiller.test',
+        createdAt: '2026-03-01T00:00:00.000Z',
+      }),
+    )
+    const [candidate] = getUnregisteredSenderCandidates(db)
+    expect(candidate.lastSeenAt).toBe('2026-03-01T00:00:00.000Z')
+  })
+
+  it('respects a custom minOccurrences threshold', () => {
+    const db = createEmptyFinanceDatabase()
+    db.pending_ingestions.push(
+      pendingFromGmail({ senderAddress: 'billing@newbiller.test' }),
+      pendingFromGmail({ senderAddress: 'billing@newbiller.test' }),
+      pendingFromGmail({ senderAddress: 'billing@newbiller.test' }),
+    )
+    expect(getUnregisteredSenderCandidates(db, 3)).toHaveLength(1)
+    expect(getUnregisteredSenderCandidates(db, 4)).toHaveLength(0)
+  })
+
+  it('sorts by occurrences descending', () => {
+    const db = createEmptyFinanceDatabase()
+    db.pending_ingestions.push(
+      pendingFromGmail({ senderAddress: 'billing@lowvolume.test' }),
+      pendingFromGmail({ senderAddress: 'billing@lowvolume.test' }),
+      pendingFromGmail({ senderAddress: 'billing@highvolume.test' }),
+      pendingFromGmail({ senderAddress: 'billing@highvolume.test' }),
+      pendingFromGmail({ senderAddress: 'billing@highvolume.test' }),
+    )
+    const candidates = getUnregisteredSenderCandidates(db)
+    expect(candidates.map((c) => c.senderAddress)).toEqual([
+      'billing@highvolume.test',
+      'billing@lowvolume.test',
+    ])
   })
 })
 
