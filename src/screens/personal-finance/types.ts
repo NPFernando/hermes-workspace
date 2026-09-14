@@ -135,7 +135,13 @@ export type PersonalFinancePayload = {
     currentNetWorthBase: number
     monthlyDeltaBase: number
     monthsOfHistoryUsed: number
-    points: Array<{ month: string; projectedNetWorthBase: number }>
+    monthlyDeltaStdDevBase: number
+    points: Array<{
+      month: string
+      projectedNetWorthBase: number
+      optimisticNetWorthBase: number
+      pessimisticNetWorthBase: number
+    }>
     accountBreakdown: Array<{
       accountId: string
       accountName: string

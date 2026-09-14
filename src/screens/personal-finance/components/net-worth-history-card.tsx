@@ -43,6 +43,8 @@ export function NetWorthHistoryCard({
     investments: number | null
     debt: number | null
     projected: number | null
+    optimistic: number | null
+    pessimistic: number | null
   }> = history.map((point) => ({
     date: point.date,
     label: shortDate(point.date),
@@ -51,6 +53,8 @@ export function NetWorthHistoryCard({
     investments: Math.round(point.investmentsBase),
     debt: Math.round(point.debtBase),
     projected: null,
+    optimistic: null,
+    pessimistic: null,
   }))
   const first = data[0].value ?? 0
   const last = data[data.length - 1].value ?? 0
@@ -63,7 +67,12 @@ export function NetWorthHistoryCard({
   // dashed line visually picks up exactly where the solid one ends, instead
   // of leaving a gap.
   if (forecast.hasData && view === 'total') {
-    data[data.length - 1] = { ...data[data.length - 1], projected: last }
+    data[data.length - 1] = {
+      ...data[data.length - 1],
+      projected: last,
+      optimistic: last,
+      pessimistic: last,
+    }
     for (const point of forecast.points) {
       data.push({
         date: point.month,
@@ -73,6 +82,8 @@ export function NetWorthHistoryCard({
         investments: null,
         debt: null,
         projected: Math.round(point.projectedNetWorthBase),
+        optimistic: Math.round(point.optimisticNetWorthBase),
+        pessimistic: Math.round(point.pessimisticNetWorthBase),
       })
     }
   }
@@ -158,16 +169,42 @@ export function NetWorthHistoryCard({
                   connectNulls={false}
                 />
                 {forecast.hasData && (
-                  <Line
-                    type="monotone"
-                    dataKey="projected"
-                    name="Projected"
-                    stroke="var(--theme-muted)"
-                    strokeWidth={2}
-                    strokeDasharray="4 4"
-                    dot={false}
-                    connectNulls
-                  />
+                  <>
+                    {forecast.monthlyDeltaStdDevBase > 0 && (
+                      <>
+                        <Line
+                          type="monotone"
+                          dataKey="optimistic"
+                          name="Optimistic (+1σ)"
+                          stroke="var(--theme-success)"
+                          strokeWidth={1}
+                          strokeDasharray="2 3"
+                          dot={false}
+                          connectNulls
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="pessimistic"
+                          name="Pessimistic (-1σ)"
+                          stroke="var(--theme-danger)"
+                          strokeWidth={1}
+                          strokeDasharray="2 3"
+                          dot={false}
+                          connectNulls
+                        />
+                      </>
+                    )}
+                    <Line
+                      type="monotone"
+                      dataKey="projected"
+                      name="Projected"
+                      stroke="var(--theme-muted)"
+                      strokeWidth={2}
+                      strokeDasharray="4 4"
+                      dot={false}
+                      connectNulls
+                    />
+                  </>
                 )}
               </>
             ) : (
@@ -210,6 +247,15 @@ export function NetWorthHistoryCard({
             {forecast.monthsOfHistoryUsed} complete month
             {forecast.monthsOfHistoryUsed === 1 ? '' : 's'} of savings) — cash
             flow only, doesn't project market/property/interest growth.
+            {forecast.monthlyDeltaStdDevBase > 0 && (
+              <>
+                {' '}
+                The green/red band (±{formatLkr(forecast.monthlyDeltaStdDevBase, base)}
+                /month) shows how much that monthly savings figure actually
+                varied across those months — not a statistical guarantee,
+                just how volatile the recent pace has been.
+              </>
+            )}
           </p>
           {forecast.accountBreakdown.length > 0 && (
             <div className="mt-3 overflow-x-auto">
