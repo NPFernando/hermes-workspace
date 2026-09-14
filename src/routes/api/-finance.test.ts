@@ -112,6 +112,14 @@ vi.mock('../../server/finance-store', () => ({
   getExchangeRate: vi.fn(() => undefined),
   getFinanceTrends: vi.fn(() => ({ series: [], categoriesThisMonth: [] })),
   getRecurringBills: vi.fn(() => []),
+  getRecurringSpendPortfolio: vi.fn(() => ({
+    billCount: 0,
+    totalAverageAmountLkr: 0,
+    loggedThisMonthAmountLkr: null,
+    loggedDrift: null,
+    billsLoggedThisMonth: 0,
+    sustainedPriceHikeCount: 0,
+  })),
   getUpcomingMoney: vi.fn(() => ({
     paydays: [],
     contracts: [],
