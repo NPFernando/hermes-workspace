@@ -291,3 +291,12 @@ export type KnownSender = {
   createdAt: string
   updatedAt: string
 }
+
+/** A sender repeatedly showing up unmatched — see
+ *  getUnregisteredSenderCandidates's doc comment in finance-store.ts. */
+export type UnregisteredSenderCandidate = {
+  senderAddress: string
+  domain: string
+  occurrences: number
+  lastSeenAt: string
+}

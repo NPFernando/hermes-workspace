@@ -51,6 +51,33 @@ describe('buildSearchQuery / matchKnownSender (pure helpers)', () => {
       matchKnownSender('billing@sub.example-utility.test', known),
     ).toEqual(known[0])
   })
+
+  it('extractSenderAddress pulls the address out of a "Name <addr>" header', async () => {
+    const { extractSenderAddress } = await import('./gmail-ingest')
+    expect(
+      extractSenderAddress('"Example Bank" <e-statement@example-bank.test>'),
+    ).toBe('e-statement@example-bank.test')
+  })
+
+  it('extractSenderAddress accepts a bare address with no display name', async () => {
+    const { extractSenderAddress } = await import('./gmail-ingest')
+    expect(extractSenderAddress('billing@example-utility.test')).toBe(
+      'billing@example-utility.test',
+    )
+  })
+
+  it('extractSenderAddress lowercases the result', async () => {
+    const { extractSenderAddress } = await import('./gmail-ingest')
+    expect(extractSenderAddress('<Billing@Example.TEST>')).toBe(
+      'billing@example.test',
+    )
+  })
+
+  it('extractSenderAddress returns undefined for a header with nothing address-shaped', async () => {
+    const { extractSenderAddress } = await import('./gmail-ingest')
+    expect(extractSenderAddress('not an email address')).toBeUndefined()
+    expect(extractSenderAddress('')).toBeUndefined()
+  })
 })
 
 /**

@@ -9,7 +9,7 @@ import {
   warningTone,
 } from '../shared-styles'
 import { parseCsv } from './csv-import-panel'
-import type { KnownSender } from '../types'
+import type { KnownSender, UnregisteredSenderCandidate } from '../types'
 
 type Draft = {
   id?: string
@@ -43,6 +43,9 @@ function fromSender(s: KnownSender): Draft {
  */
 export function KnownSendersCard() {
   const [senders, setSenders] = useState<Array<KnownSender>>([])
+  const [candidates, setCandidates] = useState<
+    Array<UnregisteredSenderCandidate>
+  >([])
   const [loading, setLoading] = useState(true)
   const [note, setNote] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -65,9 +68,18 @@ export function KnownSendersCard() {
       body: JSON.stringify({ action: 'list_known_senders' }),
     })
       .then((r) => r.json())
-      .then((data: { ok: boolean; knownSenders?: Array<KnownSender> }) => {
-        if (data.ok) setSenders(data.knownSenders ?? [])
-      })
+      .then(
+        (data: {
+          ok: boolean
+          knownSenders?: Array<KnownSender>
+          unregisteredSenderCandidates?: Array<UnregisteredSenderCandidate>
+        }) => {
+          if (data.ok) {
+            setSenders(data.knownSenders ?? [])
+            setCandidates(data.unregisteredSenderCandidates ?? [])
+          }
+        },
+      )
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
@@ -108,6 +120,37 @@ export function KnownSendersCard() {
     } finally {
       setBusyId(null)
     }
+  }
+
+  async function registerCandidate(candidate: UnregisteredSenderCandidate) {
+    setBusyId(`candidate-${candidate.senderAddress}`)
+    setNote(null)
+    try {
+      const res = await fetch('/api/finance', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'upsert_known_sender',
+          label: candidate.domain,
+          matchDomain: candidate.domain,
+        }),
+      })
+      const data = (await res.json()) as { ok: boolean; error?: string }
+      if (!data.ok) setNote(data.error || 'Could not register sender')
+      await load()
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  function dismissCandidate(candidate: UnregisteredSenderCandidate) {
+    // Purely client-side for now — the candidate reappears next load since
+    // nothing is persisted. Registering it (which removes it from the
+    // unmatched pool) is the real dismissal; this just clears the current
+    // view without a server round trip for a "not interested" click.
+    setCandidates((prev) =>
+      prev.filter((c) => c.senderAddress !== candidate.senderAddress),
+    )
   }
 
   async function remove(id: string) {
@@ -275,6 +318,51 @@ export function KnownSendersCard() {
               .map((s) => `row ${s.row + 1} (${s.reason})`)
               .join(', ')}.`}
         </p>
+      )}
+
+      {candidates.length > 0 && (
+        <div className="mt-3 rounded-xl border border-[var(--theme-border)]/60 bg-[color-mix(in_srgb,var(--theme-warning)_8%,transparent)] p-3">
+          <p className="text-xs font-medium text-[var(--theme-text)]">
+            Detected, not registered yet
+          </p>
+          <p className="mt-0.5 text-xs text-[var(--theme-muted)]">
+            These senders have shown up repeatedly in emails that didn't
+            match anything registered — worth adding them?
+          </p>
+          <div className="mt-2 grid gap-2">
+            {candidates.map((c) => (
+              <div
+                key={c.senderAddress}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--theme-border)]/50 px-2 py-1"
+              >
+                <span className="text-xs text-[var(--theme-text)]">
+                  {c.senderAddress}
+                  <span className="ml-1 text-[var(--theme-muted)]">
+                    — seen {c.occurrences}×, last{' '}
+                    {new Date(c.lastSeenAt).toLocaleDateString()}
+                  </span>
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={busyId === `candidate-${c.senderAddress}`}
+                    onClick={() => void registerCandidate(c)}
+                    className={confirmButtonClass}
+                  >
+                    Register
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => dismissCandidate(c)}
+                    className={buttonClass}
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {editing && (

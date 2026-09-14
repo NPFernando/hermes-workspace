@@ -66,6 +66,18 @@ export function buildSearchQuery(knownSenders: Array<KnownSender>, afterSeconds:
   return `${group} after:${afterSeconds}`
 }
 
+/** Pulls the bare email address out of a From header ("Name <addr>" or a
+ *  bare address) — undefined if nothing address-shaped is found. Used to
+ *  stamp senderAddress on every pending_ingestion so unmatched-but-repeat
+ *  senders can be surfaced as registration candidates later. */
+export function extractSenderAddress(fromHeader: string): string | undefined {
+  const angleMatch = fromHeader.match(/<([^<>]+)>/)
+  const candidate = (angleMatch ? angleMatch[1] : fromHeader).trim().toLowerCase()
+  return /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(candidate)
+    ? candidate
+    : undefined
+}
+
 /** Matches the message's From header against registered known senders — domain match first, exact address as a tiebreaker. */
 export function matchKnownSender(
   fromHeader: string,
@@ -257,6 +269,7 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
     const bodyText = findPlainTextBody(message.payload)
     const fromHeader = findHeader(message, 'From')
     const matchedSender = matchKnownSender(fromHeader, knownSenders)
+    const senderAddress = extractSenderAddress(fromHeader)
     const attachments = findAttachments(message.payload).filter(
       (a) =>
         a.mimeType === 'application/pdf' || a.mimeType.startsWith('image/'),
@@ -276,6 +289,7 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
         extracted: extraction.data,
         matchedSenderId: matchedSender?.id,
         matchedSenderLabel: matchedSender?.label,
+        senderAddress,
       })
       queued += 1
       continue
@@ -313,6 +327,7 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
           passwordHint: matchedSender?.passwordScheme ?? findPasswordHint(bodyText),
           matchedSenderId: matchedSender?.id,
           matchedSenderLabel: matchedSender?.label,
+        senderAddress,
         })
         queued += 1
         continue
@@ -330,6 +345,7 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
           error: `Could not process document: ${normalized.reason}`,
           matchedSenderId: matchedSender?.id,
           matchedSenderLabel: matchedSender?.label,
+        senderAddress,
         })
         queued += 1
         continue
@@ -350,6 +366,7 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
       error: extraction.ok ? undefined : extraction.reason,
       matchedSenderId: matchedSender?.id,
       matchedSenderLabel: matchedSender?.label,
+        senderAddress,
     })
     queued += 1
   }

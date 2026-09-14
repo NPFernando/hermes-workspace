@@ -34,6 +34,7 @@ import {
   getRecurringBills,
   getRecurringSpendPortfolio,
   getUnifiedTransactions,
+  getUnregisteredSenderCandidates,
   getUpcomingMoney,
   ledgerTransactionsForDb,
   listKnownSenders,
@@ -2503,6 +2504,9 @@ export const Route = createFileRoute('/api/finance')({
                   ...rest,
                   hasPassword: Boolean(encryptedPassword),
                 }),
+              ),
+              unregisteredSenderCandidates: getUnregisteredSenderCandidates(
+                ensureFinanceStore(),
               ),
             })
           }
