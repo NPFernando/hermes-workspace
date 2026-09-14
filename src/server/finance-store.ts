@@ -4411,6 +4411,14 @@ export type NetWorthForecastPoint = {
   /** YYYY-MM, always in the future relative to when this was computed. */
   month: string
   projectedNetWorthBase: number
+  /** ±1 standard deviation of the trailing months' own savings figures,
+   *  compounded the same linear way as the midline — shows how volatile the
+   *  underlying savings rate actually was, not a statistical confidence
+   *  interval in the rigorous sense (too few trailing months for that).
+   *  Equal to projectedNetWorthBase when there's only one trailing month
+   *  (stddev of a single value is 0 — nothing to show a band around). */
+  optimisticNetWorthBase: number
+  pessimisticNetWorthBase: number
 }
 
 export type NetWorthForecastAccountShare = {
@@ -4438,6 +4446,10 @@ export type NetWorthForecast = {
    *  baseCurrency — the flat monthly rate the projection compounds by. */
   monthlyDeltaBase: number
   monthsOfHistoryUsed: number
+  /** Standard deviation of the trailing months' own savings figures, in
+   *  baseCurrency — the ± band width each forecast point's midline is
+   *  drawn around. 0 when there's only one trailing month. */
+  monthlyDeltaStdDevBase: number
   points: Array<NetWorthForecastPoint>
   /** Where the projected growth lands, per account — see
    *  NetWorthForecastAccountShare's doc comment for the allocation rule. */
@@ -4494,6 +4506,7 @@ export function getNetWorthForecast(
       currentNetWorthBase,
       monthlyDeltaBase: 0,
       monthsOfHistoryUsed: 0,
+      monthlyDeltaStdDevBase: 0,
       points: [],
       accountBreakdown: flatAccountBreakdown(),
     }
@@ -4503,6 +4516,14 @@ export function getNetWorthForecast(
   const avgMonthlySavingsLkr =
     trailing.reduce((sum, row) => sum + row.savings, 0) / trailing.length
   const monthlyDeltaBase = lkrToBaseCurrency(db, avgMonthlySavingsLkr)
+  // Population stddev (divide by n, not n-1) — trailingMonths is a small,
+  // fixed window we're describing in full, not sampling from a larger one.
+  const varianceLkr =
+    trailing.reduce(
+      (sum, row) => sum + (row.savings - avgMonthlySavingsLkr) ** 2,
+      0,
+    ) / trailing.length
+  const monthlyDeltaStdDevBase = lkrToBaseCurrency(db, Math.sqrt(varianceLkr))
 
   const points: Array<NetWorthForecastPoint> = []
   for (let i = 1; i <= monthsAhead; i++) {
@@ -4511,6 +4532,10 @@ export function getNetWorthForecast(
     points.push({
       month,
       projectedNetWorthBase: currentNetWorthBase + monthlyDeltaBase * i,
+      optimisticNetWorthBase:
+        currentNetWorthBase + (monthlyDeltaBase + monthlyDeltaStdDevBase) * i,
+      pessimisticNetWorthBase:
+        currentNetWorthBase + (monthlyDeltaBase - monthlyDeltaStdDevBase) * i,
     })
   }
 
@@ -4555,6 +4580,7 @@ export function getNetWorthForecast(
     currentNetWorthBase,
     monthlyDeltaBase,
     monthsOfHistoryUsed: trailing.length,
+    monthlyDeltaStdDevBase,
     points,
     accountBreakdown,
   }

@@ -3274,6 +3274,78 @@ describe('getNetWorthForecast', () => {
       forecast.currentNetWorthBase - 40_000,
     )
   })
+
+  describe('confidence band (monthlyDeltaStdDevBase)', () => {
+    function pushMonth(
+      db: ReturnType<typeof createEmptyFinanceDatabase>,
+      monthsAgo: number,
+      income: number,
+      expense: number,
+    ) {
+      const now = new Date()
+      const d = new Date(now.getUTCFullYear(), now.getUTCMonth() - monthsAgo, 10)
+      const date = d.toISOString().slice(0, 10)
+      db.income_records.push(
+        incomeRow({
+          id: `inc-${monthsAgo}`,
+          dateReceived: date,
+          originalAmount: income,
+          convertedLkrAmount: income,
+        }),
+      )
+      db.expense_records.push(
+        expenseRow({
+          id: `exp-${monthsAgo}`,
+          date,
+          amount: expense,
+          convertedLkrAmount: expense,
+        }),
+      )
+    }
+
+    it('is 0 when the trailing months had identical savings', () => {
+      const db = createEmptyFinanceDatabase()
+      pushMonth(db, 1, 100_000, 60_000) // 40k
+      pushMonth(db, 2, 100_000, 60_000) // 40k
+      const forecast = getNetWorthForecast(db, 1, 2)
+      expect(forecast.monthlyDeltaStdDevBase).toBe(0)
+      expect(forecast.points[0].optimisticNetWorthBase).toBe(
+        forecast.points[0].projectedNetWorthBase,
+      )
+      expect(forecast.points[0].pessimisticNetWorthBase).toBe(
+        forecast.points[0].projectedNetWorthBase,
+      )
+    })
+
+    it('is 0 with a single trailing month (nothing to vary against)', () => {
+      const db = createEmptyFinanceDatabase()
+      pushMonth(db, 1, 100_000, 60_000)
+      const forecast = getNetWorthForecast(db, 1, 3)
+      expect(forecast.monthsOfHistoryUsed).toBe(1)
+      expect(forecast.monthlyDeltaStdDevBase).toBe(0)
+    })
+
+    it('widens the band around the midline when trailing months varied', () => {
+      const db = createEmptyFinanceDatabase()
+      // Savings of 20k and 60k -> mean 40k, population stddev 20k.
+      pushMonth(db, 1, 100_000, 40_000) // 60k savings
+      pushMonth(db, 2, 100_000, 80_000) // 20k savings
+      const forecast = getNetWorthForecast(db, 2, 2)
+      expect(forecast.monthlyDeltaBase).toBe(40_000)
+      expect(forecast.monthlyDeltaStdDevBase).toBe(20_000)
+      // Month 2: midline +80k, band +/-40k (stddev * 2 months) around it.
+      const [, second] = forecast.points
+      expect(second.projectedNetWorthBase).toBe(
+        forecast.currentNetWorthBase + 80_000,
+      )
+      expect(second.optimisticNetWorthBase).toBe(
+        forecast.currentNetWorthBase + 120_000,
+      )
+      expect(second.pessimisticNetWorthBase).toBe(
+        forecast.currentNetWorthBase + 40_000,
+      )
+    })
+  })
 })
 
 describe('copyBudgetsToMonth', () => {
