@@ -65,6 +65,17 @@ export type PersonalFinancePayload = {
     priceHikeStreak: number
     sustainedPriceHike: boolean
   }>
+  /** Portfolio-level rollup of recurringBills — see
+   *  getRecurringSpendPortfolio's doc comment for the logged-vs-all-bills
+   *  distinction in the drift math. */
+  recurringSpendPortfolio: {
+    billCount: number
+    totalAverageAmountLkr: number
+    loggedThisMonthAmountLkr: number | null
+    loggedDrift: number | null
+    billsLoggedThisMonth: number
+    sustainedPriceHikeCount: number
+  }
   /** Forward cash-flow estimate from recent history and pending schedules. */
   cashFlowForecast: {
     averageMonthlyIncomeLkr: number

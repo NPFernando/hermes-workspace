@@ -32,6 +32,7 @@ import {
   getFxGainLoss,
   getNetWorthForecast,
   getRecurringBills,
+  getRecurringSpendPortfolio,
   getUnifiedTransactions,
   getUpcomingMoney,
   ledgerTransactionsForDb,
@@ -510,6 +511,7 @@ function personalFinancePayload() {
     wgTargetLkr > 0
       ? Math.min(100, Math.max(0, (wgCurrentLkr / wgTargetLkr) * 100))
       : 0
+  const recurringBillsList = getRecurringBills(db)
   return {
     ok: true,
     checkedAt: Date.now(),
@@ -538,7 +540,8 @@ function personalFinancePayload() {
     // Python port in personal-finance-digest.sh). Amounts are raw LKR — the
     // client scales by `fxToBase` for display.
     trends: getFinanceTrends(db),
-    recurringBills: getRecurringBills(db),
+    recurringBills: recurringBillsList,
+    recurringSpendPortfolio: getRecurringSpendPortfolio(recurringBillsList),
     cashFlowForecast: getCashFlowForecast(db),
     upcomingMoney: getUpcomingMoney(db),
     currencyExposure: getCurrencyExposure(db),

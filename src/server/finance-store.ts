@@ -3955,6 +3955,63 @@ export function getRecurringBills(
   return results.sort((a, b) => b.monthsSeen - a.monthsSeen)
 }
 
+export type RecurringSpendPortfolio = {
+  billCount: number
+  /** Sum of every tracked bill's averageAmount, regardless of whether it's
+   *  logged yet this month — "what a typical month of recurring bills
+   *  costs", informational only, not part of the drift comparison below. */
+  totalAverageAmountLkr: number
+  /** Sum of thisMonthAmount across only the bills already logged this
+   *  month, or null if none are logged yet. */
+  loggedThisMonthAmountLkr: number | null
+  /** Drift of loggedThisMonthAmountLkr against the SAME logged bills' own
+   *  combined average — not totalAverageAmountLkr, which would include
+   *  unlogged bills and bias the ratio toward looking artificially low.
+   *  Null until at least one bill is logged this month. */
+  loggedDrift: number | null
+  billsLoggedThisMonth: number
+  sustainedPriceHikeCount: number
+}
+
+/**
+ * Rolls getRecurringBills' per-bill signals up to a single "how's my
+ * recurring spend doing overall this month" view — the existing drift/
+ * price-hike-streak fields are per-bill only, with no portfolio-level
+ * total. Pure function of getRecurringBills' own output, so it can never
+ * drift from what the per-bill list already shows.
+ */
+export function getRecurringSpendPortfolio(
+  bills: Array<RecurringBill>,
+): RecurringSpendPortfolio {
+  const totalAverageAmountLkr = bills.reduce(
+    (sum, b) => sum + b.averageAmount,
+    0,
+  )
+  const logged = bills.filter((b) => b.thisMonthAmount !== null)
+  const loggedThisMonthAmountLkr =
+    logged.length > 0
+      ? logged.reduce((sum, b) => sum + (b.thisMonthAmount ?? 0), 0)
+      : null
+  const loggedAverageAmountLkr = logged.reduce(
+    (sum, b) => sum + b.averageAmount,
+    0,
+  )
+  const loggedDrift =
+    loggedThisMonthAmountLkr !== null && loggedAverageAmountLkr > 0
+      ? (loggedThisMonthAmountLkr - loggedAverageAmountLkr) /
+        loggedAverageAmountLkr
+      : null
+
+  return {
+    billCount: bills.length,
+    totalAverageAmountLkr,
+    loggedThisMonthAmountLkr,
+    loggedDrift,
+    billsLoggedThisMonth: logged.length,
+    sustainedPriceHikeCount: bills.filter((b) => b.sustainedPriceHike).length,
+  }
+}
+
 /** This-month payday state for a job. Pure. The client keeps an identical copy
  *  in `payday-status.ts` (with its own test) for the per-row badge; this one
  *  feeds `getUpcomingMoney` + the payload so the digest cron stops

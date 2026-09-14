@@ -23,13 +23,14 @@ import {
   getMonthlySummary,
   getNetWorthForecast,
   getRecurringBills,
+  getRecurringSpendPortfolio,
   getUnifiedTransactions,
   getUpcomingMoney,
   ledgerTransactionsForDb,
   maskSensitive,
   tradingPerformanceSummary,
 } from './finance-store'
-import type { BudgetCategory, FinanceAccount } from './finance-store'
+import type { BudgetCategory, FinanceAccount, RecurringBill } from './finance-store'
 
 /**
  * Fresh `finance-store` module instance backed by a pure in-memory store — no
@@ -2957,6 +2958,97 @@ describe('PF review item 7: server-side dashboard derivations', () => {
     const [bill] = getRecurringBills(db)
     expect(bill.priceHikeStreak).toBe(1)
     expect(bill.sustainedPriceHike).toBe(false)
+  })
+
+  describe('getRecurringSpendPortfolio', () => {
+    function bill(over: Partial<RecurringBill> = {}): RecurringBill {
+      return {
+        vendor: 'netflix',
+        displayVendor: 'Netflix',
+        category: 'Subscriptions',
+        monthsSeen: 3,
+        averageAmount: 2_000,
+        loggedThisMonth: false,
+        thisMonthAmount: null,
+        drift: null,
+        priceHikeStreak: 0,
+        sustainedPriceHike: false,
+        ...over,
+      }
+    }
+
+    it('returns nulls when no bills are logged yet this month', () => {
+      const portfolio = getRecurringSpendPortfolio([
+        bill({ vendor: 'a', averageAmount: 2_000 }),
+        bill({ vendor: 'b', averageAmount: 3_000 }),
+      ])
+      expect(portfolio).toEqual({
+        billCount: 2,
+        totalAverageAmountLkr: 5_000,
+        loggedThisMonthAmountLkr: null,
+        loggedDrift: null,
+        billsLoggedThisMonth: 0,
+        sustainedPriceHikeCount: 0,
+      })
+    })
+
+    it('computes loggedDrift against only the logged bills own average, not every tracked bill', () => {
+      const portfolio = getRecurringSpendPortfolio([
+        // Logged, over its own 2,000 average.
+        bill({
+          vendor: 'a',
+          averageAmount: 2_000,
+          loggedThisMonth: true,
+          thisMonthAmount: 2_400,
+        }),
+        // Not logged yet — must NOT drag the drift ratio down just because
+        // its average is large and it contributed nothing this month.
+        bill({ vendor: 'b', averageAmount: 10_000 }),
+      ])
+      expect(portfolio.totalAverageAmountLkr).toBe(12_000) // informational, includes bill b
+      expect(portfolio.loggedThisMonthAmountLkr).toBe(2_400)
+      expect(portfolio.billsLoggedThisMonth).toBe(1)
+      expect(portfolio.loggedDrift).toBeCloseTo(0.2) // 2,400 vs bill a's own 2,000 average only
+    })
+
+    it('sums thisMonthAmount across multiple logged bills', () => {
+      const portfolio = getRecurringSpendPortfolio([
+        bill({
+          vendor: 'a',
+          averageAmount: 2_000,
+          loggedThisMonth: true,
+          thisMonthAmount: 2_000,
+        }),
+        bill({
+          vendor: 'b',
+          averageAmount: 3_000,
+          loggedThisMonth: true,
+          thisMonthAmount: 3_600,
+        }),
+      ])
+      expect(portfolio.loggedThisMonthAmountLkr).toBe(5_600)
+      expect(portfolio.loggedDrift).toBeCloseTo(0.12) // 5,600 vs 5,000 combined average
+    })
+
+    it('counts sustained price hikes regardless of whether logged this month', () => {
+      const portfolio = getRecurringSpendPortfolio([
+        bill({ vendor: 'a', sustainedPriceHike: true }),
+        bill({ vendor: 'b', sustainedPriceHike: true }),
+        bill({ vendor: 'c', sustainedPriceHike: false }),
+      ])
+      expect(portfolio.sustainedPriceHikeCount).toBe(2)
+    })
+
+    it('returns zeros for an empty bill list', () => {
+      expect(getRecurringSpendPortfolio([])).toEqual({
+        billCount: 0,
+        totalAverageAmountLkr: 0,
+        loggedThisMonthAmountLkr: null,
+        loggedDrift: null,
+        billsLoggedThisMonth: 0,
+        sustainedPriceHikeCount: 0,
+      })
+    })
   })
 
   it('getUpcomingMoney surfaces an FD maturing within 30 days and a due-soon payday', () => {

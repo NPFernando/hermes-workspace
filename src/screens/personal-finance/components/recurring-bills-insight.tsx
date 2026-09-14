@@ -126,6 +126,28 @@ export function RecurringBillsInsight({
           Detected from repeated vendors with a similar amount over the last 3
           months. Nothing is logged automatically.
         </p>
+        {(() => {
+          const portfolio = payload.recurringSpendPortfolio
+          if (
+            portfolio.loggedDrift === null ||
+            portfolio.loggedThisMonthAmountLkr === null
+          ) {
+            return null
+          }
+          const driftPct = Math.round(portfolio.loggedDrift * 100)
+          if (Math.abs(driftPct) < 5) return null
+          return (
+            <p
+              className={`text-xs font-medium ${driftPct > 0 ? 'text-[var(--theme-warning)]' : 'text-[var(--theme-success)]'}`}
+            >
+              Total recurring spend logged so far this month:{' '}
+              {formatLkr(portfolio.loggedThisMonthAmountLkr * fx, payload.baseCurrency)}{' '}
+              ({driftPct > 0 ? '+' : ''}
+              {driftPct}% vs those {portfolio.billsLoggedThisMonth} bills'
+              usual total)
+            </p>
+          )
+        })()}
         {unlogged.length > 1 && (
           <button
             type="button"
