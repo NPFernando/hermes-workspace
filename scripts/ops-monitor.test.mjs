@@ -28,4 +28,22 @@ describe('operational monitor', () => {
     const next = await collectOperationalStatus({ repo: root, statePath, exec: (file, args) => file === 'git' && args[0] === 'rev-parse' ? 'abc' : file === 'git' && args[0] === 'show' ? '100' : file === 'systemctl' ? 'MainPID=23\nExecMainStatus=0\nResult=success\nActiveState=active' : '' })
     expect(next.issues).toContainEqual(expect.objectContaining({ code: 'pid_changed', level: 'warning' }))
   })
+
+  it('reports uptime, memory, OOM evidence, deployment history, and service errors', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'hermes-ops-monitor-'))
+    const exec = (file, args) => {
+      if (file === 'git' && args[0] === 'rev-parse') return 'abc'
+      if (file === 'git' && args[0] === 'show') return '100'
+      if (file === 'systemctl') return 'MainPID=22\nExecMainStatus=0\nResult=success\nActiveState=active\nActiveEnterTimestamp=Thu 1970-01-01 00:00:01 UTC\nMemoryCurrent=12345\nOOMKilled=no'
+      if (file === 'journalctl' && args[0] === '-k') return 'kernel: Out of memory: Killed process 22'
+      if (file === 'journalctl' && args[1] === 'hermes-workspace-deploy.service') return 'deploy succeeded at commit abc'
+      if (file === 'journalctl') return 'workspace: error: test failure'
+      return ''
+    }
+    const status = await collectOperationalStatus({ repo: root, statePath: join(root, 'state.json'), now: 10_000, exec })
+    expect(status.service).toMatchObject({ residentMemoryKb: null, oomDetected: true })
+    expect(status.service.uptimeSeconds).toBeGreaterThan(0)
+    expect(status.deploymentHistory).toEqual(['deploy succeeded at commit abc'])
+    expect(status.issues.map((issue) => issue.code)).toEqual(expect.arrayContaining(['oom_event', 'service_errors']))
+  })
 })
