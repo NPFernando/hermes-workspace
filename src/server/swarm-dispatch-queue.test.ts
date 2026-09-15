@@ -1,19 +1,20 @@
 import { spawn } from 'node:child_process'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { fileURLToPath } from 'node:url'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { Pool } from 'pg'
 import {
+
   cancelSwarmDispatchQueueJob,
   closeSwarmDispatchQueuePool,
   enqueueSwarmDispatch,
   getSwarmDispatchQueueJob,
   getSwarmDispatchQueueSnapshot,
   retrySwarmDispatchQueueJob,
-  runSwarmDispatchQueueCycle,
-  SwarmDispatchQueueIdempotencyError,
-  type QueueProcessor,
-  SwarmDispatchQueueRetryError,
+  runSwarmDispatchQueueCycle
 } from './swarm-dispatch-queue'
+import type {QueueProcessor,
+  SwarmDispatchQueueIdempotencyError,
+  SwarmDispatchQueueRetryError} from './swarm-dispatch-queue';
 
 const database = process.env.SWARM_QUEUE_PG_DATABASE ?? ''
 const integrationRequested = process.env.RUN_SWARM_QUEUE_PG_INTEGRATION === '1'

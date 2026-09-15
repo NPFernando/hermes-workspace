@@ -20,7 +20,6 @@
     "test:e2e:finance": "node scripts/finance-browser-e2e.mjs",
     "test:e2e:agent-cockpit": "node scripts/agent-cockpit-browser-e2e.mjs",
     "test:pg-integration": "tsx scripts/finance-pg-integration.ts",
-    "test:pg-integration:isolated": "bash scripts/test-finance-pg-isolated.sh",
     "swarm-queue:provision": "node scripts/provision-swarm-dispatch-queue.mjs",
     "swarm-queue:migrate": "node scripts/migrate-swarm-dispatch-queue.mjs",
     "test:queue:isolated": "bash scripts/test-swarm-queue-isolated.sh",

@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import {
+  SwarmDispatchQueueRetryError,
+  retrySwarmDispatchQueueJob,
+} from '../../server/swarm-dispatch-queue'
+import { Route } from './swarm-dispatch'
+
 const state = vi.hoisted(() => ({ authenticated: false }))
 const queue = vi.hoisted(() => ({
   retry: vi.fn(),
@@ -45,12 +51,6 @@ vi.mock('../../server/swarm-dispatch-queue', () => {
     waitForSwarmDispatchQueueJob: vi.fn(),
   }
 })
-
-import { Route } from './swarm-dispatch'
-import {
-  retrySwarmDispatchQueueJob,
-  SwarmDispatchQueueRetryError,
-} from '../../server/swarm-dispatch-queue'
 
 type RouteHandlers = {
   GET: (ctx: { request: Request }) => Promise<Response>

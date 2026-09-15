@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { Route } from './workspace-session-health'
+
 const state = vi.hoisted(() => ({ authenticated: false }))
 const read = vi.hoisted(() => vi.fn())
 
@@ -9,8 +11,6 @@ vi.mock('../../server/auth-middleware', () => ({
 vi.mock('../../server/workspace-session-health', () => ({
   getWorkspaceSessionHealth: read,
 }))
-
-import { Route } from './workspace-session-health'
 
 type RouteHandlers = {
   GET: (ctx: { request: Request }) => Promise<Response>

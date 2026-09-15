@@ -3,10 +3,10 @@ import { mkdtempSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { ProviderUsageResult } from './provider-usage'
 import { recordAndReadProviderUsageHistory } from './provider-usage-history'
+import type { ProviderUsageResult } from './provider-usage'
 
-const directories: string[] = []
+const directories: Array<string> = []
 
 afterEach(() => {
   for (const directory of directories.splice(0)) {

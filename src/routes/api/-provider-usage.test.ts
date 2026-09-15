@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { Route } from './provider-usage'
+
 const state = vi.hoisted(() => ({ authenticated: false }))
 const getUsage = vi.hoisted(() => vi.fn())
 const getUsageHistory = vi.hoisted(() => vi.fn(() => []))
@@ -13,8 +15,6 @@ vi.mock('../../server/provider-usage', () => ({
 vi.mock('../../server/provider-usage-history', () => ({
   recordAndReadProviderUsageHistory: getUsageHistory,
 }))
-
-import { Route } from './provider-usage'
 
 type RouteHandlers = {
   GET: (ctx: { request: Request }) => Promise<Response>

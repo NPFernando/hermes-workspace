@@ -1,12 +1,15 @@
 // @vitest-environment jsdom
 import React, { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createRoot, type Root } from 'react-dom/client'
+import {  createRoot } from 'react-dom/client'
 import { AgentControlPlane } from './agent-control-plane'
+import type {Root} from 'react-dom/client';
 
-const { queryState } = vi.hoisted(() => ({
+const { queryState } = vi.hoisted<{
+  queryState: { data: Record<string, unknown>; keys: Array<string> }
+}>(() => ({
   queryState: {
-    data: {} as Record<string, unknown>,
+    data: {},
     keys: [] as Array<string>,
   },
 }))

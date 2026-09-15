@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { Route } from './harp-observability'
+
 const state = vi.hoisted(() => ({ authenticated: false }))
 const reads = vi.hoisted(() => ({
   observability: vi.fn(),
@@ -15,8 +17,6 @@ vi.mock('../../server/harp-observability', () => ({
 vi.mock('../../server/harp-memory-client', () => ({
   getHarpReadiness: reads.readiness,
 }))
-
-import { Route } from './harp-observability'
 
 type RouteHandlers = {
   GET: (ctx: { request: Request }) => Promise<Response>

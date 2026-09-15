@@ -1,18 +1,18 @@
 // @vitest-environment jsdom
 import React, { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import {  createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  lastSevenUtcDays,
-  providerFreshness,
-  quotaAlert,
-} from './ai-usage-panel'
 import { codexCreditsUsageLine } from '../../../server/provider-usage'
-import { AiUsagePanel } from './ai-usage-panel'
+import {
+  AiUsagePanel,
+  lastSevenUtcDays,
+  providerFreshness, quotaAlert
+} from './ai-usage-panel'
+import type {Root} from 'react-dom/client';
 
 const { queryState } = vi.hoisted(() => ({
   queryState: {
-    data: null as unknown,
+    data: null as Record<string, unknown> | null,
     isError: false,
     isFetching: false,
     isPending: false,
@@ -197,7 +197,7 @@ describe('AiUsagePanel rendered provider dashboard', () => {
 
     try {
       await renderPanel()
-      const text = document.body.textContent ?? ''
+      const text = document.body.textContent
       expect(text).toContain('Not configured')
       expect(text).toContain('No Claude credentials found.')
       expect(text).toContain('Source: Undocumented account endpoint')
