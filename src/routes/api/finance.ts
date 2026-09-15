@@ -47,7 +47,7 @@ import {
   recordNetWorthSnapshot,
   setKnownSenderPassword,
   setNonLiveExecutionMode,
-  snoozeFxExposureAlert,
+  snoozeAlert,
   storeIntelligenceRecords,
   tradingPerformanceSummary,
   updateExchangeRate,
@@ -2496,19 +2496,23 @@ export const Route = createFileRoute('/api/finance')({
               return json({ ok: false, error: message }, { status: 502 })
             }
           }
-          if (action === 'snooze_fx_exposure_alert') {
-            const holdingId =
-              typeof body.holdingId === 'string' ? body.holdingId : ''
-            if (!holdingId.trim()) {
+          if (action === 'snooze_alert') {
+            // Shared by every snoozable proactive alert (FX exposure,
+            // budget pace, tax-record completeness) — `key` is the alert's
+            // own dismissKey, `magnitude` is its dismissMagnitude at the
+            // moment of snoozing, both echoed straight from the payload the
+            // client already rendered rather than re-derived here.
+            const key = typeof body.key === 'string' ? body.key : ''
+            if (!key.trim()) {
               return json(
-                { ok: false, error: 'holdingId is required.' },
+                { ok: false, error: 'key is required.' },
                 { status: 400 },
               )
             }
-            const fxPctAtSnooze =
-              typeof body.fxPct === 'number' ? Math.abs(body.fxPct) : 0
+            const magnitude =
+              typeof body.magnitude === 'number' ? body.magnitude : 0
             const db = ensureFinanceStore()
-            snoozeFxExposureAlert(db, holdingId, fxPctAtSnooze)
+            snoozeAlert(db, key, magnitude)
             return json({ ok: true })
           }
           if (action === 'list_known_senders') {

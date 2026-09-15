@@ -2,9 +2,12 @@
 /**
  * FinanceAlertsCard — renders the aggregated alert list from financeAlerts()
  * / financeStorageAlerts(). Covers: empty state (renders nothing), plain
- * alerts with no dismissKey (no Snooze button), and the FX-exposure-style
- * snoozable alert (Snooze button POSTs snooze_fx_exposure_alert and
- * optimistically removes the alert from view).
+ * alerts with no dismissKey (no Snooze button), and a snoozable alert
+ * (Snooze button POSTs snooze_alert with the alert's dismissKey/
+ * dismissMagnitude and optimistically removes the alert from view). Any
+ * alert type can be snoozable now (FX exposure, budget pace, tax-record
+ * completeness) — this component treats them identically, so one fixture
+ * alert stands in for all of them.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import React from 'react'
@@ -73,7 +76,7 @@ describe('FinanceAlertsCard', () => {
     expect(container.textContent).toContain('Snooze')
   })
 
-  it('POSTs snooze_fx_exposure_alert with the holdingId and parsed fxPct, and removes the alert', async () => {
+  it('POSTs snooze_alert with the dismissKey/dismissMagnitude, and removes the alert', async () => {
     mockFetch()
     const { container } = await render(
       payload([
@@ -82,6 +85,7 @@ describe('FinanceAlertsCard', () => {
           title: 'FX exposure: AAPL',
           detail: 'USD has moved against this holding by 16.7% of its cost basis.',
           dismissKey: 'h-1',
+          dismissMagnitude: 16.7,
         },
       ]),
     )
@@ -94,13 +98,42 @@ describe('FinanceAlertsCard', () => {
       '/api/finance',
       expect.objectContaining({
         body: JSON.stringify({
-          action: 'snooze_fx_exposure_alert',
-          holdingId: 'h-1',
-          fxPct: 16.7,
+          action: 'snooze_alert',
+          key: 'h-1',
+          magnitude: 16.7,
         }),
       }),
     )
     expect(container.textContent).toBe('')
+  })
+
+  it('defaults magnitude to 0 when the alert has no dismissMagnitude', async () => {
+    mockFetch()
+    const { container } = await render(
+      payload([
+        {
+          level: 'info',
+          title: 'No tax record for 2026 yet',
+          detail: 'LKR 100,000 in taxable income logged.',
+          dismissKey: 'tax-record:2026',
+        },
+      ]),
+    )
+    const button = container.querySelector('button') as HTMLButtonElement
+    await React.act(async () => {
+      button.click()
+      await Promise.resolve()
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/finance',
+      expect.objectContaining({
+        body: JSON.stringify({
+          action: 'snooze_alert',
+          key: 'tax-record:2026',
+          magnitude: 0,
+        }),
+      }),
+    )
   })
 
   it('leaves other alerts visible after snoozing one', async () => {

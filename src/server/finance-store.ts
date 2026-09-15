@@ -3298,15 +3298,21 @@ function trailingMeanAndStdDev(
   return { mean, stdDev: Math.sqrt(variance) }
 }
 
+const TAX_RECORD_SNOOZE_REESCALATION_RATIO = 1.2
+
 function getTaxRecordAlerts(db: FinanceDatabase): Array<{
   level: 'info' | 'warning' | 'critical'
   title: string
   detail: string
+  dismissKey?: string
+  dismissMagnitude?: number
 }> {
   const alerts: Array<{
     level: 'info' | 'warning' | 'critical'
     title: string
     detail: string
+    dismissKey?: string
+    dismissMagnitude?: number
   }> = []
   const now = new Date()
   const currentYear = String(now.getFullYear())
@@ -3322,7 +3328,19 @@ function getTaxRecordAlerts(db: FinanceDatabase): Array<{
   const hasRecordThisYear = db.tax_records.some(
     (r) => r.taxYear === currentYear,
   )
-  if (taxableThisYear > 0 && !hasRecordThisYear) {
+  const taxRecordSnoozeKey = `tax-record:${currentYear}`
+  const taxRecordSnooze = readAlertSnoozes(
+    db.settings as Record<string, unknown>,
+  ).find((s) => s.key === taxRecordSnoozeKey)
+  const taxRecordSnoozed =
+    taxRecordSnooze &&
+    // Relative, not additive — taxableThisYear scales with income, so a
+    // fixed LKR re-escalation threshold would be meaningless across
+    // different income levels. Resurfaces once it's grown 20%+ past the
+    // snoozed figure.
+    taxableThisYear <
+      taxRecordSnooze.magnitudeAtSnooze * TAX_RECORD_SNOOZE_REESCALATION_RATIO
+  if (taxableThisYear > 0 && !hasRecordThisYear && !taxRecordSnoozed) {
     // Full-year projection with a confidence band, from completed months
     // only (now.getMonth() is 0-indexed, so it's exactly the count of
     // completed months before the current, partial one) — excludes the
@@ -3357,6 +3375,8 @@ function getTaxRecordAlerts(db: FinanceDatabase): Array<{
       level: 'info',
       title: `No tax record for ${currentYear} yet`,
       detail: `${lkr(taxableThisYear)} in taxable income logged for ${currentYear} so far, with no tax record on file yet.${projectionNote}`,
+      dismissKey: taxRecordSnoozeKey,
+      dismissMagnitude: taxableThisYear,
     })
   }
 
@@ -3388,11 +3408,21 @@ function getTaxRecordAlerts(db: FinanceDatabase): Array<{
         Math.floor(updated.getMonth() / 3) === quarterStartMonth / 3
       )
     })
-    if (taxableThisQuarter > 0 && !loggedThisQuarter) {
+    const quarterSnoozeKey = `tax-record-quarter:${now.getFullYear()}-Q${quarterIndex}`
+    const quarterSnooze = readAlertSnoozes(
+      db.settings as Record<string, unknown>,
+    ).find((s) => s.key === quarterSnoozeKey)
+    const quarterSnoozed =
+      quarterSnooze &&
+      taxableThisQuarter <
+        quarterSnooze.magnitudeAtSnooze * TAX_RECORD_SNOOZE_REESCALATION_RATIO
+    if (taxableThisQuarter > 0 && !loggedThisQuarter && !quarterSnoozed) {
       alerts.push({
         level: 'info',
         title: `Q${quarterIndex} tax record not yet logged`,
         detail: `${lkr(taxableThisQuarter)} in taxable income received this quarter (Q${quarterIndex} ${now.getFullYear()}, ${daysLeftInQuarter} days left) with nothing logged in tax records yet.`,
+        dismissKey: quarterSnoozeKey,
+        dismissMagnitude: taxableThisQuarter,
       })
     }
   }
@@ -3405,6 +3435,7 @@ export function financeAlerts(db: FinanceDatabase): Array<{
   title: string
   detail: string
   dismissKey?: string
+  dismissMagnitude?: number
 }> {
   const summary = financeSummary(db)
   const alerts: Array<{
@@ -3412,6 +3443,7 @@ export function financeAlerts(db: FinanceDatabase): Array<{
     title: string
     detail: string
     dismissKey?: string
+    dismissMagnitude?: number
   }> = []
   if (
     summary.totalExpensesBase > summary.totalIncomeBase &&
@@ -3500,7 +3532,18 @@ export function financeAlerts(db: FinanceDatabase): Array<{
     if (daysElapsed >= 5 && daysLeft >= 3) {
       const dailyRate = row.actual / daysElapsed
       const projectedTotal = dailyRate * daysInMonth
-      if (projectedTotal > row.budget * 1.1) {
+      const paceSnoozeKey = `budget-pace:${row.category}:${row.month}`
+      // Ratio, not the LKR total — scale-independent across categories with
+      // wildly different budget sizes. Resurfaces once the projection is
+      // 15 points-of-budget worse than when snoozed (e.g. snoozed at 120%
+      // of budget, resurfaces once it's projecting 135%+).
+      const paceMagnitude = (projectedTotal / row.budget) * 100
+      const paceSnooze = readAlertSnoozes(
+        db.settings as Record<string, unknown>,
+      ).find((s) => s.key === paceSnoozeKey)
+      const paceSnoozed =
+        paceSnooze && paceMagnitude < paceSnooze.magnitudeAtSnooze + 15
+      if (projectedTotal > row.budget * 1.1 && !paceSnoozed) {
         // Confidence band from the category's trailing 3 completed months
         // of actual spend — same population-stddev approach as the
         // net-worth forecast and savings-goal timeline, so a single flat
@@ -3532,6 +3575,8 @@ export function financeAlerts(db: FinanceDatabase): Array<{
           level: 'warning',
           title: `On pace to exceed budget: ${row.category}`,
           detail: `Spending ${lkr(row.actual)} in the first ${daysElapsed} days puts you on pace for ~${lkr(projectedTotal)} this month, vs a ${lkr(row.budget)} budget.${bandNote}`,
+          dismissKey: paceSnoozeKey,
+          dismissMagnitude: paceMagnitude,
         })
       }
     }
@@ -4683,48 +4728,52 @@ export function getFxGainLoss(db: FinanceDatabase): {
  * on) and LKR-denominated holdings (fxGainLkr is always 0 for those by
  * construction — no currency risk to report).
  */
-type FxExposureSnooze = {
-  holdingId: string
+type AlertSnooze = {
+  /** Caller-chosen, e.g. an FX holding id, `budget-pace:<category>:<month>`,
+   *  or `tax-record:<year>` — just needs to be stable across reloads and
+   *  unique per snoozable thing within its alert type. */
+  key: string
   snoozedAt: string
-  /** |fxPct| at the moment of snoozing — re-surfaces once the exposure has
-   *  worsened by SNOOZE_REESCALATION_PCT past this, so snoozing a holding
-   *  you've decided to hold through doesn't also hide a later, materially
-   *  worse move in the same direction. */
-  fxPctAtSnooze: number
+  /** Whatever the alert's own "how bad is this" number is (FX exposure %,
+   *  budget-pace's percent-of-budget-projected, tax-record's LKR taxable
+   *  income) at the moment of snoozing. Each call site defines its own
+   *  re-escalation rule against this — the storage is shared, the
+   *  "meaningfully worse" judgment isn't, since an FX percentage point and
+   *  an LKR amount aren't comparable on the same scale. */
+  magnitudeAtSnooze: number
 }
 
-function readFxExposureSnoozes(
+function readAlertSnoozes(
   settings: Record<string, unknown>,
-): Array<FxExposureSnooze> {
-  return Array.isArray(settings.fxExposureSnoozes)
-    ? (settings.fxExposureSnoozes as Array<FxExposureSnooze>)
+): Array<AlertSnooze> {
+  return Array.isArray(settings.alertSnoozes)
+    ? (settings.alertSnoozes as Array<AlertSnooze>)
     : []
 }
 
 /**
  * Records an explicit "I've seen this, don't keep telling me" on one
- * holding's FX exposure alert — mirrors dismissSenderCandidate's shape and
- * its non-permanence: the same holding resurfaces if the exposure gets
- * meaningfully worse, rather than a single click silencing it forever
- * while the currency keeps moving further against it.
+ * proactive alert — shared by every snoozable alert type (FX exposure,
+ * budget pace, tax-record completeness). Mirrors dismissSenderCandidate's
+ * non-permanence: each call site re-surfaces its own snoozed alert once
+ * the underlying number gets meaningfully worse, rather than one click
+ * silencing it forever while the real situation keeps deteriorating.
  */
-export function snoozeFxExposureAlert(
+export function snoozeAlert(
   db: FinanceDatabase,
-  holdingId: string,
-  fxPctAtSnooze: number,
+  key: string,
+  magnitudeAtSnooze: number,
 ): void {
   const settings = db.settings as Record<string, unknown>
-  const existing = readFxExposureSnoozes(settings).filter(
-    (s) => s.holdingId !== holdingId,
-  )
-  settings.fxExposureSnoozes = [
+  const existing = readAlertSnoozes(settings).filter((s) => s.key !== key)
+  settings.alertSnoozes = [
     ...existing,
-    { holdingId, snoozedAt: new Date().toISOString(), fxPctAtSnooze },
+    { key, snoozedAt: new Date().toISOString(), magnitudeAtSnooze },
   ]
   writeFinanceStore(db)
 }
 
-const SNOOZE_REESCALATION_PCT = 5
+const FX_SNOOZE_REESCALATION_PCT = 5
 
 export function getFxExposureAlerts(
   db: FinanceDatabase,
@@ -4733,9 +4782,10 @@ export function getFxExposureAlerts(
   level: 'info' | 'warning' | 'critical'
   title: string
   detail: string
-  /** Present only on snoozable alerts — the holding id to pass back to
-   *  snoozeFxExposureAlert(). Alert types with nothing to snooze omit it. */
+  /** Present only on snoozable alerts — the key to pass back to
+   *  snoozeAlert(). Alert types with nothing to snooze omit it. */
   dismissKey?: string
+  dismissMagnitude?: number
 }> {
   const { entries } = getFxGainLoss(db)
   const alerts: Array<{
@@ -4743,12 +4793,14 @@ export function getFxExposureAlerts(
     title: string
     detail: string
     dismissKey?: string
+    dismissMagnitude?: number
   }> = []
   const lkr = (n: number) => `LKR ${Math.round(n).toLocaleString('en-LK')}`
   const snoozed = new Map(
-    readFxExposureSnoozes(db.settings as Record<string, unknown>).map(
-      (s) => [s.holdingId, s],
-    ),
+    readAlertSnoozes(db.settings as Record<string, unknown>).map((s) => [
+      s.key,
+      s,
+    ]),
   )
 
   for (const entry of entries) {
@@ -4758,7 +4810,7 @@ export function getFxExposureAlerts(
     const snooze = snoozed.get(entry.id)
     if (
       snooze &&
-      Math.abs(fxPct) < snooze.fxPctAtSnooze + SNOOZE_REESCALATION_PCT
+      Math.abs(fxPct) < snooze.magnitudeAtSnooze + FX_SNOOZE_REESCALATION_PCT
     ) {
       continue
     }
@@ -4767,6 +4819,7 @@ export function getFxExposureAlerts(
       title: `FX exposure: ${entry.symbol}`,
       detail: `${entry.currency} has moved against this holding by ${Math.abs(fxPct).toFixed(1)}% of its cost basis since purchase (${lkr(entry.fxGainLkr)}), separate from how the asset itself performed.`,
       dismissKey: entry.id,
+      dismissMagnitude: Math.abs(fxPct),
     })
   }
   return alerts
