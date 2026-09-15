@@ -1713,6 +1713,12 @@ describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)',
     expect(db.finance_accounts[0]).toMatchObject({
       platform: 'Sampath   Bank',
       branchName: 'Colombo 03',
+      institutionId: db.financial_institutions[0].id,
+      branchId: db.financial_branches[0].id,
+    })
+    expect(db.fixed_deposits[0]).toMatchObject({
+      institutionId: db.financial_institutions[0].id,
+      branchId: db.financial_branches[0].id,
     })
 
     store.updateFinanceRecord('fixed_deposit', db.fixed_deposits[0].id, {
@@ -1724,6 +1730,7 @@ describe('income_sources / stock_holdings / fixed_deposits (add/update/delete)',
       'Colombo 03',
       'Kandy',
     ])
+    expect(db.fixed_deposits[0].branchId).toBe(db.financial_branches[1].id)
   })
 })
 
