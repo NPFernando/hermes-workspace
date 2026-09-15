@@ -1398,6 +1398,45 @@ describe('dismissSenderCandidate', () => {
   })
 })
 
+describe('listDismissedSenderCandidates / removeDismissedSenderCandidate', () => {
+  it('lists what dismissSenderCandidate persisted', async () => {
+    const store = await freshFinanceStore()
+    const db = store.readFinanceStore()
+    store.dismissSenderCandidate(db, 'billing@listed.test', 3)
+    expect(store.listDismissedSenderCandidates(store.readFinanceStore())).toEqual([
+      expect.objectContaining({
+        senderAddress: 'billing@listed.test',
+        occurrencesAtDismissal: 3,
+      }),
+    ])
+  })
+
+  it('removes only the named dismissal, leaving others untouched', async () => {
+    const store = await freshFinanceStore()
+    const db1 = store.readFinanceStore()
+    store.dismissSenderCandidate(db1, 'billing@keep.test', 2)
+    const db2 = store.readFinanceStore()
+    store.dismissSenderCandidate(db2, 'billing@remove.test', 2)
+    const db3 = store.readFinanceStore()
+    store.removeDismissedSenderCandidate(db3, 'billing@remove.test')
+    const remaining = store.listDismissedSenderCandidates(
+      store.readFinanceStore(),
+    )
+    expect(remaining.map((d) => d.senderAddress)).toEqual([
+      'billing@keep.test',
+    ])
+  })
+
+  it('is a no-op when the key does not exist', async () => {
+    const store = await freshFinanceStore()
+    const db = store.readFinanceStore()
+    store.removeDismissedSenderCandidate(db, 'billing@never-dismissed.test')
+    expect(store.listDismissedSenderCandidates(store.readFinanceStore())).toEqual(
+      [],
+    )
+  })
+})
+
 describe('recordGmailSyncError', () => {
   it('stores the failure onto settings.gmailIngest.lastError', async () => {
     const store = await freshFinanceStore()
@@ -4182,6 +4221,36 @@ describe('snoozeAlert', () => {
     const snoozes = (after.settings as Record<string, unknown>)
       .alertSnoozes as Array<{ key: string }>
     expect(snoozes.map((s) => s.key).sort()).toEqual(['key-a', 'key-b'])
+  })
+})
+
+describe('listAlertSnoozes / removeAlertSnooze', () => {
+  it('lists what snoozeAlert persisted', async () => {
+    const store = await freshFinanceStore()
+    const db = store.readFinanceStore()
+    store.snoozeAlert(db, 'h-listed', 7)
+    expect(store.listAlertSnoozes(store.readFinanceStore())).toEqual([
+      expect.objectContaining({ key: 'h-listed', magnitudeAtSnooze: 7 }),
+    ])
+  })
+
+  it('removes only the named snooze, leaving others untouched', async () => {
+    const store = await freshFinanceStore()
+    const db1 = store.readFinanceStore()
+    store.snoozeAlert(db1, 'key-keep', 1)
+    const db2 = store.readFinanceStore()
+    store.snoozeAlert(db2, 'key-remove', 2)
+    const db3 = store.readFinanceStore()
+    store.removeAlertSnooze(db3, 'key-remove')
+    const remaining = store.listAlertSnoozes(store.readFinanceStore())
+    expect(remaining.map((s) => s.key)).toEqual(['key-keep'])
+  })
+
+  it('is a no-op when the key does not exist', async () => {
+    const store = await freshFinanceStore()
+    const db = store.readFinanceStore()
+    store.removeAlertSnooze(db, 'never-snoozed')
+    expect(store.listAlertSnoozes(store.readFinanceStore())).toEqual([])
   })
 })
 

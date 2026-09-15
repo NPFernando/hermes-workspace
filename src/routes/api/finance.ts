@@ -38,6 +38,8 @@ import {
   getUnregisteredSenderCandidates,
   getUpcomingMoney,
   ledgerTransactionsForDb,
+  listAlertSnoozes,
+  listDismissedSenderCandidates,
   listKnownSenders,
   listPendingIngestions,
   maskSensitive,
@@ -45,6 +47,8 @@ import {
   recordCategoryCorrection,
   recordGmailSyncError,
   recordNetWorthSnapshot,
+  removeAlertSnooze,
+  removeDismissedSenderCandidate,
   setKnownSenderPassword,
   setNonLiveExecutionMode,
   snoozeAlert,
@@ -2513,6 +2517,41 @@ export const Route = createFileRoute('/api/finance')({
               typeof body.magnitude === 'number' ? body.magnitude : 0
             const db = ensureFinanceStore()
             snoozeAlert(db, key, magnitude)
+            return json({ ok: true })
+          }
+          if (action === 'list_snoozes') {
+            // One combined listing for the snooze/dismissal management UI —
+            // the two mechanisms (generic alert snoozes, sender-candidate
+            // dismissals) have separate storage but the UI treats them as
+            // one "things I've silenced" list.
+            const db = ensureFinanceStore()
+            return json({
+              ok: true,
+              alertSnoozes: listAlertSnoozes(db),
+              dismissedSenderCandidates: listDismissedSenderCandidates(db),
+            })
+          }
+          if (action === 'remove_alert_snooze') {
+            const key = typeof body.key === 'string' ? body.key : ''
+            if (!key.trim()) {
+              return json(
+                { ok: false, error: 'key is required.' },
+                { status: 400 },
+              )
+            }
+            removeAlertSnooze(ensureFinanceStore(), key)
+            return json({ ok: true })
+          }
+          if (action === 'remove_dismissed_sender_candidate') {
+            const senderAddress =
+              typeof body.senderAddress === 'string' ? body.senderAddress : ''
+            if (!senderAddress.trim()) {
+              return json(
+                { ok: false, error: 'senderAddress is required.' },
+                { status: 400 },
+              )
+            }
+            removeDismissedSenderCandidate(ensureFinanceStore(), senderAddress)
             return json({ ok: true })
           }
           if (action === 'list_known_senders') {

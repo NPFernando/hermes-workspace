@@ -2372,13 +2372,42 @@ export type UnregisteredSenderCandidate = {
  * registered, matchKnownSender() would tag future emails from it, so it
  * naturally drops off this list on its own.
  */
-type DismissedSenderCandidate = {
+export type DismissedSenderCandidate = {
   senderAddress: string
   dismissedAt: string
   /** occurrences at the moment of dismissal — if it keeps showing up well
    *  past that (see REDISMISS_GROWTH_THRESHOLD below), it resurfaces rather
    *  than staying hidden forever on the strength of a single old decision. */
   occurrencesAtDismissal: number
+}
+
+/** Read-only listing for the snooze/dismissal management UI — mirrors
+ *  readDismissedSenderCandidates but takes db (not settings) for
+ *  consistency with every other public list* accessor in this file. */
+export function listDismissedSenderCandidates(
+  db: FinanceDatabase,
+): Array<DismissedSenderCandidate> {
+  return readDismissedSenderCandidates(db.settings)
+}
+
+/** Un-dismisses a sender candidate early — the candidate resurfaces on the
+ *  next getUnregisteredSenderCandidates() call regardless of whether its
+ *  occurrences have grown, same as if it had never been dismissed. */
+export function removeDismissedSenderCandidate(
+  db: FinanceDatabase,
+  senderAddress: string,
+): void {
+  const settings = db.settings as Record<string, unknown>
+  const gmailIngest = (
+    settings.gmailIngest && typeof settings.gmailIngest === 'object'
+      ? { ...(settings.gmailIngest as Record<string, unknown>) }
+      : {}
+  ) as Record<string, unknown>
+  gmailIngest.dismissedSenderCandidates = readDismissedSenderCandidates(
+    settings,
+  ).filter((d) => d.senderAddress !== senderAddress)
+  settings.gmailIngest = gmailIngest
+  writeFinanceStore(db)
 }
 
 function readDismissedSenderCandidates(
@@ -4728,7 +4757,7 @@ export function getFxGainLoss(db: FinanceDatabase): {
  * on) and LKR-denominated holdings (fxGainLkr is always 0 for those by
  * construction — no currency risk to report).
  */
-type AlertSnooze = {
+export type AlertSnooze = {
   /** Caller-chosen, e.g. an FX holding id, `budget-pace:<category>:<month>`,
    *  or `tax-record:<year>` — just needs to be stable across reloads and
    *  unique per snoozable thing within its alert type. */
@@ -4749,6 +4778,22 @@ function readAlertSnoozes(
   return Array.isArray(settings.alertSnoozes)
     ? (settings.alertSnoozes as Array<AlertSnooze>)
     : []
+}
+
+/** Read-only listing for the snooze/dismissal management UI. */
+export function listAlertSnoozes(db: FinanceDatabase): Array<AlertSnooze> {
+  return readAlertSnoozes(db.settings)
+}
+
+/** Un-snoozes an alert early — it resurfaces on the next financeAlerts()
+ *  call regardless of whether its magnitude has grown, same as if it had
+ *  never been snoozed. */
+export function removeAlertSnooze(db: FinanceDatabase, key: string): void {
+  const settings = db.settings as Record<string, unknown>
+  settings.alertSnoozes = readAlertSnoozes(settings).filter(
+    (s) => s.key !== key,
+  )
+  writeFinanceStore(db)
 }
 
 /**
