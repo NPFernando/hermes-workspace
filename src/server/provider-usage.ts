@@ -13,6 +13,8 @@ import { execSync } from 'node:child_process'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { safeErrorMessage } from './rate-limit'
+import { buildSharedUsageBudget } from './usage-budget'
+import type { SharedUsageBudget } from './usage-budget'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,6 +50,7 @@ export type ProviderUsageResponse = {
   ok: boolean
   updatedAt: number
   providers: Array<ProviderUsageResult>
+  sharedBudget: SharedUsageBudget
   error?: string
 }
 
@@ -1241,6 +1244,7 @@ export async function getProviderUsage(
     ok: true,
     updatedAt: now,
     providers: activeProviders,
+    sharedBudget: buildSharedUsageBudget(activeProviders),
   }
 
   cache = { timestamp: now, payload }
