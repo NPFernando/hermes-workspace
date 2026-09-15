@@ -17,6 +17,16 @@ export type SavingsGoalTimeline =
       projectedDate: string
       requiredMonthlyContribution: number | null
       targetDateMonths: number | null
+      /** Set only when a volatilityRatio was passed in — how many months
+       *  sooner/later the goal might land if the stated monthlyContribution
+       *  runs volatilityRatio higher/lower some months, same variability
+       *  the net-worth forecast's ±1σ band already surfaces elsewhere.
+       *  Not shown when the goal is already this month (monthsRemaining=0)
+       *  or the pessimistic contribution would be non-positive. */
+      optimisticMonthsRemaining: number | null
+      optimisticDate: string | null
+      pessimisticMonthsRemaining: number | null
+      pessimisticDate: string | null
     }
 
 function addCalendarMonths(date: Date, months: number): Date {
@@ -49,10 +59,17 @@ function monthsUntil(targetDate: string, today: Date): number | null {
   )
 }
 
-/** Straight-line savings estimate; intentionally assumes no interest or investment return. */
+/** Straight-line savings estimate; intentionally assumes no interest or
+ *  investment return. `volatilityRatio` (e.g. 0.15 = ±15%) is optional —
+ *  when given (the caller's own trailing-months savings stddev / mean,
+ *  same figure the net-worth forecast's ±1σ band is built from), the
+ *  'projected' result also carries an optimistic/pessimistic pair showing
+ *  how much the payoff date could realistically shift, instead of implying
+ *  the stated monthlyContribution will land exactly every month. */
 export function savingsGoalTimeline(
   goal: SavingsGoalTimelineInput,
   today = new Date(),
+  volatilityRatio = 0,
 ): SavingsGoalTimeline {
   if (goal.status === 'achieved') return { state: 'achieved' }
   if (goal.status === 'paused' || goal.status === 'abandoned') {
@@ -87,11 +104,43 @@ export function savingsGoalTimeline(
         ? remaining
         : null
 
+  // Only floor at 0 (a negative ratio would make "optimistic" the slower
+  // one, backwards) — deliberately NOT capped at the top: a real trailing-
+  // months stddev can exceed the mean (a genuinely noisy 2-3 month
+  // history), and the ratio needs to be able to reach/exceed 1 for the
+  // slowerContribution <= 0 guard below to ever actually do anything.
+  const clampedRatio = Math.max(0, volatilityRatio)
+  let optimisticMonthsRemaining: number | null = null
+  let optimisticDate: string | null = null
+  let pessimisticMonthsRemaining: number | null = null
+  let pessimisticDate: string | null = null
+  if (clampedRatio > 0) {
+    const fasterContribution = monthlyContribution * (1 + clampedRatio)
+    optimisticMonthsRemaining = Math.ceil(remaining / fasterContribution)
+    optimisticDate = addCalendarMonths(today, optimisticMonthsRemaining)
+      .toISOString()
+      .slice(0, 10)
+    // A ratio >= 1 would make the "slower" contribution zero or negative —
+    // there's no meaningful payoff date for "might save nothing some
+    // months", so pessimistic stays null rather than showing Infinity.
+    const slowerContribution = monthlyContribution * (1 - clampedRatio)
+    if (slowerContribution > 0) {
+      pessimisticMonthsRemaining = Math.ceil(remaining / slowerContribution)
+      pessimisticDate = addCalendarMonths(today, pessimisticMonthsRemaining)
+        .toISOString()
+        .slice(0, 10)
+    }
+  }
+
   return {
     state: 'projected',
     monthsRemaining,
     projectedDate,
     requiredMonthlyContribution,
     targetDateMonths,
+    optimisticMonthsRemaining,
+    optimisticDate,
+    pessimisticMonthsRemaining,
+    pessimisticDate,
   }
 }
