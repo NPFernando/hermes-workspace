@@ -1,0 +1,62 @@
+name: Scheduled Dependency Audit
+
+on:
+  schedule:
+    - cron: '30 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Audit and report dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Run high-severity audit
+        id: audit
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          pnpm audit --audit-level=high | tee dependency-audit.txt
+
+      - name: Capture outdated dependency report
+        continue-on-error: true
+        run: pnpm outdated --format json > dependency-outdated.json
+
+      - name: Upload dependency reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audit-${{ github.run_number }}
+          path: |
+            dependency-audit.txt
+            dependency-outdated.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Summarize audit status
+        if: always()
+        run: |
+          if [ "${{ steps.audit.outcome }}" = "failure" ]; then
+            echo "High-severity dependency findings were reported in the uploaded artifact."
+          else
+            echo "No high-severity dependency findings were reported."
+          fi
