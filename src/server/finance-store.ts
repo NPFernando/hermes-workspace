@@ -3349,6 +3349,7 @@ export function financeAlerts(db: FinanceDatabase): Array<{
     }
   }
   alerts.push(...getTaxRecordAlerts(db))
+  alerts.push(...getFxExposureAlerts(db))
   return alerts
 }
 
@@ -4332,6 +4333,10 @@ export type FxGainLossEntry = {
   fxGainLkr: number
   totalReturnLkr: number
   insufficientHistory: boolean
+  /** LKR cost basis at buyDate — the denominator getFxExposureAlerts uses
+   *  to turn fxGainLkr into a percentage. 0 for insufficientHistory rows
+   *  (no reliable conversion was possible). */
+  costLkrAtBuy: number
 }
 
 /**
@@ -4417,6 +4422,7 @@ export function getFxGainLoss(db: FinanceDatabase): {
         fxGainLkr: 0,
         totalReturnLkr: returnLkr,
         insufficientHistory: false,
+        costLkrAtBuy: costNative,
       }
     }
 
@@ -4447,6 +4453,7 @@ export function getFxGainLoss(db: FinanceDatabase): {
         fxGainLkr: 0,
         totalReturnLkr: 0,
         insufficientHistory: true,
+        costLkrAtBuy: 0,
       }
     }
 
@@ -4464,6 +4471,7 @@ export function getFxGainLoss(db: FinanceDatabase): {
       fxGainLkr,
       totalReturnLkr: returnLkr,
       insufficientHistory: false,
+      costLkrAtBuy,
     }
   })
 
@@ -4474,6 +4482,42 @@ export function getFxGainLoss(db: FinanceDatabase): {
     totalReturnLkr,
     excludedCount,
   }
+}
+
+/**
+ * Portfolio-level early warning for currency risk — getFxGainLoss already
+ * splits each holding's return into asset vs. FX movement, but only shows
+ * it after the fact on the FX Gain/Loss card. This surfaces it proactively,
+ * same "catch it early" shape as the budget pace-alert: a holding whose FX
+ * component has moved against it by more than thresholdPct of its own cost
+ * basis gets flagged, rather than only being visible to someone who opens
+ * that card. Excludes insufficientHistory rows (nothing reliable to alert
+ * on) and LKR-denominated holdings (fxGainLkr is always 0 for those by
+ * construction — no currency risk to report).
+ */
+export function getFxExposureAlerts(
+  db: FinanceDatabase,
+  thresholdPct = 10,
+): Array<{ level: 'info' | 'warning' | 'critical'; title: string; detail: string }> {
+  const { entries } = getFxGainLoss(db)
+  const alerts: Array<{
+    level: 'info' | 'warning' | 'critical'
+    title: string
+    detail: string
+  }> = []
+  const lkr = (n: number) => `LKR ${Math.round(n).toLocaleString('en-LK')}`
+
+  for (const entry of entries) {
+    if (entry.insufficientHistory || entry.costLkrAtBuy <= 0) continue
+    const fxPct = (entry.fxGainLkr / entry.costLkrAtBuy) * 100
+    if (fxPct >= -thresholdPct) continue
+    alerts.push({
+      level: 'warning',
+      title: `FX exposure: ${entry.symbol}`,
+      detail: `${entry.currency} has moved against this holding by ${Math.abs(fxPct).toFixed(1)}% of its cost basis since purchase (${lkr(entry.fxGainLkr)}), separate from how the asset itself performed.`,
+    })
+  }
+  return alerts
 }
 
 /**

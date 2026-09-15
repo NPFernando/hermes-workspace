@@ -19,6 +19,7 @@ import {
   getBudgetVsActual,
   getCurrencyExposure,
   getFinanceTrends,
+  getFxExposureAlerts,
   getFxGainLoss,
   getMonthlySummary,
   getNetWorthForecast,
@@ -3871,6 +3872,90 @@ describe('getFxGainLoss', () => {
     expect(result.excludedCount).toBe(1)
     expect(result.totalAssetGainLkr).toBe(2 * (150 - 100) * 300)
     expect(result.totalFxGainLkr).toBe(0)
+  })
+})
+
+describe('getFxExposureAlerts', () => {
+  function holding(over: Partial<Record<string, unknown>> = {}) {
+    return {
+      id: 'h1',
+      symbol: 'AAPL',
+      platform: 'IBKR',
+      quantity: 2,
+      buyPrice: 100,
+      buyDate: '2026-01-01',
+      currency: 'USD' as const,
+      lastKnownPrice: 150,
+      priceSource: 'manual' as const,
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      ...over,
+    }
+  }
+  function rate(rateValue: number, date: string) {
+    return {
+      base: 'USD' as const,
+      target: 'LKR' as const,
+      rate: rateValue,
+      date,
+      updatedAt: `${date}T00:00:00.000Z`,
+    }
+  }
+
+  it('flags a holding whose FX component moved against it beyond the threshold', () => {
+    const db = createEmptyFinanceDatabase()
+    // costNative = 100*2 = 200. fxGainLkr = 200 * (rateNow - rateAtBuy).
+    // Rate dropped 300 -> 250: fxGainLkr = 200 * (250-300) = -10,000.
+    // costLkrAtBuy = 200*300 = 60,000. fxPct = -10,000/60,000 = -16.67%.
+    db.exchange_rates.push(rate(300, '2026-01-01'), rate(250, '2026-06-01'))
+    db.stock_holdings.push(holding())
+
+    const alerts = getFxExposureAlerts(db)
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0]).toMatchObject({
+      level: 'warning',
+      title: 'FX exposure: AAPL',
+    })
+    expect(alerts[0].detail).toContain('USD')
+    expect(alerts[0].detail).toContain('16.7%')
+  })
+
+  it('stays silent when the FX move is within the threshold', () => {
+    const db = createEmptyFinanceDatabase()
+    // Rate 300 -> 295: fxGainLkr = 200*(295-300) = -1,000. costLkrAtBuy = 60,000.
+    // fxPct = -1.67%, well under the default 10% threshold.
+    db.exchange_rates.push(rate(300, '2026-01-01'), rate(295, '2026-06-01'))
+    db.stock_holdings.push(holding())
+    expect(getFxExposureAlerts(db)).toEqual([])
+  })
+
+  it('stays silent when FX moved in the holding’s favor, only a loss direction is flagged', () => {
+    const db = createEmptyFinanceDatabase()
+    db.exchange_rates.push(rate(300, '2026-01-01'), rate(400, '2026-06-01'))
+    db.stock_holdings.push(holding())
+    expect(getFxExposureAlerts(db)).toEqual([])
+  })
+
+  it('never flags an LKR-denominated holding (fxGainLkr is always 0 by construction)', () => {
+    const db = createEmptyFinanceDatabase()
+    db.stock_holdings.push(holding({ currency: 'LKR' }))
+    expect(getFxExposureAlerts(db)).toEqual([])
+  })
+
+  it('never flags a holding with insufficientHistory (no exchange rate on file)', () => {
+    const db = createEmptyFinanceDatabase()
+    db.stock_holdings.push(holding())
+    expect(getFxExposureAlerts(db)).toEqual([])
+  })
+
+  it('respects a custom thresholdPct', () => {
+    const db = createEmptyFinanceDatabase()
+    // fxPct = -1.67%, as in the "stays silent" case above.
+    db.exchange_rates.push(rate(300, '2026-01-01'), rate(295, '2026-06-01'))
+    db.stock_holdings.push(holding())
+    expect(getFxExposureAlerts(db, 1)).toHaveLength(1)
+    expect(getFxExposureAlerts(db, 10)).toEqual([])
   })
 })
 
