@@ -47,6 +47,7 @@ export function FixedDepositsPanel({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const [bankName, setBankName] = useState('')
+  const [branchName, setBranchName] = useState('')
   const [principal, setPrincipal] = useState('')
   const [currency, setCurrency] = useState('LKR')
   const [interestRatePct, setInterestRatePct] = useState('')
@@ -70,6 +71,7 @@ export function FixedDepositsPanel({
         kind: 'fixed_deposit',
         payload: {
           bankName: bankName.trim(),
+          branchName: branchName.trim() || undefined,
           principal: Number(principal) || 0,
           currency,
           interestRatePct: Number(interestRatePct) || 0,
@@ -83,6 +85,7 @@ export function FixedDepositsPanel({
     )
     if (data) {
       setBankName('')
+      setBranchName('')
       setPrincipal('')
       setInterestRatePct('')
       setMaturityDate('')
@@ -123,6 +126,34 @@ export function FixedDepositsPanel({
   }
 
   const deposits = payload.data.fixed_deposits
+  const knownInstitutionNames = [
+    ...payload.data.financial_institutions.map((item) => stringField(item, 'name')),
+    ...payload.data.finance_accounts
+      .filter((item) => stringField(item, 'type') === 'bank')
+      .map((item) => stringField(item, 'platform')),
+    ...deposits.map((item) => stringField(item, 'bankName')),
+  ].filter(Boolean)
+  const uniqueInstitutionNames = [...new Map(
+    knownInstitutionNames.map((value) => [value.trim().replace(/\s+/g, ' ').toLocaleLowerCase(), value.trim()]),
+  ).values()]
+  const normalizedBankName = bankName.trim().replace(/\s+/g, ' ').toLocaleLowerCase()
+  const selectedInstitution = payload.data.financial_institutions.find(
+    (item) => stringField(item, 'normalizedName') === normalizedBankName,
+  )
+  const catalogBranches = selectedInstitution
+    ? payload.data.financial_branches.filter(
+        (item) => stringField(item, 'institutionId') === stringField(selectedInstitution, 'id'),
+      ).map((item) => stringField(item, 'name'))
+    : []
+  const legacyBranches = [
+    ...payload.data.finance_accounts
+      .filter((item) => stringField(item, 'platform').trim().replace(/\s+/g, ' ').toLocaleLowerCase() === normalizedBankName)
+      .map((item) => stringField(item, 'branchName')),
+    ...deposits
+      .filter((item) => stringField(item, 'bankName').trim().replace(/\s+/g, ' ').toLocaleLowerCase() === normalizedBankName)
+      .map((item) => stringField(item, 'branchName')),
+  ].filter(Boolean)
+  const branchOptions = [...new Set([...catalogBranches, ...legacyBranches])]
 
   return (
     <section className="mt-6 rounded-3xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/70 p-5">
@@ -138,8 +169,23 @@ export function FixedDepositsPanel({
           placeholder="Bank name"
           value={bankName}
           onChange={(e) => setBankName(e.target.value)}
+          list="finance-fd-institution-options"
           className={inputClass}
         />
+        <datalist id="finance-fd-institution-options">
+          {uniqueInstitutionNames.map((institution) => <option key={institution} value={institution} />)}
+        </datalist>
+        <input
+          type="text"
+          placeholder="Branch (optional)"
+          value={branchName}
+          onChange={(e) => setBranchName(e.target.value)}
+          list="finance-fd-branch-options"
+          className={inputClass}
+        />
+        <datalist id="finance-fd-branch-options">
+          {branchOptions.map((branch) => <option key={branch} value={branch} />)}
+        </datalist>
         <input
           type="number"
           placeholder="Principal"
@@ -228,6 +274,7 @@ export function FixedDepositsPanel({
               <div>
                 <span className="font-medium text-[var(--theme-text)]">
                   {stringField(fd, 'bankName')}
+                  {stringField(fd, 'branchName') && ` · ${stringField(fd, 'branchName')} branch`}
                 </span>{' '}
                 <span className="text-xs text-[var(--theme-muted)]">
                   · {formatMoney(numberField(fd, 'principal'), fdCurrency)} ·{' '}

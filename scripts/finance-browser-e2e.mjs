@@ -163,6 +163,8 @@ const financePayload = {
         balance: 100_000,
       },
     ],
+    financial_institutions: [],
+    financial_branches: [],
     income_records: [],
     expense_records: [],
     transfers: [],
