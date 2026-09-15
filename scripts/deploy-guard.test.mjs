@@ -1,16 +1,32 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { chmodSync, cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, it } from 'vitest'
+import { afterEach, describe, it } from 'vitest'
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url))
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
 
+// Every fixture() call leaked its mkdtempSync() directory permanently — no
+// cleanup existed anywhere in this file. Found via 84 unremoved
+// /tmp/hermes-deploy-guard-* directories accumulated in under an hour, one
+// per test run (each run creates 2, one per `it` below). afterEach here
+// removes whatever the just-finished test created, regardless of which
+// `it` ran or whether it threw.
+const fixtureRoots = []
+
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'hermes-deploy-guard-'))
+  fixtureRoots.push(root)
   git(root, 'init', '-q', '-b', 'main')
   git(root, 'config', 'user.email', 'test@example.invalid')
   git(root, 'config', 'user.name', 'Deploy Guard Test')
@@ -43,6 +59,12 @@ function fixture() {
 }
 
 const run = (f, ...args) => spawnSync('bash', [f.script, ...args], { cwd: f.root, encoding: 'utf8', env: f.env })
+
+afterEach(() => {
+  while (fixtureRoots.length > 0) {
+    rmSync(fixtureRoots.pop(), { recursive: true, force: true })
+  }
+})
 
 describe('deploy local-ahead guard', () => {
   it('rejects local-ahead releases without explicit approval', () => {
