@@ -4445,6 +4445,51 @@ describe('financeAlerts — category budget thresholds', () => {
       )
       expect(has).toBe(expectedPaceAlert(30_000, 24_000))
     })
+
+    it("adds a confidence band from the category's trailing 3 months of actual spend", () => {
+      const db = createEmptyFinanceDatabase()
+      seedBudget(db, { budget: 10_000, spent: 8_000 })
+      const now = new Date()
+      for (let i = 1; i <= 3; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 15)
+        db.expense_records.push({
+          id: `e-groc-trailing-${i}`,
+          date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-15`,
+          vendor: 'Keells',
+          category: 'Groceries',
+          currency: 'LKR',
+          amount: 9_000 + i * 500,
+          convertedLkrAmount: 9_000 + i * 500,
+          recurring: false,
+          workRelated: false,
+          taxDeductiblePossible: false,
+          source: 't',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        })
+      }
+      const alert = financeAlerts(db).find(
+        (a) => a.title === 'On pace to exceed budget: Groceries',
+      )
+      if (expectedPaceAlert(10_000, 8_000)) {
+        expect(alert?.detail).toContain('typically')
+      } else {
+        expect(alert).toBeUndefined()
+      }
+    })
+
+    it('omits the confidence band when the category has no trailing spend history', () => {
+      const db = createEmptyFinanceDatabase()
+      seedBudget(db, { budget: 10_000, spent: 8_000 })
+      const alert = financeAlerts(db).find(
+        (a) => a.title === 'On pace to exceed budget: Groceries',
+      )
+      if (expectedPaceAlert(10_000, 8_000)) {
+        expect(alert?.detail).not.toContain('typically')
+      } else {
+        expect(alert).toBeUndefined()
+      }
+    })
   })
 })
 
@@ -4494,6 +4539,38 @@ describe('financeAlerts — tax record completeness (getTaxRecordAlerts)', () =>
     )
     expect(alert).toBeDefined()
     expect(alert?.level).toBe('info')
+  })
+
+  it('projects a full-year confidence band once at least 2 completed months have taxable income', () => {
+    const now = new Date()
+    // Needs 2+ completed months before "now" to say anything about spread —
+    // skip on a run where the calendar itself can't provide that (Jan/Feb),
+    // same "don't assert what the date can't support" approach the
+    // pace-alert tests above use via expectedPaceAlert.
+    if (now.getMonth() < 2) return
+    const db = createEmptyFinanceDatabase()
+    const year = new Date().getFullYear()
+    db.income_records.push(taxableIncome(`${year}-01-15`, 100_000))
+    db.income_records.push(taxableIncome(`${year}-02-15`, 120_000))
+    const alert = financeAlerts(db).find(
+      (a) => a.title === `No tax record for ${year} yet`,
+    )
+    expect(alert?.detail).toContain('projects to roughly')
+  })
+
+  it('omits the confidence band when no completed month has taxable income yet', () => {
+    const db = createEmptyFinanceDatabase()
+    const year = new Date().getFullYear()
+    const now = new Date()
+    const currentMonth = String(now.getMonth() + 1).padStart(2, '0')
+    // Income only in the current, still-in-progress month — every completed
+    // month before it is genuinely zero, so there's no real spread to band.
+    db.income_records.push(taxableIncome(`${year}-${currentMonth}-05`, 100_000))
+    const alert = financeAlerts(db).find(
+      (a) => a.title === `No tax record for ${year} yet`,
+    )
+    expect(alert).toBeDefined()
+    expect(alert?.detail).not.toContain('projects to roughly')
   })
 
   it('stays silent for the year once a tax record exists for it', () => {

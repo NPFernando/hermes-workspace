@@ -3184,6 +3184,45 @@ export function recordNetWorthSnapshot(
  * for it, either for the whole year or (more urgently) within the current
  * calendar quarter as it's about to close.
  */
+/**
+ * Actual category spend for one past month, without requiring a
+ * budget_categories entry for it — getBudgetVsActual returns null when no
+ * budget was ever set for that month, which is common for prior months and
+ * would make it useless for a volatility lookback.
+ */
+function actualCategorySpendForMonth(
+  db: FinanceDatabase,
+  category: string,
+  year: number,
+  month: number,
+): number {
+  let actual = 0
+  for (const exp of db.expense_records) {
+    if (!includeInTotals(exp)) continue
+    const dateInfo = parseDate(exp.date)
+    if (!dateInfo || dateInfo.year !== year || dateInfo.month !== month)
+      continue
+    for (const part of expenseCategoryBreakdown(exp)) {
+      if (part.category === category) actual += part.lkr
+    }
+  }
+  return actual
+}
+
+/** Population mean + stddev over a trailing window, or null if there isn't
+ *  enough history to trust a spread (same "need real data before showing a
+ *  band" caution as the net-worth forecast and savings-goal timeline). */
+function trailingMeanAndStdDev(
+  values: Array<number>,
+  minSamples = 2,
+): { mean: number; stdDev: number } | null {
+  if (values.length < minSamples) return null
+  const mean = values.reduce((sum, v) => sum + v, 0) / values.length
+  const variance =
+    values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / values.length
+  return { mean, stdDev: Math.sqrt(variance) }
+}
+
 function getTaxRecordAlerts(db: FinanceDatabase): Array<{
   level: 'info' | 'warning' | 'critical'
   title: string
@@ -3209,10 +3248,40 @@ function getTaxRecordAlerts(db: FinanceDatabase): Array<{
     (r) => r.taxYear === currentYear,
   )
   if (taxableThisYear > 0 && !hasRecordThisYear) {
+    // Full-year projection with a confidence band, from completed months
+    // only (now.getMonth() is 0-indexed, so it's exactly the count of
+    // completed months before the current, partial one) — excludes the
+    // in-progress month so a half-finished month doesn't drag the average
+    // down and understate what the full year is on track for. Same
+    // population-stddev band as the net-worth forecast and budget-pace
+    // alert; skipped below 2 completed months since one data point can't
+    // say anything about spread.
+    const completedMonthlyTaxable: Array<number> = []
+    for (let month = 1; month <= now.getMonth(); month++) {
+      let sum = 0
+      for (const inc of db.income_records) {
+        if (!inc.taxable) continue
+        const d = parseDate(inc.dateReceived)
+        if (!d || String(d.year) !== currentYear || d.month !== month)
+          continue
+        sum += inc.convertedLkrAmount
+      }
+      completedMonthlyTaxable.push(sum)
+    }
+    const band = completedMonthlyTaxable.some((v) => v > 0)
+      ? trailingMeanAndStdDev(completedMonthlyTaxable)
+      : null
+    const projectionNote = band
+      ? ` At the current run rate, full-year taxable income projects to roughly ${lkr(
+          band.mean * 12,
+        )} (${lkr(Math.max(0, band.mean - band.stdDev) * 12)}–${lkr(
+          (band.mean + band.stdDev) * 12,
+        )} depending on month-to-month variability).`
+      : ''
     alerts.push({
       level: 'info',
       title: `No tax record for ${currentYear} yet`,
-      detail: `${lkr(taxableThisYear)} in taxable income logged for ${currentYear} so far, with no tax record on file yet.`,
+      detail: `${lkr(taxableThisYear)} in taxable income logged for ${currentYear} so far, with no tax record on file yet.${projectionNote}`,
     })
   }
 
@@ -3355,10 +3424,37 @@ export function financeAlerts(db: FinanceDatabase): Array<{
       const dailyRate = row.actual / daysElapsed
       const projectedTotal = dailyRate * daysInMonth
       if (projectedTotal > row.budget * 1.1) {
+        // Confidence band from the category's trailing 3 completed months
+        // of actual spend — same population-stddev approach as the
+        // net-worth forecast and savings-goal timeline, so a single flat
+        // projection doesn't hide how much this category's spend normally
+        // swings month to month.
+        const trailingActuals: Array<number> = []
+        for (let i = 1; i <= 3; i++) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+          trailingActuals.push(
+            actualCategorySpendForMonth(
+              db,
+              row.category,
+              d.getFullYear(),
+              d.getMonth() + 1,
+            ),
+          )
+        }
+        // All-zero history (a brand-new category with no prior months of
+        // spend at all) isn't real variance data — trailingMeanAndStdDev's
+        // length check alone can't tell "no history" from "genuinely flat
+        // spend", so check for it explicitly.
+        const band = trailingActuals.some((v) => v > 0)
+          ? trailingMeanAndStdDev(trailingActuals)
+          : null
+        const bandNote = band
+          ? ` (typically ${lkr(Math.max(0, projectedTotal - band.stdDev))}–${lkr(projectedTotal + band.stdDev)} based on this category's recent month-to-month swing)`
+          : ''
         alerts.push({
           level: 'warning',
           title: `On pace to exceed budget: ${row.category}`,
-          detail: `Spending ${lkr(row.actual)} in the first ${daysElapsed} days puts you on pace for ~${lkr(projectedTotal)} this month, vs a ${lkr(row.budget)} budget.`,
+          detail: `Spending ${lkr(row.actual)} in the first ${daysElapsed} days puts you on pace for ~${lkr(projectedTotal)} this month, vs a ${lkr(row.budget)} budget.${bandNote}`,
         })
       }
     }
