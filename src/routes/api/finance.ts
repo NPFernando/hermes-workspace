@@ -17,6 +17,7 @@ import {
   copyBudgetsToMonth,
   deleteFinanceRecord,
   deleteKnownSender,
+  dismissSenderCandidate,
   ensureFinanceStore,
   financeAlerts,
   financeStorageAlerts,
@@ -2542,6 +2543,30 @@ export const Route = createFileRoute('/api/finance')({
             return json({
               ok: true,
               knownSender: { ...rest, hasPassword: Boolean(encryptedPassword) },
+            })
+          }
+          if (action === 'dismiss_sender_candidate') {
+            const senderAddress =
+              typeof body.senderAddress === 'string' ? body.senderAddress : ''
+            if (!senderAddress.trim()) {
+              return json(
+                { ok: false, error: 'senderAddress is required.' },
+                { status: 400 },
+              )
+            }
+            const occurrencesAtDismissal =
+              typeof body.occurrences === 'number' ? body.occurrences : 0
+            const db = ensureFinanceStore()
+            dismissSenderCandidate(
+              db,
+              senderAddress.toLowerCase(),
+              occurrencesAtDismissal,
+            )
+            return json({
+              ok: true,
+              unregisteredSenderCandidates: getUnregisteredSenderCandidates(
+                ensureFinanceStore(),
+              ),
             })
           }
           if (action === 'bulk_import_known_senders') {
