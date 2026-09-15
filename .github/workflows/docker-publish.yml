@@ -15,6 +15,12 @@ on:
     tags: ['v*']
   workflow_dispatch:
 
+# A newer release supersedes an older one. Cancelling an in-flight publish
+# prevents stale images from winning a race with the current main commit.
+concurrency:
+  group: hermes-workspace-publish-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   packages: write
@@ -64,6 +70,7 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
+          build-args: HERMES_BUILD_ID=${{ github.sha }}
           load: true
           tags: hermes-workspace:smoke
           cache-from: type=gha
@@ -88,8 +95,10 @@ jobs:
                 ;;
             esac
 
-            if curl -fsS http://127.0.0.1:3000/ >/dev/null; then
-              echo "Container stayed alive and served HTTP successfully"
+            if curl -fsS -D /tmp/hermes-headers -o /dev/null http://127.0.0.1:3000/; then
+              actual=$(tr -d '\r' < /tmp/hermes-headers | awk -F': ' 'tolower($1) == "x-workspace-build" { print $2 }')
+              test "$actual" = "${{ github.sha }}" || { echo "Build identity mismatch: $actual"; exit 1; }
+              echo "Container served the expected commit $actual"
               exit 0
             fi
 
@@ -104,6 +113,7 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
+          build-args: HERMES_BUILD_ID=${{ github.sha }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
