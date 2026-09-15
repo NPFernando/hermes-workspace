@@ -41,6 +41,7 @@ import { Route as ChatIndexRouteImport } from './routes/chat/index'
 import { Route as SettingsProvidersRouteImport } from './routes/settings/providers'
 import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
 import { Route as ApiWorkspaceVersionRouteImport } from './routes/api/workspace-version'
+import { Route as ApiWorkspaceSessionHealthRouteImport } from './routes/api/workspace-session-health'
 import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
 import { Route as ApiWorkflowTemplatesRouteImport } from './routes/api/workflow-templates'
 import { Route as ApiValidateProviderRouteImport } from './routes/api/validate-provider'
@@ -419,6 +420,12 @@ const ApiWorkspaceVersionRoute = ApiWorkspaceVersionRouteImport.update({
   path: '/api/workspace-version',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWorkspaceSessionHealthRoute =
+  ApiWorkspaceSessionHealthRouteImport.update({
+    id: '/api/workspace-session-health',
+    path: '/api/workspace-session-health',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiWorkspaceRoute = ApiWorkspaceRouteImport.update({
   id: '/api/workspace',
   path: '/api/workspace',
@@ -1679,6 +1686,7 @@ export interface FileRoutesByFullPath {
   '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/workflow-templates': typeof ApiWorkflowTemplatesRoute
   '/api/workspace': typeof ApiWorkspaceRouteWithChildren
+  '/api/workspace-session-health': typeof ApiWorkspaceSessionHealthRoute
   '/api/workspace-version': typeof ApiWorkspaceVersionRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
@@ -1929,6 +1937,7 @@ export interface FileRoutesByTo {
   '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/workflow-templates': typeof ApiWorkflowTemplatesRoute
   '/api/workspace': typeof ApiWorkspaceRouteWithChildren
+  '/api/workspace-session-health': typeof ApiWorkspaceSessionHealthRoute
   '/api/workspace-version': typeof ApiWorkspaceVersionRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
@@ -2181,6 +2190,7 @@ export interface FileRoutesById {
   '/api/validate-provider': typeof ApiValidateProviderRoute
   '/api/workflow-templates': typeof ApiWorkflowTemplatesRoute
   '/api/workspace': typeof ApiWorkspaceRouteWithChildren
+  '/api/workspace-session-health': typeof ApiWorkspaceSessionHealthRoute
   '/api/workspace-version': typeof ApiWorkspaceVersionRoute
   '/chat/$sessionKey': typeof ChatSessionKeyRoute
   '/settings/providers': typeof SettingsProvidersRoute
@@ -2434,6 +2444,7 @@ export interface FileRouteTypes {
     | '/api/validate-provider'
     | '/api/workflow-templates'
     | '/api/workspace'
+    | '/api/workspace-session-health'
     | '/api/workspace-version'
     | '/chat/$sessionKey'
     | '/settings/providers'
@@ -2684,6 +2695,7 @@ export interface FileRouteTypes {
     | '/api/validate-provider'
     | '/api/workflow-templates'
     | '/api/workspace'
+    | '/api/workspace-session-health'
     | '/api/workspace-version'
     | '/chat/$sessionKey'
     | '/settings/providers'
@@ -2935,6 +2947,7 @@ export interface FileRouteTypes {
     | '/api/validate-provider'
     | '/api/workflow-templates'
     | '/api/workspace'
+    | '/api/workspace-session-health'
     | '/api/workspace-version'
     | '/chat/$sessionKey'
     | '/settings/providers'
@@ -3187,6 +3200,7 @@ export interface RootRouteChildren {
   ApiValidateProviderRoute: typeof ApiValidateProviderRoute
   ApiWorkflowTemplatesRoute: typeof ApiWorkflowTemplatesRoute
   ApiWorkspaceRoute: typeof ApiWorkspaceRouteWithChildren
+  ApiWorkspaceSessionHealthRoute: typeof ApiWorkspaceSessionHealthRoute
   ApiWorkspaceVersionRoute: typeof ApiWorkspaceVersionRoute
   ChatSessionKeyRoute: typeof ChatSessionKeyRoute
   ChatIndexRoute: typeof ChatIndexRoute
@@ -3458,6 +3472,13 @@ declare module '@tanstack/react-router' {
       path: '/api/workspace-version'
       fullPath: '/api/workspace-version'
       preLoaderRoute: typeof ApiWorkspaceVersionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/workspace-session-health': {
+      id: '/api/workspace-session-health'
+      path: '/api/workspace-session-health'
+      fullPath: '/api/workspace-session-health'
+      preLoaderRoute: typeof ApiWorkspaceSessionHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/workspace': {
@@ -5403,6 +5424,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiValidateProviderRoute: ApiValidateProviderRoute,
   ApiWorkflowTemplatesRoute: ApiWorkflowTemplatesRoute,
   ApiWorkspaceRoute: ApiWorkspaceRouteWithChildren,
+  ApiWorkspaceSessionHealthRoute: ApiWorkspaceSessionHealthRoute,
   ApiWorkspaceVersionRoute: ApiWorkspaceVersionRoute,
   ChatSessionKeyRoute: ChatSessionKeyRoute,
   ChatIndexRoute: ChatIndexRoute,

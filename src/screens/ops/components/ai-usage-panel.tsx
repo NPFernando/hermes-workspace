@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 type UsageLine = {
   type: 'progress' | 'text' | 'badge'
   label: string
+  measure?: 'quota' | 'usage' | 'spend' | 'balance' | 'availability'
   used?: number
   limit?: number
   format?: 'percent' | 'dollars' | 'tokens'
@@ -17,6 +18,8 @@ type ProviderUsage = {
   status: 'ok' | 'missing_credentials' | 'auth_expired' | 'error'
   message?: string
   plan?: string
+  source?: string
+  sourceKind?: 'provider_api' | 'local_auth' | 'credential_check'
   lines: Array<UsageLine>
   updatedAt: number
 }
@@ -25,7 +28,21 @@ type ProviderUsageResponse = {
   ok: boolean
   updatedAt: number
   providers: Array<ProviderUsage>
+  history?: Array<UsageHistoryPoint>
   error?: string
+}
+
+type UsageHistoryPoint = {
+  day: string
+  provider: string
+  displayName: string
+  label: string
+  measure: 'quota' | 'spend'
+  used: number
+  limit: number | null
+  percent: number | null
+  sampledAt: number
+  source: string | null
 }
 
 type HermesModelUsage = {
@@ -43,11 +60,36 @@ type CopilotUsage = {
   lastEventAt: string | null
 }
 
+type CopilotDailyUsage = {
+  day: string
+  requests: number
+  sessions: number
+  inputTokens: number
+  outputTokens: number
+  aiu: number
+}
+
+type HermesDailyUsage = {
+  day: string
+  sessions: number
+  tokens: number
+  billedCostUsd: number
+  estimatedCostUsd: number
+}
+
 export type QuotaAlert = 'limit' | 'critical' | 'warning' | null
+
+export function providerFreshness(
+  updatedAt: number,
+  now = Date.now(),
+): 'current' | 'stale' {
+  return now - updatedAt <= 10 * 60_000 ? 'current' : 'stale'
+}
 
 export function quotaAlert(line: UsageLine): QuotaAlert {
   if (
     line.type !== 'progress' ||
+    (line.measure !== 'quota' && line.measure !== 'spend') ||
     line.used === undefined ||
     line.limit === undefined ||
     line.limit <= 0
@@ -60,6 +102,71 @@ export function quotaAlert(line: UsageLine): QuotaAlert {
   if (percent >= 90) return 'critical'
   if (percent >= 75) return 'warning'
   return null
+}
+
+export function lastSevenUtcDays(now = Date.now()): Array<string> {
+  const today = new Date(now)
+  const days: Array<string> = []
+  for (let offset = 6; offset >= 0; offset -= 1) {
+    const date = new Date(
+      Date.UTC(
+        today.getUTCFullYear(),
+        today.getUTCMonth(),
+        today.getUTCDate() - offset,
+      ),
+    )
+    days.push(date.toISOString().slice(0, 10))
+  }
+  return days
+}
+
+function DailyTrendCard({
+  title,
+  unit,
+  days,
+  values,
+  formatValue,
+}: {
+  title: string
+  unit: string
+  days: Array<string>
+  values: Map<string, number>
+  formatValue: (value: number) => string
+}) {
+  const maximum = Math.max(1, ...values.values())
+  return (
+    <article className="rounded-lg border border-[var(--theme-border,rgba(128,128,128,0.2))] bg-[var(--theme-panel)] p-3">
+      <h3 className="text-xs font-medium text-[var(--theme-text)]">{title}</h3>
+      <p className="text-[10px] text-[var(--theme-muted)]">{unit}</p>
+      <div
+        className="mt-3 grid grid-cols-7 items-end gap-1"
+        aria-label={`${title}, last seven days`}
+      >
+        {days.map((day) => {
+          const value = values.get(day)
+          const height =
+            value === undefined ? 0 : Math.max(4, (value / maximum) * 48)
+          return (
+            <div key={day} className="flex min-w-0 flex-col items-center gap-1">
+              <span className="max-w-full truncate text-[9px] tabular-nums text-[var(--theme-muted)]">
+                {value === undefined ? '—' : formatValue(value)}
+              </span>
+              <div className="flex h-12 w-full items-end rounded bg-[var(--theme-hover)]">
+                <div
+                  className="w-full rounded bg-accent-500"
+                  style={{ height: `${height}px` }}
+                  aria-hidden="true"
+                />
+              </div>
+              <span className="text-[9px] text-[var(--theme-muted)]">
+                {day.slice(5)}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </article>
+  )
 }
 
 function usageValue(line: UsageLine): string {
@@ -84,15 +191,32 @@ function providerStatus(status: ProviderUsage['status']): string {
   }
 }
 
-function alertLabel(alert: QuotaAlert): string | null {
-  if (alert === 'limit') return 'Limit reached'
-  if (alert === 'critical') return '90%+ used'
-  if (alert === 'warning') return '75%+ used'
+function alertLabel(
+  alert: QuotaAlert,
+  measure?: UsageLine['measure'],
+): string | null {
+  const subject = measure === 'spend' ? 'spend limit' : 'quota'
+  if (alert === 'limit') return `${subject} reached`
+  if (alert === 'critical') return `90%+ of ${subject}`
+  if (alert === 'warning') return `75%+ of ${subject}`
+  return null
+}
+
+function measurementLabel(measure?: UsageLine['measure']): string | null {
+  if (measure === 'quota') return 'Quota'
+  if (measure === 'usage') return 'Usage'
+  if (measure === 'spend') return 'Spend'
+  if (measure === 'balance') return 'Balance'
+  if (measure === 'availability') return 'Credential check'
   return null
 }
 
 function ProviderCard({ provider }: { provider: ProviderUsage }) {
   const hasData = provider.status === 'ok' && provider.lines.length > 0
+  const freshness =
+    provider.status === 'ok'
+      ? providerFreshness(provider.updatedAt)
+      : 'unavailable'
 
   return (
     <article className="min-w-0 rounded-xl border border-[var(--theme-border,rgba(128,128,128,0.2))] bg-[var(--theme-panel)] p-3">
@@ -124,7 +248,8 @@ function ProviderCard({ provider }: { provider: ProviderUsage }) {
         <div className="space-y-3">
           {provider.lines.map((line, index) => {
             const alert = quotaAlert(line)
-            const alertText = alertLabel(alert)
+            const alertText = alertLabel(alert, line.measure)
+            const measureText = measurementLabel(line.measure)
             const hasProgress =
               line.type === 'progress' &&
               line.used !== undefined &&
@@ -139,6 +264,11 @@ function ProviderCard({ provider }: { provider: ProviderUsage }) {
                 <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-xs">
                   <span className="text-[var(--theme-muted)]">
                     {line.label}
+                    {measureText ? (
+                      <span className="ml-1 rounded bg-[var(--theme-hover)] px-1 py-0.5 text-[9px] uppercase tracking-wide">
+                        {measureText}
+                      </span>
+                    ) : null}
                   </span>
                   <span className="flex items-center gap-2 font-medium tabular-nums text-[var(--theme-text)]">
                     {usageValue(line)}
@@ -195,7 +325,9 @@ function ProviderCard({ provider }: { provider: ProviderUsage }) {
         </p>
       )}
       <p className="mt-3 text-[10px] text-[var(--theme-muted)]">
-        Updated {new Date(provider.updatedAt).toLocaleTimeString()}
+        Source: {provider.source ?? 'Source metadata unavailable'} · {freshness}{' '}
+        {freshness === 'unavailable' ? '· last attempt' : 'snapshot'}{' '}
+        {new Date(provider.updatedAt).toLocaleString()} (poll time)
       </p>
     </article>
   )
@@ -226,9 +358,13 @@ function AgentSummary({
 export function AiUsagePanel({
   hermesUsage,
   copilotUsage,
+  copilotDailyUsage,
+  hermesDailyUsage,
 }: {
   hermesUsage: HermesModelUsage | null
   copilotUsage: CopilotUsage | null
+  copilotDailyUsage: Array<CopilotDailyUsage> | null
+  hermesDailyUsage: Array<HermesDailyUsage> | null
 }) {
   const query = useQuery({
     queryKey: ['provider-usage', 'ops-cost'],
@@ -254,6 +390,116 @@ export function AiUsagePanel({
   const codex = providers.find((provider) => provider.provider === 'codex')
   const claude = providers.find((provider) => provider.provider === 'claude')
   const lastUpdated = query.data?.updatedAt
+  const days = lastSevenUtcDays()
+  const trendSeries: Array<{
+    key: string
+    title: string
+    unit: string
+    values: Map<string, number>
+    formatValue: (value: number) => string
+  }> = []
+
+  if (copilotDailyUsage?.length) {
+    trendSeries.push(
+      {
+        key: 'copilot-requests',
+        title: 'Copilot requests',
+        unit: 'Requests',
+        values: new Map(
+          copilotDailyUsage.map((row) => [row.day, row.requests]),
+        ),
+        formatValue: (value) => Math.round(value).toLocaleString(),
+      },
+      {
+        key: 'copilot-tokens',
+        title: 'Copilot tokens',
+        unit: 'Tokens',
+        values: new Map(
+          copilotDailyUsage.map((row) => [
+            row.day,
+            row.inputTokens + row.outputTokens,
+          ]),
+        ),
+        formatValue: (value) => Math.round(value).toLocaleString(),
+      },
+      {
+        key: 'copilot-aiu',
+        title: 'Copilot AI units',
+        unit: 'AI units',
+        values: new Map(copilotDailyUsage.map((row) => [row.day, row.aiu])),
+        formatValue: (value) =>
+          value.toLocaleString(undefined, { maximumFractionDigits: 3 }),
+      },
+    )
+  }
+  if (hermesDailyUsage?.length) {
+    trendSeries.push(
+      {
+        key: 'hermes-sessions',
+        title: 'Hermes gateway sessions',
+        unit: 'Sessions',
+        values: new Map(hermesDailyUsage.map((row) => [row.day, row.sessions])),
+        formatValue: (value) => Math.round(value).toLocaleString(),
+      },
+      {
+        key: 'hermes-tokens',
+        title: 'Hermes gateway tokens',
+        unit: 'Tokens',
+        values: new Map(hermesDailyUsage.map((row) => [row.day, row.tokens])),
+        formatValue: (value) => Math.round(value).toLocaleString(),
+      },
+      {
+        key: 'hermes-billed-cost',
+        title: 'Hermes billable cost',
+        unit: 'USD (actual where available; otherwise estimated)',
+        values: new Map(
+          hermesDailyUsage.map((row) => [row.day, row.billedCostUsd]),
+        ),
+        formatValue: (value) => `$${value.toFixed(2)}`,
+      },
+      {
+        key: 'hermes-recorded-cost',
+        title: 'Hermes cost including subscriptions',
+        unit: 'USD (actual where available; otherwise estimated)',
+        values: new Map(
+          hermesDailyUsage.map((row) => [row.day, row.estimatedCostUsd]),
+        ),
+        formatValue: (value) => `$${value.toFixed(2)}`,
+      },
+    )
+  }
+  const providerHistory = query.data?.history ?? []
+  const providerSeries = new Map<
+    string,
+    { provider: string; label: string; values: Map<string, number> }
+  >()
+  for (const point of providerHistory) {
+    const value = point.percent ?? point.used
+    const key = `${point.provider}:${point.label}:${point.measure}`
+    const series = providerSeries.get(key) ?? {
+      provider: point.displayName,
+      label: point.label,
+      values: new Map<string, number>(),
+    }
+    series.values.set(point.day, value)
+    providerSeries.set(key, series)
+  }
+  for (const [key, series] of providerSeries) {
+    const measure = providerHistory.find(
+      (point) => `${point.provider}:${point.label}:${point.measure}` === key,
+    )?.measure
+    trendSeries.push({
+      key,
+      title: `${series.provider} · ${series.label} snapshot`,
+      unit:
+        measure === 'quota'
+          ? 'Percent used at latest daily snapshot'
+          : 'USD at latest daily snapshot',
+      values: series.values,
+      formatValue: (value) =>
+        measure === 'quota' ? `${Math.round(value)}%` : `$${value.toFixed(2)}`,
+    })
+  }
 
   return (
     <section className="space-y-3 rounded-xl border border-[var(--theme-border,rgba(128,128,128,0.2))] bg-[var(--theme-card)] p-4">
@@ -263,8 +509,8 @@ export function AiUsagePanel({
             AI agent &amp; provider usage
           </h2>
           <p className="mt-1 text-xs text-[var(--theme-muted)]">
-            Provider-reported limits where available; Hermes session telemetry
-            is shown separately.
+            Quota, spend, usage, and credential checks are labeled by source;
+            Hermes and Copilot local telemetry are shown separately.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -312,7 +558,7 @@ export function AiUsagePanel({
           }
           note={
             copilotUsage
-              ? `${copilotUsage.requests24h.toLocaleString()} today · ${copilotUsage.sessions7d.toLocaleString()} sessions · ${(copilotUsage.inputTokens7d + copilotUsage.outputTokens7d).toLocaleString()} tokens · ${copilotUsage.aiu7d.toLocaleString()} AIU${copilotUsage.lastEventAt ? ` · last ${new Date(copilotUsage.lastEventAt).toLocaleString()}` : ''}`
+              ? `${copilotUsage.requests24h.toLocaleString()} today · ${copilotUsage.sessions7d.toLocaleString()} sessions · ${(copilotUsage.inputTokens7d + copilotUsage.outputTokens7d).toLocaleString()} tokens · ${copilotUsage.aiu7d.toLocaleString()} AIU · local CLI telemetry, not GitHub billing; provider limits unavailable${copilotUsage.lastEventAt ? ` · last ${new Date(copilotUsage.lastEventAt).toLocaleString()}` : ''}`
               : 'Copilot CLI usage database unavailable'
           }
         />
@@ -325,11 +571,39 @@ export function AiUsagePanel({
           }
           note={
             hermesUsage
-              ? `${hermesUsage.tokens.toLocaleString()} tokens · gateway sessions only`
+              ? `${hermesUsage.tokens.toLocaleString()} tokens · gateway sessions only; provider plan limits unavailable`
               : 'Gateway session store unavailable'
           }
         />
       </div>
+
+      {trendSeries.length > 0 ? (
+        <section aria-label="Daily AI usage trends" className="space-y-2">
+          <div>
+            <h3 className="text-xs font-semibold text-[var(--theme-text)]">
+              Daily trends · last 7 days
+            </h3>
+            <p className="text-[10px] text-[var(--theme-muted)]">
+              UTC days. Copilot and Hermes are daily totals; provider quota and
+              spend cards show the latest reading that day. Missing days mean no
+              source data was observed, not zero usage. Provider history
+              accumulates after the first authenticated dashboard read.
+            </p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {trendSeries.map((series) => (
+              <DailyTrendCard
+                key={series.key}
+                title={series.title}
+                unit={series.unit}
+                days={days}
+                values={series.values}
+                formatValue={series.formatValue}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {query.isError ? (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-[var(--theme-text)]">
@@ -358,8 +632,9 @@ export function AiUsagePanel({
 
       <p className="text-[10px] text-[var(--theme-muted)]">
         Copilot readings come from local CLI counters, not GitHub billing
-        totals. Provider readings are separate account limits, not a combined
-        budget. Missing feeds are shown as unavailable rather than estimated.
+        totals. OpenAI API token usage is not billing data. Provider limits are
+        separate and are not a combined budget; undocumented account feeds are
+        labeled, and missing feeds are unavailable rather than estimated.
       </p>
     </section>
   )

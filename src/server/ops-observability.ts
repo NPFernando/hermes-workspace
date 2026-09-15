@@ -224,6 +224,15 @@ export interface CopilotUsageSummary {
   lastEventAt: string | null
 }
 
+export interface CopilotDailyUsage {
+  day: string
+  requests: number
+  sessions: number
+  inputTokens: number
+  outputTokens: number
+  aiu: number
+}
+
 /** Read Copilot CLI usage counters only; never reads prompts or responses. */
 export async function getCopilotUsageSummary(
   dbPath = join(homedir(), '.copilot', 'session-store.db'),
@@ -267,6 +276,46 @@ export async function getCopilotUsageSummary(
   }
 }
 
+export async function getCopilotDailyUsage(
+  dbPath = join(homedir(), '.copilot', 'session-store.db'),
+  days = 7,
+): Promise<Array<CopilotDailyUsage> | null> {
+  const boundedDays = Math.max(1, Math.min(90, Math.floor(days)))
+  const rows = await sqliteJson<
+    Array<{
+      day: string
+      requests: number | null
+      sessions: number | null
+      input_tokens: number | null
+      output_tokens: number | null
+      aiu: number | null
+    }>
+  >(
+    dbPath,
+    `SELECT date(created_at) AS day,
+            COUNT(*) AS requests,
+            COUNT(DISTINCT session_id) AS sessions,
+            SUM(COALESCE(input_tokens, 0)) AS input_tokens,
+            SUM(COALESCE(output_tokens, 0)) AS output_tokens,
+            ROUND(SUM(COALESCE(total_nano_aiu, 0)) / 1000000000.0, 6) AS aiu
+       FROM assistant_usage_events
+      WHERE datetime(created_at) >= datetime('now','-${boundedDays} days')
+      GROUP BY date(created_at)
+      ORDER BY day`,
+  )
+  if (!rows) return null
+  const count = (value: number | null) =>
+    typeof value === 'number' && Number.isFinite(value) ? value : 0
+  return rows.map((row) => ({
+    day: row.day,
+    requests: count(row.requests),
+    sessions: count(row.sessions),
+    inputTokens: count(row.input_tokens),
+    outputTokens: count(row.output_tokens),
+    aiu: count(row.aiu),
+  }))
+}
+
 async function getSessionModelCosts(
   days = 7,
 ): Promise<Array<ModelUsageRow> | null> {
@@ -302,6 +351,53 @@ async function getSessionModelCosts(
     billedCostUsd: r.billed ?? 0,
     estCostUsd: r.est ?? 0,
     tokens: r.toks ?? 0,
+  }))
+}
+
+export interface HermesDailyUsage {
+  day: string
+  sessions: number
+  tokens: number
+  billedCostUsd: number
+  estimatedCostUsd: number
+}
+
+export async function getHermesDailyUsage(
+  dbPath = join(HERMES_HOME, 'state.db'),
+  days = 7,
+): Promise<Array<HermesDailyUsage> | null> {
+  const boundedDays = Math.max(1, Math.min(90, Math.floor(days)))
+  const rows = await sqliteJson<
+    Array<{
+      day: string
+      sessions: number | null
+      tokens: number | null
+      billed: number | null
+      estimated: number | null
+    }>
+  >(
+    dbPath,
+    `SELECT date(started_at,'unixepoch') AS day,
+            COUNT(*) AS sessions,
+            SUM(COALESCE(input_tokens,0)+COALESCE(output_tokens,0)) AS tokens,
+            ROUND(SUM(CASE WHEN billing_provider='openai-codex'
+                              OR COALESCE(model,'') LIKE '%:free%' THEN 0
+                            ELSE COALESCE(actual_cost_usd, estimated_cost_usd, 0) END), 4) AS billed,
+            ROUND(SUM(COALESCE(actual_cost_usd, estimated_cost_usd, 0)), 4) AS estimated
+       FROM sessions
+      WHERE started_at >= strftime('%s','now','-${boundedDays} days')
+      GROUP BY date(started_at,'unixepoch')
+      ORDER BY day`,
+  )
+  if (!rows) return null
+  const count = (value: number | null) =>
+    typeof value === 'number' && Number.isFinite(value) ? value : 0
+  return rows.map((row) => ({
+    day: row.day,
+    sessions: count(row.sessions),
+    tokens: count(row.tokens),
+    billedCostUsd: count(row.billed),
+    estimatedCostUsd: count(row.estimated),
   }))
 }
 
@@ -563,6 +659,8 @@ export interface OpsObservability {
   liveness: ModelLiveness | null
   modelUsage7d: Array<ModelUsageRow> | null
   copilotUsage7d: CopilotUsageSummary | null
+  copilotDailyUsage7d: Array<CopilotDailyUsage> | null
+  hermesDailyUsage7d: Array<HermesDailyUsage> | null
   escalation: EscalationStats | null
   cronJobs: Array<OpsCronJob> | null
   financeStorageMonitor: FinanceStorageMonitorSummary | null
@@ -572,20 +670,31 @@ export interface OpsObservability {
 }
 
 export async function getOpsObservability(): Promise<OpsObservability> {
-  const [cost, liveness, modelUsage7d, copilotUsage7d, headroom] =
-    await Promise.all([
-      getCostSummary().catch(() => null),
-      getModelLiveness().catch(() => null),
-      getSessionModelCosts(7).catch(() => null),
-      getCopilotUsageSummary().catch(() => null),
-      getHeadroomStats().catch(() => null),
-    ])
+  const [
+    cost,
+    liveness,
+    modelUsage7d,
+    copilotUsage7d,
+    copilotDailyUsage7d,
+    hermesDailyUsage7d,
+    headroom,
+  ] = await Promise.all([
+    getCostSummary().catch(() => null),
+    getModelLiveness().catch(() => null),
+    getSessionModelCosts(7).catch(() => null),
+    getCopilotUsageSummary().catch(() => null),
+    getCopilotDailyUsage().catch(() => null),
+    getHermesDailyUsage().catch(() => null),
+    getHeadroomStats().catch(() => null),
+  ])
   return {
     generatedAt: new Date().toISOString(),
     cost,
     liveness,
     modelUsage7d,
     copilotUsage7d,
+    copilotDailyUsage7d,
+    hermesDailyUsage7d,
     escalation: getEscalationStats(),
     cronJobs: getOpsCronJobs(),
     financeStorageMonitor: getFinanceStorageMonitorSummary(),

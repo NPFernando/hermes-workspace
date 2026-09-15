@@ -4,9 +4,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  getCopilotDailyUsage,
   getCopilotUsageSummary,
   getFinanceStorageMonitorSummary,
   getFinanceStorageSmokeCronSummary,
+  getHermesDailyUsage,
 } from './ops-observability'
 
 const tempDirs: Array<string> = []
@@ -54,12 +56,37 @@ describe('ops-observability Copilot usage', () => {
       outputTokens7d: 75,
       aiu7d: 3,
     })
+    const daily = await getCopilotDailyUsage(dbPath)
+    expect(daily).toHaveLength(2)
+    expect(daily?.map((row) => row.requests)).toEqual([1, 1])
+    expect(daily?.reduce((sum, row) => sum + row.inputTokens, 0)).toBe(300)
   })
 
   it('returns null when the local Copilot telemetry database is absent', async () => {
     await expect(
       getCopilotUsageSummary(join(tmpdir(), 'missing-copilot-usage.db')),
     ).resolves.toBeNull()
+  })
+})
+
+describe('ops-observability Hermes daily usage', () => {
+  it('aggregates local gateway sessions by UTC day with billed and estimated spend separated', async () => {
+    const dir = makeTempDir()
+    const dbPath = join(dir, 'state.db')
+    execFileSync('/usr/bin/sqlite3', [dbPath], {
+      input: [
+        'CREATE TABLE sessions (started_at INTEGER, billing_provider TEXT, model TEXT, input_tokens INTEGER, output_tokens INTEGER, actual_cost_usd REAL, estimated_cost_usd REAL);',
+        "INSERT INTO sessions VALUES (strftime('%s','now','-2 hours'), 'openrouter', 'paid-model', 100, 50, 0.12, 0.12);",
+        "INSERT INTO sessions VALUES (strftime('%s','now','-2 days'), 'openai-codex', 'gpt-codex', 200, 25, NULL, 0.05);",
+        "INSERT INTO sessions VALUES (strftime('%s','now','-9 days'), 'openrouter', 'old-model', 500, 500, 1.0, 1.0);",
+      ].join('\n'),
+    })
+
+    const daily = await getHermesDailyUsage(dbPath)
+    expect(daily).toHaveLength(2)
+    expect(daily?.map((row) => row.sessions)).toEqual([1, 1])
+    expect(daily?.map((row) => row.billedCostUsd)).toEqual([0, 0.12])
+    expect(daily?.map((row) => row.estimatedCostUsd)).toEqual([0.05, 0.12])
   })
 })
 

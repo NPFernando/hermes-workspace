@@ -17,14 +17,12 @@ import { safeErrorMessage } from './rate-limit'
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type ProviderStatus =
-  | 'ok'
-  | 'missing_credentials'
-  | 'auth_expired'
-  | 'error'
+  'ok' | 'missing_credentials' | 'auth_expired' | 'error'
 
 export type UsageLine = {
   type: 'progress' | 'text' | 'badge'
   label: string
+  measure?: 'quota' | 'usage' | 'spend' | 'balance' | 'availability'
   used?: number
   limit?: number
   format?: 'percent' | 'dollars' | 'tokens'
@@ -39,7 +37,10 @@ export type ProviderUsageResult = {
   status: ProviderStatus
   message?: string
   plan?: string
+  source?: string
+  sourceKind?: 'provider_api' | 'local_auth' | 'credential_check'
   lines: Array<UsageLine>
+  /** Time this server fetched the source, not the provider's event timestamp. */
   updatedAt: number
 }
 
@@ -69,6 +70,88 @@ function readNumber(v: unknown): number | undefined {
     if (Number.isFinite(n)) return n
   }
   return undefined
+}
+
+function usageSource(provider: string): {
+  source: string
+  sourceKind: ProviderUsageResult['sourceKind']
+} {
+  const sources: Record<
+    string,
+    { source: string; sourceKind: ProviderUsageResult['sourceKind'] }
+  > = {
+    claude: {
+      source:
+        'GET https://api.anthropic.com/api/oauth/usage (undocumented account endpoint)',
+      sourceKind: 'provider_api',
+    },
+    codex: {
+      source:
+        'GET https://chatgpt.com/backend-api/wham/usage (undocumented account endpoint)',
+      sourceKind: 'provider_api',
+    },
+    openai: {
+      source:
+        'GET https://api.openai.com/v1/organization/usage/completions (tokens, not billing)',
+      sourceKind: 'provider_api',
+    },
+    openrouter: {
+      source: 'GET https://openrouter.ai/api/v1/key (per-key spend and limit)',
+      sourceKind: 'provider_api',
+    },
+    gemini: {
+      source:
+        'GET https://generativelanguage.googleapis.com/v1beta/models (credential check only)',
+      sourceKind: 'credential_check',
+    },
+  }
+  return (
+    sources[provider] ?? {
+      source: 'Unknown source',
+      sourceKind: 'provider_api',
+    }
+  )
+}
+
+export function classifyUsageMeasure(
+  provider: string,
+  line: UsageLine,
+): UsageLine['measure'] {
+  const label = line.label.toLowerCase()
+  if (provider === 'claude')
+    return label === 'extra usage'
+      ? 'spend'
+      : label === 'status'
+        ? 'availability'
+        : 'quota'
+  if (provider === 'codex')
+    return label.includes('credit')
+      ? 'balance'
+      : label === 'status'
+        ? 'availability'
+        : 'quota'
+  if (provider === 'openai')
+    return label === 'status' ? 'availability' : 'usage'
+  if (provider === 'openrouter')
+    return label.includes('spend')
+      ? 'spend'
+      : label === 'status'
+        ? 'availability'
+        : 'usage'
+  if (provider === 'gemini') return 'availability'
+  return undefined
+}
+
+function addUsageProvenance(result: ProviderUsageResult): ProviderUsageResult {
+  const source = usageSource(result.provider)
+  return {
+    ...result,
+    ...source,
+    lines: result.lines.map((line) => ({
+      ...line,
+      measure: line.measure ?? classifyUsageMeasure(result.provider, line),
+    })),
+  }
 }
 
 function expandHome(p: string): string {
@@ -379,8 +462,7 @@ export async function fetchClaudeUsage(): Promise<ProviderUsageResult> {
   }
 
   const sevenDaySonnet = data.seven_day_sonnet as
-    | Record<string, unknown>
-    | undefined
+    Record<string, unknown> | undefined
   if (sevenDaySonnet && typeof sevenDaySonnet.utilization === 'number') {
     lines.push({
       type: 'progress',
@@ -650,17 +732,13 @@ export async function fetchCodexUsage(): Promise<ProviderUsageResult> {
   // Parse rate limits from headers and body
   const rateLimit = data.rate_limit as Record<string, unknown> | undefined
   const primaryWindow = rateLimit?.primary_window as
-    | Record<string, unknown>
-    | undefined
+    Record<string, unknown> | undefined
   const secondaryWindow = rateLimit?.secondary_window as
-    | Record<string, unknown>
-    | undefined
+    Record<string, unknown> | undefined
   const reviewRateLimit = data.code_review_rate_limit as
-    | Record<string, unknown>
-    | undefined
+    Record<string, unknown> | undefined
   const reviewWindow = reviewRateLimit?.primary_window as
-    | Record<string, unknown>
-    | undefined
+    Record<string, unknown> | undefined
 
   // Headers have the most accurate percent data
   const headerPrimary = readNumber(
@@ -790,60 +868,94 @@ export async function fetchOpenAIUsage(): Promise<ProviderUsageResult> {
     }
   }
 
-  // Fetch organization subscription info
+  // OpenAI's Usage API is an organization analytics feed, not billing data.
   try {
-    const subRes = await fetch(
-      'https://api.openai.com/v1/organization/usage/completions?start_time=' +
-        Math.floor((now - 86400000 * 30) / 1000),
-      {
+    const buckets: Array<Record<string, unknown>> = []
+    let cursor: string | undefined
+    let paginationIncomplete = false
+    for (let pageIndex = 0; pageIndex < 5; pageIndex += 1) {
+      const url = new URL(
+        'https://api.openai.com/v1/organization/usage/completions',
+      )
+      url.searchParams.set(
+        'start_time',
+        String(Math.floor((now - 86400000 * 30) / 1000)),
+      )
+      url.searchParams.set('end_time', String(Math.floor(now / 1000)))
+      url.searchParams.set('bucket_width', '1d')
+      url.searchParams.set('limit', '31')
+      if (cursor) url.searchParams.set('page', cursor)
+
+      const subRes = await fetch(url, {
         headers: { Authorization: `Bearer ${apiKey}` },
-      },
-    )
-
-    if (subRes.status === 401 || subRes.status === 403) {
-      // Fall back to simpler approach — just report the key is valid
-      return {
-        provider: 'openai',
-        displayName: 'OpenAI',
-        status: 'ok',
-        lines: [
-          {
-            type: 'badge',
-            label: 'Status',
-            value: 'API key active',
-            color: '#10b981',
-          },
-        ],
-        updatedAt: now,
+      })
+      if (subRes.status === 401 || subRes.status === 403) {
+        return {
+          provider: 'openai',
+          displayName: 'OpenAI',
+          status: 'error',
+          message: `Organization Usage API denied access (HTTP ${subRes.status}); no usage or billing data is available.`,
+          lines: [],
+          updatedAt: now,
+        }
       }
+      if (!subRes.ok) {
+        return {
+          provider: 'openai',
+          displayName: 'OpenAI',
+          status: 'error',
+          message: `Organization Usage API returned HTTP ${subRes.status}.`,
+          lines: [],
+          updatedAt: now,
+        }
+      }
+      const payload = (await subRes.json().catch(() => null)) as Record<
+        string,
+        unknown
+      > | null
+      const pageBuckets = payload?.data
+      if (!payload || !Array.isArray(pageBuckets)) {
+        return {
+          provider: 'openai',
+          displayName: 'OpenAI',
+          status: 'error',
+          message:
+            'Organization Usage API returned an invalid page; usage data is unavailable.',
+          lines: [],
+          updatedAt: now,
+        }
+      }
+      buckets.push(...(pageBuckets as Array<Record<string, unknown>>))
+      if (payload.has_more !== true) break
+      if (
+        typeof payload.next_page !== 'string' ||
+        !payload.next_page ||
+        pageIndex === 4
+      ) {
+        paginationIncomplete = true
+        break
+      }
+      cursor = payload.next_page
     }
-
-    if (!subRes.ok) {
+    if (paginationIncomplete) {
       return {
         provider: 'openai',
         displayName: 'OpenAI',
         status: 'error',
-        message: `HTTP ${subRes.status}`,
+        message:
+          'Organization Usage API pagination was incomplete; refusing to show a partial 30-day total.',
         lines: [],
         updatedAt: now,
       }
     }
-
-    const payload = (await subRes.json().catch(() => null)) as Record<
-      string,
-      unknown
-    > | null
     const lines: Array<UsageLine> = []
 
-    // Parse usage buckets if available
-    const data = payload?.data as Array<Record<string, unknown>> | undefined
-    if (Array.isArray(data) && data.length > 0) {
+    if (buckets.length > 0) {
       let totalInputTokens = 0
       let totalOutputTokens = 0
-      for (const bucket of data) {
+      for (const bucket of buckets) {
         const results = bucket.results as
-          | Array<Record<string, unknown>>
-          | undefined
+          Array<Record<string, unknown>> | undefined
         if (Array.isArray(results)) {
           for (const r of results) {
             totalInputTokens += readNumber(r.input_tokens) ?? 0
@@ -855,11 +967,13 @@ export async function fetchOpenAIUsage(): Promise<ProviderUsageResult> {
         lines.push({
           type: 'text',
           label: 'Input (30d)',
+          measure: 'usage',
           value: `${(totalInputTokens / 1_000_000).toFixed(2)}M tokens`,
         })
         lines.push({
           type: 'text',
           label: 'Output (30d)',
+          measure: 'usage',
           value: `${(totalOutputTokens / 1_000_000).toFixed(2)}M tokens`,
         })
       }
@@ -911,7 +1025,7 @@ export async function fetchOpenRouterUsage(): Promise<ProviderUsageResult> {
   }
 
   try {
-    const res = await fetch('https://openrouter.ai/api/v1/auth/key', {
+    const res = await fetch('https://openrouter.ai/api/v1/key', {
       headers: { Authorization: `Bearer ${apiKey}` },
     })
 
@@ -933,15 +1047,19 @@ export async function fetchOpenRouterUsage(): Promise<ProviderUsageResult> {
     const data = (payload.data ?? payload) as Record<string, unknown>
     const usage = (data.usage ?? {}) as Record<string, unknown>
 
-    const costUsd = readNumber(usage.cost ?? data.cost ?? data.usage_cost) ?? 0
-    const limitUsd = readNumber(data.limit ?? data.spend_limit)
+    const costUsd =
+      readNumber(data.usage) ??
+      readNumber(usage.cost ?? data.cost ?? data.usage_cost) ??
+      0
+    const limitUsd = readNumber(data.limit)
 
     const lines: Array<UsageLine> = []
 
     if (limitUsd && limitUsd > 0) {
       lines.push({
         type: 'progress',
-        label: 'Spend',
+        label: 'All-time key spend',
+        measure: 'spend',
         used: costUsd,
         limit: limitUsd,
         format: 'dollars',
@@ -949,9 +1067,26 @@ export async function fetchOpenRouterUsage(): Promise<ProviderUsageResult> {
     } else {
       lines.push({
         type: 'text',
-        label: 'Spend',
+        label: 'All-time key spend',
+        measure: 'spend',
         value: `$${costUsd.toFixed(2)}`,
       })
+    }
+
+    for (const [label, value] of [
+      ['Daily key spend', data.usage_daily],
+      ['Weekly key spend', data.usage_weekly],
+      ['Monthly key spend', data.usage_monthly],
+    ] as const) {
+      const amount = readNumber(value)
+      if (amount !== undefined) {
+        lines.push({
+          type: 'text',
+          label,
+          value: `$${amount.toFixed(2)}`,
+          measure: 'spend',
+        })
+      }
     }
 
     const inputTokens =
@@ -962,6 +1097,7 @@ export async function fetchOpenRouterUsage(): Promise<ProviderUsageResult> {
       lines.push({
         type: 'text',
         label: 'Tokens',
+        measure: 'usage',
         value: `${((inputTokens + outputTokens) / 1_000_000).toFixed(2)}M total`,
       })
     }
@@ -1085,17 +1221,17 @@ export async function getProviderUsage(
   ])
 
   const providers: Array<ProviderUsageResult> = results.map((r, i) => {
-    if (r.status === 'fulfilled') return r.value
+    if (r.status === 'fulfilled') return addUsageProvenance(r.value)
     const names = ['Claude (OAuth)', 'Codex', 'OpenAI', 'OpenRouter', 'Gemini']
     const ids = ['claude', 'codex', 'openai', 'openrouter', 'gemini']
-    return {
+    return addUsageProvenance({
       provider: ids[i],
       displayName: names[i],
       status: 'error' as const,
       message: r.reason instanceof Error ? r.reason.message : String(r.reason),
       lines: [],
       updatedAt: now,
-    }
+    })
   })
 
   // Show all providers — unconfigured ones display setup instructions

@@ -17,13 +17,24 @@ The server refuses to fall back to an in-memory or finance/research queue if the
 database is missing or unavailable. Serial dispatch is authenticated and remains
 opt-in; parallel dispatch is unchanged.
 
-Queue jobs persist their payload, status, timestamps, result, and error. A
-session-level Postgres advisory lock is held while the serial worker runs, so
-other server instances cannot claim jobs concurrently. Pending jobs survive
-restarts and resume when the server starts. A job that was already running when
-the process died is marked `interrupted` and is not replayed automatically:
-agent prompt delivery is not transactionally idempotent, so blind replay could
-send the same task twice. Inspect the agent state before manually retrying it.
+Queue jobs persist their payload, status, timestamps, result, error, retry link,
+and dead-letter time. A session-level Postgres advisory lock is held while the
+serial worker runs, so other server instances cannot claim jobs concurrently.
+Each running job also has a 15-second lease renewed every second. The worker
+uses a per-claim fencing token when renewing and finishing; a worker that loses
+its lease aborts its signal and cannot overwrite the newer queue state. A new
+worker waits for a still-valid lease to expire before recovering abandoned work.
+Pending jobs survive restarts and resume when the server starts.
+
+Failed and interrupted jobs are retained as dead letters. They are never
+automatically replayed because dispatch may have reached some agents before a
+failure. The queue UI offers a manual retry only after the operator confirms
+they inspected agent state and accepts possible duplicate prompts. A retry is
+a new linked job; repeated requests for the same source job return the same
+retry job instead of creating duplicates. Serial POST requests can also send an
+`Idempotency-Key` header (1-128 safe characters): an identical retry of that
+HTTP submission returns the original queued job, while reusing the key for a
+different payload returns HTTP 409.
 
 Pending jobs can be cancelled immediately. Cancelling the active job interrupts
 its current agent command (SIGTERM for one-shot execution or Ctrl-C in the
@@ -34,13 +45,20 @@ batch fails with its partial result and later assignments are not sent.
 The authenticated `GET /api/swarm-dispatch` endpoint returns the active job,
 pending jobs, and recent terminal statuses without exposing prompts. Send
 `DELETE /api/swarm-dispatch?id=<uuid>` to cancel a pending or active job.
+The authenticated `PATCH /api/swarm-dispatch?id=<uuid>` endpoint only requeues
+failed/interrupted dead letters when the body explicitly sets
+`{"acknowledgePossibleDuplicate":true}`.
 
 The Postgres integration suite is deliberately opt-in and must target a
-dedicated `*_test` database:
+dedicated loopback `*_test` database with explicit test credentials. The
+recommended runner creates and removes its own disposable PostgreSQL instance;
+it never reads `~/.hermes/.env`:
 
 ```sh
-SWARM_QUEUE_PG_DATABASE=hermes_swarm_queue_test pnpm swarm-queue:migrate
-RUN_SWARM_QUEUE_PG_INTEGRATION=1 \
-  SWARM_QUEUE_PG_DATABASE=hermes_swarm_queue_test \
-  pnpm exec vitest run src/server/swarm-dispatch-queue.test.ts
+pnpm test:queue:isolated
 ```
+
+The integration suite covers concurrent duplicate submissions, independent
+worker processes, FIFO ordering, lease renewal and expiry, restart recovery,
+cancellation, dead-letter handling, explicit retry, and retry idempotency. It
+never inserts or dispatches synthetic jobs into a production database.

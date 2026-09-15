@@ -9,6 +9,7 @@
  */
 import { useQuery } from '@tanstack/react-query'
 import { AiUsagePanel } from './components/ai-usage-panel'
+import { AgentControlPlane } from './components/agent-control-plane'
 
 interface CostSummary {
   burn24h: number | null
@@ -118,6 +119,21 @@ interface OpsPayload {
     aiu7d: number
     lastEventAt: string | null
   } | null
+  copilotDailyUsage7d: Array<{
+    day: string
+    requests: number
+    sessions: number
+    inputTokens: number
+    outputTokens: number
+    aiu: number
+  }> | null
+  hermesDailyUsage7d: Array<{
+    day: string
+    sessions: number
+    tokens: number
+    billedCostUsd: number
+    estimatedCostUsd: number
+  }> | null
   escalation: EscalationStats | null
   cronJobs: Array<OpsCronJob> | null
   financeStorageMonitor: FinanceStorageMonitorSummary | null
@@ -230,6 +246,8 @@ export function OpsCostScreen() {
     liveness,
     modelUsage7d,
     copilotUsage7d,
+    copilotDailyUsage7d,
+    hermesDailyUsage7d,
     escalation,
     cronJobs,
     financeStorageMonitor,
@@ -304,6 +322,8 @@ export function OpsCostScreen() {
 
       <AiUsagePanel
         copilotUsage={copilotUsage7d}
+        copilotDailyUsage={copilotDailyUsage7d}
+        hermesDailyUsage={hermesDailyUsage7d}
         hermesUsage={
           modelUsage7d
             ? modelUsage7d.reduce(
@@ -316,6 +336,8 @@ export function OpsCostScreen() {
             : null
         }
       />
+
+      <AgentControlPlane />
 
       {/* Headroom context-compression proxy (delegated-subagent OpenRouter traffic) */}
       <Panel title="Context compression — Headroom proxy">

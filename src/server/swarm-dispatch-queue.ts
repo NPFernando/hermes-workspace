@@ -12,14 +12,11 @@ const ENQUEUE_LOCK_A = 918_232
 const ENQUEUE_LOCK_B = 112
 const MAX_PENDING = 12
 const POLL_MS = 1_000
+const JOB_LEASE_MS = 15_000
+const LEASE_HEARTBEAT_MS = 1_000
 
 export type SwarmDispatchQueueStatus =
-  | 'pending'
-  | 'running'
-  | 'succeeded'
-  | 'failed'
-  | 'cancelled'
-  | 'interrupted'
+  'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'interrupted'
 
 export type SwarmDispatchQueueJob<TPayload = Record<string, unknown>> = {
   id: string
@@ -32,6 +29,9 @@ export type SwarmDispatchQueueJob<TPayload = Record<string, unknown>> = {
   queuedAt: number
   startedAt: number | null
   finishedAt: number | null
+  leaseExpiresAt: number | null
+  deadLetterAt: number | null
+  retryOfJobId: string | null
 }
 
 export type SwarmDispatchQueueItem = {
@@ -42,6 +42,9 @@ export type SwarmDispatchQueueItem = {
   assignmentCount: number
   status: SwarmDispatchQueueStatus
   cancelRequestedAt: number | null
+  leaseExpiresAt: number | null
+  deadLetterAt: number | null
+  retryOfJobId: string | null
 }
 
 export type SwarmDispatchQueueSnapshot = {
@@ -72,10 +75,35 @@ type QueueRow = {
   payload: Record<string, unknown>
   result: unknown
   error: string | null
+  lease_token: string | null
   cancel_requested_at: Date | string | null
   queued_at: Date | string
   started_at: Date | string | null
   finished_at: Date | string | null
+  lease_expires_at: Date | string | null
+  dead_letter_at: Date | string | null
+  retry_of_job_id: string | null
+  submission_key: string | null
+}
+
+export class SwarmDispatchQueueRetryError extends Error {
+  constructor(
+    readonly kind: 'acknowledgement-required' | 'not-found' | 'not-retryable',
+    message: string,
+  ) {
+    super(message)
+    this.name = 'SwarmDispatchQueueRetryError'
+  }
+}
+
+export class SwarmDispatchQueueIdempotencyError extends Error {
+  constructor(
+    readonly kind: 'invalid-key' | 'payload-conflict',
+    message: string,
+  ) {
+    super(message)
+    this.name = 'SwarmDispatchQueueIdempotencyError'
+  }
 }
 
 export type QueueWorkerContext = { signal: AbortSignal; jobId: string }
@@ -101,7 +129,10 @@ function parseHermesEnv(): Partial<Record<QueueEnvKey, string>> {
     process.env.CLAUDE_HOME ??
     path.join(os.homedir(), '.hermes')
   const values: Partial<Record<QueueEnvKey, string>> = {}
-  for (const envPath of [path.join(home, '.env'), path.join(home, '.hermes.backup', '.env')]) {
+  for (const envPath of [
+    path.join(home, '.env'),
+    path.join(home, '.hermes.backup', '.env'),
+  ]) {
     let contents = ''
     try {
       contents = fs.readFileSync(envPath, 'utf8')
@@ -183,6 +214,9 @@ function mapJob<TPayload = Record<string, unknown>>(
     queuedAt: toMillis(row.queued_at) ?? Date.now(),
     startedAt: toMillis(row.started_at),
     finishedAt: toMillis(row.finished_at),
+    leaseExpiresAt: toMillis(row.lease_expires_at),
+    deadLetterAt: toMillis(row.dead_letter_at),
+    retryOfJobId: row.retry_of_job_id,
   }
 }
 
@@ -212,7 +246,22 @@ async function ensureSchema(): Promise<Pool> {
 export async function enqueueSwarmDispatch(
   payload: object,
   assignmentCount: number,
-): Promise<{ id: string; position: number; queuedAt: number }> {
+  submissionKey?: string,
+): Promise<{
+  id: string
+  position: number
+  queuedAt: number
+  alreadyQueued: boolean
+}> {
+  if (
+    submissionKey !== undefined &&
+    (submissionKey.length > 128 || !/^[A-Za-z0-9._:-]+$/.test(submissionKey))
+  ) {
+    throw new SwarmDispatchQueueIdempotencyError(
+      'invalid-key',
+      'Idempotency-Key must contain 1 to 128 letters, digits, dots, underscores, colons, or hyphens.',
+    )
+  }
   const pg = await ensureSchema()
   const client = await pg.connect()
   const id = randomUUID()
@@ -222,6 +271,51 @@ export async function enqueueSwarmDispatch(
       ENQUEUE_LOCK_A,
       ENQUEUE_LOCK_B,
     ])
+    if (submissionKey !== undefined) {
+      const existing = await client.query<{
+        id: string
+        status: SwarmDispatchQueueStatus
+        assignment_count: number
+        payload_matches: boolean
+        queued_at: Date | string
+      }>(
+        `SELECT id, status, assignment_count, payload = $2::jsonb AS payload_matches, queued_at
+         FROM ${TABLE} WHERE submission_key = $1 FOR UPDATE`,
+        [submissionKey, JSON.stringify(payload)],
+      )
+      if (existing.rows[0]) {
+        const job = existing.rows[0]
+        if (
+          job.assignment_count !==
+            Math.max(1, Math.min(12, Math.floor(assignmentCount))) ||
+          !job.payload_matches
+        ) {
+          throw new SwarmDispatchQueueIdempotencyError(
+            'payload-conflict',
+            'This Idempotency-Key was already used for a different dispatch payload.',
+          )
+        }
+        const position =
+          job.status === 'pending'
+            ? await client.query<{ position: string }>(
+                `WITH target AS (
+                   SELECT queued_at, id FROM ${TABLE} WHERE id = $1::uuid
+                 )
+                 SELECT count(*)::text AS position FROM ${TABLE} AS jobs, target
+                 WHERE jobs.status = 'pending'
+                   AND (jobs.queued_at, jobs.id) <= (target.queued_at, target.id)`,
+                [job.id],
+              )
+            : null
+        await client.query('COMMIT')
+        return {
+          id: job.id,
+          position: Number(position?.rows[0]?.position ?? 0),
+          queuedAt: toMillis(job.queued_at) ?? Date.now(),
+          alreadyQueued: true,
+        }
+      }
+    }
     const pending = await client.query<{ count: string }>(
       `SELECT count(*)::text AS count FROM ${TABLE} WHERE status = 'pending'`,
     )
@@ -230,22 +324,33 @@ export async function enqueueSwarmDispatch(
       throw new SwarmDispatchQueueFullError()
     }
     const inserted = await client.query<QueueRow>(
-      `INSERT INTO ${TABLE} (id, status, assignment_count, payload)
-       VALUES ($1, 'pending', $2, $3::jsonb)
+      `INSERT INTO ${TABLE} (id, status, assignment_count, payload, submission_key)
+       VALUES ($1, 'pending', $2, $3::jsonb, $4)
        RETURNING id, status, assignment_count, payload, result, error,
-         cancel_requested_at, queued_at, started_at, finished_at`,
-      [id, Math.max(1, Math.min(12, Math.floor(assignmentCount))), JSON.stringify(payload)],
+         lease_token, cancel_requested_at, queued_at, started_at, finished_at,
+         lease_expires_at, dead_letter_at, retry_of_job_id`,
+      [
+        id,
+        Math.max(1, Math.min(12, Math.floor(assignmentCount))),
+        JSON.stringify(payload),
+        submissionKey ?? null,
+      ],
     )
     const position = await client.query<{ position: string }>(
-      `SELECT count(*)::text AS position FROM ${TABLE}
-       WHERE status = 'pending' AND (queued_at, id) <= ($1::timestamptz, $2::uuid)`,
-      [inserted.rows[0].queued_at, id],
+      `WITH target AS (
+         SELECT queued_at, id FROM ${TABLE} WHERE id = $1::uuid
+       )
+       SELECT count(*)::text AS position FROM ${TABLE} AS jobs, target
+       WHERE jobs.status = 'pending'
+         AND (jobs.queued_at, jobs.id) <= (target.queued_at, target.id)`,
+      [id],
     )
     await client.query('COMMIT')
     return {
       id,
       position: Number(position.rows[0]?.position ?? 1),
       queuedAt: toMillis(inserted.rows[0].queued_at) ?? Date.now(),
+      alreadyQueued: false,
     }
   } catch (error) {
     try {
@@ -255,10 +360,156 @@ export async function enqueueSwarmDispatch(
     }
     if (
       error instanceof SwarmDispatchQueueFullError ||
+      error instanceof SwarmDispatchQueueIdempotencyError ||
       error instanceof SwarmDispatchQueueUnavailableError
-    ) throw error
+    )
+      throw error
     throw new SwarmDispatchQueueUnavailableError(
       'Could not persist the serial dispatch in the dedicated queue database.',
+    )
+  } finally {
+    client.release()
+  }
+}
+
+export async function retrySwarmDispatchQueueJob(
+  id: string,
+  acknowledgePossibleDuplicate: boolean,
+): Promise<{
+  id: string
+  position: number
+  queuedAt: number
+  retryOfJobId: string
+  alreadyQueued: boolean
+}> {
+  if (!acknowledgePossibleDuplicate) {
+    throw new SwarmDispatchQueueRetryError(
+      'acknowledgement-required',
+      'Explicit acknowledgement is required because an earlier attempt may have partially reached agents.',
+    )
+  }
+
+  const pg = await ensureSchema()
+  const client = await pg.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query('SELECT pg_advisory_xact_lock($1, $2)', [
+      ENQUEUE_LOCK_A,
+      ENQUEUE_LOCK_B,
+    ])
+    const sourceResult = await client.query<{
+      id: string
+      status: SwarmDispatchQueueStatus
+      assignment_count: number
+      payload: Record<string, unknown>
+      dead_letter_at: Date | string | null
+    }>(
+      `SELECT id, status, assignment_count, payload, dead_letter_at
+       FROM ${TABLE} WHERE id = $1::uuid FOR UPDATE`,
+      [id],
+    )
+    const source = sourceResult.rows[0]
+    if (sourceResult.rowCount === 0) {
+      throw new SwarmDispatchQueueRetryError(
+        'not-found',
+        'Queue job not found.',
+      )
+    }
+    if (
+      !['failed', 'interrupted'].includes(source.status) ||
+      !source.dead_letter_at
+    ) {
+      throw new SwarmDispatchQueueRetryError(
+        'not-retryable',
+        'Only failed or interrupted dead-letter jobs can be retried.',
+      )
+    }
+
+    const previousRetry = await client.query<{
+      id: string
+      status: SwarmDispatchQueueStatus
+      queued_at: Date | string
+    }>(
+      `SELECT id, status, queued_at FROM ${TABLE}
+       WHERE retry_of_job_id = $1::uuid`,
+      [id],
+    )
+    if (previousRetry.rows[0]) {
+      const existing = previousRetry.rows[0]
+      const position =
+        existing.status === 'pending'
+          ? await client.query<{ position: string }>(
+              `WITH target AS (
+                 SELECT queued_at, id FROM ${TABLE} WHERE id = $1::uuid
+               )
+               SELECT count(*)::text AS position FROM ${TABLE} AS jobs, target
+               WHERE jobs.status = 'pending'
+                 AND (jobs.queued_at, jobs.id) <= (target.queued_at, target.id)`,
+              [existing.id],
+            )
+          : null
+      await client.query('COMMIT')
+      return {
+        id: existing.id,
+        position: Number(position?.rows[0]?.position ?? 0),
+        queuedAt: toMillis(existing.queued_at) ?? Date.now(),
+        retryOfJobId: id,
+        alreadyQueued: true,
+      }
+    }
+
+    const pending = await client.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM ${TABLE} WHERE status = 'pending'`,
+    )
+    if (Number(pending.rows[0]?.count ?? 0) >= MAX_PENDING) {
+      throw new SwarmDispatchQueueFullError()
+    }
+    const retryId = randomUUID()
+    const inserted = await client.query<QueueRow>(
+      `INSERT INTO ${TABLE} (id, status, assignment_count, payload, retry_of_job_id)
+       VALUES ($1::uuid, 'pending', $2, $3::jsonb, $4::uuid)
+       RETURNING id, status, assignment_count, payload, result, error,
+         lease_token, cancel_requested_at, queued_at, started_at, finished_at,
+         lease_expires_at, dead_letter_at, retry_of_job_id`,
+      [
+        retryId,
+        source.assignment_count,
+        JSON.stringify(source.payload),
+        source.id,
+      ],
+    )
+    const position = await client.query<{ position: string }>(
+      `WITH target AS (
+         SELECT queued_at, id FROM ${TABLE} WHERE id = $1::uuid
+       )
+       SELECT count(*)::text AS position FROM ${TABLE} AS jobs, target
+       WHERE jobs.status = 'pending'
+         AND (jobs.queued_at, jobs.id) <= (target.queued_at, target.id)`,
+      [retryId],
+    )
+    await client.query('COMMIT')
+    return {
+      id: retryId,
+      position: Number(position.rows[0]?.position ?? 1),
+      queuedAt: toMillis(inserted.rows[0].queued_at) ?? Date.now(),
+      retryOfJobId: id,
+      alreadyQueued: false,
+    }
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK')
+    } catch {
+      // Preserve the original failure if transaction cleanup also fails.
+    }
+    if (
+      error instanceof SwarmDispatchQueueRetryError ||
+      error instanceof SwarmDispatchQueueFullError ||
+      error instanceof SwarmDispatchQueueUnavailableError
+    ) {
+      throw error
+    }
+    throw new SwarmDispatchQueueUnavailableError(
+      'Could not enqueue the reviewed retry in the dedicated queue database.',
     )
   } finally {
     client.release()
@@ -271,7 +522,8 @@ export async function getSwarmDispatchQueueJob(
   const pg = await ensureSchema()
   const result = await pg.query<QueueRow>(
     `SELECT id, status, assignment_count, payload, result, error,
-       cancel_requested_at, queued_at, started_at, finished_at
+       lease_token, cancel_requested_at, queued_at, started_at, finished_at,
+       lease_expires_at, dead_letter_at, retry_of_job_id
      FROM ${TABLE} WHERE id = $1::uuid`,
     [id],
   )
@@ -284,7 +536,14 @@ export async function waitForSwarmDispatchQueueJob(
 ): Promise<SwarmDispatchQueueJob | null> {
   for (;;) {
     const job = await getSwarmDispatchQueueJob(id)
-    if (!job || job.status === 'succeeded' || job.status === 'failed' || job.status === 'cancelled' || job.status === 'interrupted') return job
+    if (
+      !job ||
+      job.status === 'succeeded' ||
+      job.status === 'failed' ||
+      job.status === 'cancelled' ||
+      job.status === 'interrupted'
+    )
+      return job
     await new Promise((resolve) => setTimeout(resolve, pollMs))
   }
 }
@@ -313,17 +572,20 @@ export async function getSwarmDispatchQueueSnapshot(): Promise<SwarmDispatchQueu
   const [active, waiting, recent] = await Promise.all([
     pg.query<QueueRow>(
       `SELECT id, status, assignment_count, payload, result, error,
-         cancel_requested_at, queued_at, started_at, finished_at
+         lease_token, cancel_requested_at, queued_at, started_at, finished_at,
+         lease_expires_at, dead_letter_at, retry_of_job_id
        FROM ${TABLE} WHERE status = 'running' ORDER BY started_at LIMIT 1`,
     ),
     pg.query<QueueRow>(
       `SELECT id, status, assignment_count, payload, result, error,
-         cancel_requested_at, queued_at, started_at, finished_at
+         lease_token, cancel_requested_at, queued_at, started_at, finished_at,
+         lease_expires_at, dead_letter_at, retry_of_job_id
        FROM ${TABLE} WHERE status = 'pending' ORDER BY queued_at, id LIMIT 50`,
     ),
     pg.query<QueueRow>(
       `SELECT id, status, assignment_count, payload, result, error,
-         cancel_requested_at, queued_at, started_at, finished_at
+         lease_token, cancel_requested_at, queued_at, started_at, finished_at,
+         lease_expires_at, dead_letter_at, retry_of_job_id
        FROM ${TABLE} WHERE status IN ('succeeded', 'failed', 'cancelled', 'interrupted')
        ORDER BY finished_at DESC NULLS LAST LIMIT 20`,
     ),
@@ -338,6 +600,9 @@ export async function getSwarmDispatchQueueSnapshot(): Promise<SwarmDispatchQueu
       assignmentCount: job.assignmentCount,
       status: job.status,
       cancelRequestedAt: job.cancelRequestedAt,
+      leaseExpiresAt: job.leaseExpiresAt,
+      deadLetterAt: job.deadLetterAt,
+      retryOfJobId: job.retryOfJobId,
     }
   }
   return {
@@ -348,9 +613,14 @@ export async function getSwarmDispatchQueueSnapshot(): Promise<SwarmDispatchQueu
   }
 }
 
-async function claimNextJob(client: PoolClient): Promise<SwarmDispatchQueueJob | null> {
+type ClaimedQueueJob = { job: SwarmDispatchQueueJob; leaseToken: string }
+
+async function claimNextJob(
+  client: PoolClient,
+): Promise<ClaimedQueueJob | null> {
   await client.query('BEGIN')
   try {
+    const leaseToken = randomUUID()
     const claimed = await client.query<QueueRow>(
       `WITH next_job AS (
          SELECT id FROM ${TABLE}
@@ -360,14 +630,19 @@ async function claimNextJob(client: PoolClient): Promise<SwarmDispatchQueueJob |
          LIMIT 1
        )
        UPDATE ${TABLE} AS jobs
-       SET status = 'running', started_at = clock_timestamp(), updated_at = clock_timestamp()
+       SET status = 'running', started_at = clock_timestamp(), updated_at = clock_timestamp(),
+           lease_token = $1::uuid,
+           lease_expires_at = clock_timestamp() + ($2::double precision * interval '1 millisecond')
        FROM next_job
        WHERE jobs.id = next_job.id
        RETURNING jobs.id, jobs.status, jobs.assignment_count, jobs.payload, jobs.result,
-         jobs.error, jobs.cancel_requested_at, jobs.queued_at, jobs.started_at, jobs.finished_at`,
+         jobs.error, jobs.lease_token, jobs.cancel_requested_at, jobs.queued_at,
+         jobs.started_at, jobs.finished_at, jobs.lease_expires_at,
+         jobs.dead_letter_at, jobs.retry_of_job_id`,
+      [leaseToken, JOB_LEASE_MS],
     )
     await client.query('COMMIT')
-    return claimed.rows[0] ? mapJob(claimed.rows[0]) : null
+    return claimed.rows[0] ? { job: mapJob(claimed.rows[0]), leaseToken } : null
   } catch (error) {
     await client.query('ROLLBACK')
     throw error
@@ -376,7 +651,8 @@ async function claimNextJob(client: PoolClient): Promise<SwarmDispatchQueueJob |
 
 async function finishJob(
   id: string,
-  status: 'succeeded' | 'failed' | 'cancelled',
+  leaseToken: string,
+  status: 'succeeded' | 'failed' | 'cancelled' | 'interrupted',
   result: unknown,
   error: string | null,
 ): Promise<void> {
@@ -385,9 +661,22 @@ async function finishJob(
     `UPDATE ${TABLE}
      SET status = CASE WHEN cancel_requested_at IS NOT NULL THEN 'cancelled' ELSE $2 END,
          result = $3::jsonb, error = $4,
+         dead_letter_at = CASE
+           WHEN cancel_requested_at IS NOT NULL OR $2 = 'cancelled' THEN NULL
+           WHEN $2 IN ('failed', 'interrupted') THEN clock_timestamp()
+           ELSE NULL
+         END,
+         lease_token = NULL, lease_expires_at = NULL,
          finished_at = clock_timestamp(), updated_at = clock_timestamp()
-     WHERE id = $1::uuid AND status = 'running'`,
-    [id, status, result === undefined ? null : JSON.stringify(result), error],
+     WHERE id = $1::uuid AND status = 'running' AND lease_token = $5::uuid
+       AND lease_expires_at > clock_timestamp()`,
+    [
+      id,
+      status,
+      result === undefined ? null : JSON.stringify(result),
+      error,
+      leaseToken,
+    ],
   )
 }
 
@@ -396,9 +685,31 @@ async function recoverInterruptedJobs(client: PoolClient): Promise<void> {
     `UPDATE ${TABLE}
      SET status = 'interrupted',
          error = COALESCE(error, 'Queue worker stopped before completion; verify agent state before retrying.'),
+         dead_letter_at = COALESCE(dead_letter_at, clock_timestamp()),
+         lease_token = NULL, lease_expires_at = NULL,
          finished_at = clock_timestamp(), updated_at = clock_timestamp()
-     WHERE status = 'running'`,
+     WHERE status = 'running' AND lease_expires_at <= clock_timestamp()`,
   )
+}
+
+async function renewJobLease(
+  id: string,
+  leaseToken: string,
+): Promise<{ renewed: boolean; cancelRequested: boolean }> {
+  const pg = await ensureSchema()
+  const renewed = await pg.query<{ cancel_requested_at: Date | string | null }>(
+    `UPDATE ${TABLE}
+     SET lease_expires_at = clock_timestamp() + ($3::double precision * interval '1 millisecond'),
+         updated_at = clock_timestamp()
+     WHERE id = $1::uuid AND status = 'running' AND lease_token = $2::uuid
+       AND lease_expires_at > clock_timestamp()
+     RETURNING cancel_requested_at`,
+    [id, leaseToken, JOB_LEASE_MS],
+  )
+  return {
+    renewed: renewed.rowCount === 1,
+    cancelRequested: Boolean(renewed.rows[0]?.cancel_requested_at),
+  }
 }
 
 async function processQueue(processor: QueueProcessor): Promise<void> {
@@ -414,43 +725,85 @@ async function processQueue(processor: QueueProcessor): Promise<void> {
     if (!ownsLock) return
 
     await recoverInterruptedJobs(client)
+    const protectedWork = await client.query(
+      `SELECT 1 FROM ${TABLE}
+       WHERE status = 'running' AND lease_expires_at > clock_timestamp()
+       LIMIT 1`,
+    )
+    // A previous worker may have lost its Postgres connection (and therefore
+    // the advisory lock) while its lease is still valid. Do not overlap it.
+    if (protectedWork.rowCount) return
+
     for (;;) {
-      const job = await claimNextJob(client)
-      if (!job) break
+      const claimed = await claimNextJob(client)
+      if (!claimed) break
+      const { job, leaseToken } = claimed
       const controller = new AbortController()
-      const cancelPoll = setInterval(() => {
-        void getSwarmDispatchQueueJob(job.id)
-          .then((current) => {
-            if (current?.cancelRequestedAt) controller.abort()
+      let heartbeatInFlight = false
+      const heartbeat = setInterval(() => {
+        if (heartbeatInFlight) return
+        heartbeatInFlight = true
+        void renewJobLease(job.id, leaseToken)
+          .then(({ renewed, cancelRequested }) => {
+            if (!renewed) {
+              controller.abort('lease-lost')
+            } else if (cancelRequested) {
+              controller.abort('cancel-requested')
+            }
           })
-          .catch(() => undefined)
+          .catch(() => {
+            controller.abort('lease-lost')
+          })
+          .finally(() => {
+            heartbeatInFlight = false
+          })
       }, POLL_MS)
-      cancelPoll.unref()
+      heartbeat.unref()
       let result: unknown = null
       let errorMessage: string | null = null
-      let status: 'succeeded' | 'failed' | 'cancelled' = 'succeeded'
+      let status: 'succeeded' | 'failed' | 'cancelled' | 'interrupted' =
+        'succeeded'
       try {
-        result = await processor(job.payload, { signal: controller.signal, jobId: job.id })
+        result = await processor(job.payload, {
+          signal: controller.signal,
+          jobId: job.id,
+        })
         const cancelled = await getSwarmDispatchQueueJob(job.id)
-        if (controller.signal.aborted || cancelled?.cancelRequestedAt) {
+        if (controller.signal.reason === 'lease-lost') {
+          status = 'interrupted'
+          errorMessage =
+            'Worker lease was lost; inspect agent state before retrying.'
+        } else if (controller.signal.aborted || cancelled?.cancelRequestedAt) {
           status = 'cancelled'
         } else if (
-          result && typeof result === 'object' &&
+          result &&
+          typeof result === 'object' &&
           Array.isArray((result as { results?: unknown }).results) &&
-          ((result as { results: Array<{ ok?: unknown }> }).results).some((item) => item.ok !== true)
+          (result as { results: Array<{ ok?: unknown }> }).results.some(
+            (item) => item.ok !== true,
+          )
         ) {
           status = 'failed'
-          errorMessage = 'One or more agent assignments failed; inspect the saved result.'
+          errorMessage =
+            'One or more agent assignments failed; inspect the saved result.'
         }
       } catch {
-        status = controller.signal.aborted ? 'cancelled' : 'failed'
-        errorMessage = controller.signal.aborted
-          ? 'Cancellation requested; active dispatch was interrupted.'
-          : 'Dispatch failed; inspect the server logs and agent state.'
+        status =
+          controller.signal.reason === 'lease-lost'
+            ? 'interrupted'
+            : controller.signal.aborted
+              ? 'cancelled'
+              : 'failed'
+        errorMessage =
+          controller.signal.reason === 'lease-lost'
+            ? 'Worker lease was lost; inspect agent state before retrying.'
+            : controller.signal.aborted
+              ? 'Cancellation requested; active dispatch was interrupted.'
+              : 'Dispatch failed; inspect the server logs and agent state.'
       } finally {
-        clearInterval(cancelPoll)
+        clearInterval(heartbeat)
       }
-      await finishJob(job.id, status, result, errorMessage)
+      await finishJob(job.id, leaseToken, status, result, errorMessage)
     }
   } finally {
     if (ownsLock) {

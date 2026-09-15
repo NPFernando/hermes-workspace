@@ -124,6 +124,30 @@ export async function proposeCategoryPreference(input: {
   })
 }
 
+/** Read the governed HARP readiness report for the selected local repository. */
+export async function getHarpReadiness(repositoryPath?: string): Promise<{
+  available: boolean
+  repositoryPath: string
+  checkedAt: number
+  report: Record<string, unknown> | null
+}> {
+  const path =
+    repositoryPath?.trim() ||
+    process.env.HARP_READINESS_REPOSITORY_PATH ||
+    `${process.env.HOME || '/home/ubuntu'}/workspace/projects/universal-harp-engine`
+  const params = new URLSearchParams({ repository_path: path })
+  const value = await call('GET', `/api/readiness?${params.toString()}`)
+  return {
+    available: value !== null && typeof value === 'object',
+    repositoryPath: path,
+    checkedAt: Date.now(),
+    report:
+      value !== null && typeof value === 'object'
+        ? (value as Record<string, unknown>)
+        : null,
+  }
+}
+
 type SearchResult = {
   results?: Array<{
     id?: string
@@ -240,7 +264,8 @@ export async function getUserFinanceMemoriesForPrompt(
   for (const entry of raw.results) {
     if (!isOwnFinanceMemory(entry)) continue
     if (entry.memory_type === CATEGORY_RULE_TYPE) continue
-    const content = typeof entry.content === 'string' ? entry.content.trim() : ''
+    const content =
+      typeof entry.content === 'string' ? entry.content.trim() : ''
     if (!content || CATEGORY_RULE_CONTENT.test(content)) continue
     out.push(
       content.length > MAX_MEMORY_CHARS
@@ -258,10 +283,7 @@ export async function getUserFinanceMemoriesForPrompt(
 
 const FINANCIAL_RULE_TYPE = 'financial_rule'
 
-export type AssistantMemoryKind =
-  | 'category_rule'
-  | 'financial_rule'
-  | 'other'
+export type AssistantMemoryKind = 'category_rule' | 'financial_rule' | 'other'
 
 export type AssistantMemory = {
   id: string
@@ -278,7 +300,10 @@ function classifyMemory(
   memoryType: unknown,
   content: string,
 ): AssistantMemoryKind {
-  if (memoryType === CATEGORY_RULE_TYPE || CATEGORY_RULE_CONTENT.test(content)) {
+  if (
+    memoryType === CATEGORY_RULE_TYPE ||
+    CATEGORY_RULE_CONTENT.test(content)
+  ) {
     return 'category_rule'
   }
   if (memoryType === FINANCIAL_RULE_TYPE) return 'financial_rule'
@@ -286,7 +311,9 @@ function classifyMemory(
 }
 
 /** Active (approved) user-scoped finance memories, for the dashboard panel. */
-export async function listActiveFinanceMemories(): Promise<Array<AssistantMemory>> {
+export async function listActiveFinanceMemories(): Promise<
+  Array<AssistantMemory>
+> {
   if (!getConfig()) return []
   const raw = (await call(
     'GET',
@@ -297,7 +324,8 @@ export async function listActiveFinanceMemories(): Promise<Array<AssistantMemory
   for (const entry of raw.results) {
     if (!isOwnFinanceMemory(entry)) continue
     const id = typeof entry.id === 'string' ? entry.id : ''
-    const content = typeof entry.content === 'string' ? entry.content.trim() : ''
+    const content =
+      typeof entry.content === 'string' ? entry.content.trim() : ''
     if (!id || !content) continue
     out.push({ id, content, kind: classifyMemory(entry.memory_type, content) })
   }
@@ -391,7 +419,9 @@ export async function listPendingFinanceCandidates(): Promise<
  * Promote a pending candidate to an active memory. `call()` returns null on
  * any non-2xx / failure, so a non-null response means the review landed.
  */
-export async function approveMemory(memoryId: string): Promise<{ ok: boolean }> {
+export async function approveMemory(
+  memoryId: string,
+): Promise<{ ok: boolean }> {
   if (!memoryId) return { ok: false }
   const res = await call('POST', '/api/approve', {
     memory_id: memoryId,

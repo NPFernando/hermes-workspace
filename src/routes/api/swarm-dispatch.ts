@@ -23,10 +23,13 @@ import {
 } from '../../server/swarm-memory'
 import {
   SwarmDispatchQueueFullError,
+  SwarmDispatchQueueIdempotencyError,
+  SwarmDispatchQueueRetryError,
   SwarmDispatchQueueUnavailableError,
   cancelSwarmDispatchQueueJob,
   enqueueSwarmDispatch,
   getSwarmDispatchQueueSnapshot,
+  retrySwarmDispatchQueueJob,
   startSwarmDispatchQueueWorker,
   waitForSwarmDispatchQueueJob,
 } from '../../server/swarm-dispatch-queue'
@@ -763,7 +766,8 @@ async function waitForFreshCheckpoint(
         checkpoint &&
         checkpoint.raw !== previousRaw &&
         checkpoint.stateLabel !== 'IN_PROGRESS'
-      ) return checkpoint
+      )
+        return checkpoint
     }
     await sleep(2_000)
   }
@@ -1353,8 +1357,8 @@ function runWorker(
   },
 ): Promise<WorkerResult> {
   return new Promise((resolve) => {
-      const workerId = assignment.workerId
-      void (async () => {
+    const workerId = assignment.workerId
+    void (async () => {
       if (options?.signal?.aborted) {
         resolve({
           workerId,
@@ -1424,15 +1428,15 @@ function runWorker(
         const effectiveLiveResult = options?.signal?.aborted
           ? liveResult
           : liveResult.ok
-          ? liveResult
-          : await tryHarpRotationAfterModelFailure({
-              workerId,
-              assignment,
-              prompt,
-              result: liveResult,
-              options,
-              startedAt,
-            })
+            ? liveResult
+            : await tryHarpRotationAfterModelFailure({
+                workerId,
+                assignment,
+                prompt,
+                result: liveResult,
+                options,
+                startedAt,
+              })
         if (options?.waitForCheckpoint && effectiveLiveResult.ok) {
           const checkpoint =
             effectiveLiveResult.checkpoint ??
@@ -1713,6 +1717,7 @@ export class SwarmDispatchError extends Error {
 type DispatchExecutionContext = {
   queueWorker?: boolean
   queueJobId?: string
+  submissionKey?: string
   signal?: AbortSignal
 }
 
@@ -1763,6 +1768,7 @@ export async function dispatchSwarmAssignments(
     const queued = await enqueueSwarmDispatch(
       body,
       assignments.length,
+      context.submissionKey,
     )
     ensureSwarmDispatchQueueWorker()
     const job = await waitForSwarmDispatchQueueJob(queued.id)
@@ -1798,9 +1804,9 @@ export async function dispatchSwarmAssignments(
   const timeoutMs = timeoutSeconds * 1000
   // Serial batches must not advance to another assignment while the current
   // agent is still working. Parallel mode retains its explicit async option.
-  const waitForCheckpoint = serialDispatch || !(
-    body.waitForCheckpoint === false && body.allowAsync === true
-  )
+  const waitForCheckpoint =
+    serialDispatch ||
+    !(body.waitForCheckpoint === false && body.allowAsync === true)
   const pollRaw =
     typeof body.checkpointPollSeconds === 'number'
       ? body.checkpointPollSeconds
@@ -1868,24 +1874,25 @@ export async function dispatchSwarmAssignments(
     for (const assignment of assignments) {
       if (context.signal?.aborted) break
       const result = await runWorker(
-          assignment,
-          timeoutMs,
-          roster.get(assignment.workerId),
-          {
-            waitForCheckpoint,
-            checkpointPollMs: checkpointPollSeconds * 1000,
-            missionId: mission.id,
-            notifySessionKey,
-            signal: context.signal,
-          },
-        )
+        assignment,
+        timeoutMs,
+        roster.get(assignment.workerId),
+        {
+          waitForCheckpoint,
+          checkpointPollMs: checkpointPollSeconds * 1000,
+          missionId: mission.id,
+          notifySessionKey,
+          signal: context.signal,
+        },
+      )
       if (
         result.delivery === 'tmux' &&
         result.ok &&
         result.checkpointStatus !== 'checkpointed'
       ) {
         result.ok = false
-        result.error = 'No terminal agent checkpoint was received; later serial assignments were held.'
+        result.error =
+          'No terminal agent checkpoint was received; later serial assignments were held.'
         markDispatchResult(assignment.workerId, result)
         recordDispatchBlock(assignment.workerId, assignment, result, {
           missionId: mission.id,
@@ -1962,7 +1969,10 @@ export const Route = createFileRoute('/api/swarm-dispatch')({
         } catch (error) {
           return json(
             { error: safeErrorMessage(error) },
-            { status: error instanceof SwarmDispatchQueueUnavailableError ? 503 : 500 },
+            {
+              status:
+                error instanceof SwarmDispatchQueueUnavailableError ? 503 : 500,
+            },
           )
         }
       },
@@ -1972,17 +1982,65 @@ export const Route = createFileRoute('/api/swarm-dispatch')({
         }
         const id = new URL(request.url).searchParams.get('id')?.trim() ?? ''
         if (!/^[0-9a-f-]{36}$/i.test(id)) {
-          return json({ error: 'A valid queue job id is required.' }, { status: 400 })
+          return json(
+            { error: 'A valid queue job id is required.' },
+            { status: 400 },
+          )
         }
         try {
           const cancellation = await cancelSwarmDispatchQueueJob(id)
-          if (!cancellation.found) return json({ error: 'Queue job not found.' }, { status: 404 })
+          if (!cancellation.found)
+            return json({ error: 'Queue job not found.' }, { status: 404 })
           return json(cancellation)
         } catch (error) {
           return json(
             { error: safeErrorMessage(error) },
-            { status: error instanceof SwarmDispatchQueueUnavailableError ? 503 : 500 },
+            {
+              status:
+                error instanceof SwarmDispatchQueueUnavailableError ? 503 : 500,
+            },
           )
+        }
+      },
+      PATCH: async ({ request }) => {
+        if (!isAuthenticated(request)) {
+          return json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        const url = new URL(request.url)
+        const id = url.searchParams.get('id')?.trim() ?? ''
+        if (!/^[0-9a-f-]{36}$/i.test(id)) {
+          return json(
+            { error: 'A valid queue job id is required.' },
+            { status: 400 },
+          )
+        }
+        let body: { acknowledgePossibleDuplicate?: unknown }
+        try {
+          body = (await request.json()) as {
+            acknowledgePossibleDuplicate?: unknown
+          }
+        } catch {
+          return json({ error: 'Invalid JSON body' }, { status: 400 })
+        }
+        try {
+          const retry = await retrySwarmDispatchQueueJob(
+            id,
+            body.acknowledgePossibleDuplicate === true,
+          )
+          ensureSwarmDispatchQueueWorker()
+          return json(retry, { status: retry.alreadyQueued ? 200 : 202 })
+        } catch (error) {
+          if (error instanceof SwarmDispatchQueueRetryError) {
+            const status = error.kind === 'not-found' ? 404 : 409
+            return json({ error: error.message, kind: error.kind }, { status })
+          }
+          if (error instanceof SwarmDispatchQueueFullError) {
+            return json({ error: error.message }, { status: 429 })
+          }
+          if (error instanceof SwarmDispatchQueueUnavailableError) {
+            return json({ error: error.message }, { status: 503 })
+          }
+          return json({ error: safeErrorMessage(error) }, { status: 500 })
         }
       },
       POST: async ({ request }) => {
@@ -1998,10 +2056,21 @@ export const Route = createFileRoute('/api/swarm-dispatch')({
         }
 
         try {
-          return json(await dispatchSwarmAssignments(body))
+          return json(
+            await dispatchSwarmAssignments(body, {
+              submissionKey:
+                request.headers.get('Idempotency-Key') ?? undefined,
+            }),
+          )
         } catch (error) {
           if (error instanceof SwarmDispatchQueueFullError) {
             return json({ error: error.message }, { status: 429 })
+          }
+          if (error instanceof SwarmDispatchQueueIdempotencyError) {
+            return json(
+              { error: error.message, kind: error.kind },
+              { status: error.kind === 'invalid-key' ? 400 : 409 },
+            )
           }
           if (error instanceof SwarmDispatchQueueUnavailableError) {
             return json({ error: error.message }, { status: 503 })
