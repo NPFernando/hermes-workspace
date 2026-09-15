@@ -3,10 +3,13 @@
 upstream-sync.py — Pull upstream hermes-workspace changes into Naveen's fork.
 
 Usage:
-  python3 scripts/upstream-sync.py            # auto mode: check + apply if safe
+  python3 scripts/upstream-sync.py            # check only; never apply
   python3 scripts/upstream-sync.py --check    # only check, report, never apply
-  python3 scripts/upstream-sync.py --apply    # apply even if our files are touched
-  python3 scripts/upstream-sync.py --status   # print current sync status and exit
+  python3 scripts/upstream-sync.py --status   # report local cached refs only
+
+The historical in-place rebase/build/restart/push path is retired. Use
+fork_sync_assistant.py preview for an isolated assessment; integrate updates
+manually only after reviewing its report.
 
 Telegram notifications are sent to the Monitoring topic (14) on success, the
 Approvals topic (23) when conflicts require review.
@@ -17,19 +20,15 @@ import json
 import os
 import subprocess
 import sys
-import textwrap
 from datetime import datetime, timezone
 from pathlib import Path
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
 REPO_DIR = Path("/home/ubuntu/hermes-workspace")
-BRANCH = "feat/harp-routing-config-ui"
-UPSTREAM_REMOTE = "origin"
+UPSTREAM_REMOTE = "upstream"
 UPSTREAM_BRANCH = "main"
 UPSTREAM_REF = f"{UPSTREAM_REMOTE}/{UPSTREAM_BRANCH}"
-NAVEEN_REMOTE = "naveen"
-SERVICE = "hermes-workspace.service"
 LOG_DIR = Path("/home/ubuntu/.hermes/logs")
 LOG_FILE = LOG_DIR / "workspace-sync.log"
 
@@ -160,69 +159,6 @@ def detect_merged_prs(commits):
             merged.append(key)
     return merged
 
-def stash_working_tree():
-    """Stash if there are uncommitted changes. Returns True if stashed."""
-    status = git("status", "--porcelain").stdout.strip()
-    if status:
-        git("stash", "push", "-m", "upstream-sync auto-stash")
-        return True
-    return False
-
-def pop_stash():
-    try:
-        git("stash", "pop", check=False)
-    except Exception:
-        pass
-
-# ── Core operations ───────────────────────────────────────────────────────────
-
-def do_rebase():
-    """
-    Rebase current branch onto upstream/main.
-    Returns (success: bool, conflict_files: list[str])
-    """
-    r = subprocess.run(
-        ["git", "rebase", UPSTREAM_REF],
-        cwd=REPO_DIR, capture_output=True, text=True
-    )
-    if r.returncode == 0:
-        return True, []
-
-    # Collect conflicted files
-    conflict_files = []
-    status = subprocess.run(
-        ["git", "diff", "--name-only", "--diff-filter=U"],
-        cwd=REPO_DIR, capture_output=True, text=True
-    ).stdout.strip().splitlines()
-    conflict_files = status
-
-    subprocess.run(["git", "rebase", "--abort"], cwd=REPO_DIR, capture_output=True)
-    return False, conflict_files
-
-def do_build():
-    """Run vite build. Returns (success: bool, output: str)"""
-    log("Building...")
-    pnpm = Path("/home/ubuntu/.hermes/node/bin/pnpm")
-    build_cmd = [str(pnpm), "run", "build"] if pnpm.exists() else ["npm", "run", "build"]
-    r = subprocess.run(build_cmd, cwd=REPO_DIR, capture_output=True, text=True, timeout=300)
-    output = r.stdout[-3000:] + r.stderr[-1000:]
-    return r.returncode == 0, output
-
-def do_restart():
-    """Restart the workspace systemd service."""
-    r = subprocess.run(
-        ["sudo", "systemctl", "restart", SERVICE],
-        capture_output=True, text=True
-    )
-    return r.returncode == 0
-
-def push_to_naveen_fork():
-    """Push updated branch to Naveen's personal fork."""
-    try:
-        git("push", NAVEEN_REMOTE, f"{BRANCH}:{BRANCH}", "--force-with-lease", check=False)
-    except Exception as e:
-        log(f"WARNING: push to naveen fork failed: {e}")
-
 # ── Notification messages ─────────────────────────────────────────────────────
 
 def msg_up_to_date():
@@ -241,7 +177,7 @@ def msg_check_only(commits, touched, merged_prs):
     lines.append(f"\n<b>Top commits:</b>")
     for h, s in commits[:10]:
         lines.append(f"  <code>{h[:7]}</code> {s}")
-    lines.append(f"\nRun <code>python3 scripts/upstream-sync.py --apply</code> to merge.")
+    lines.append("\nReview with the isolated fork-sync preview, then integrate manually after reviewing the report.")
     return "\n".join(lines)
 
 def msg_conflict(commits, conflict_files, touched, merged_prs):
@@ -262,51 +198,8 @@ def msg_conflict(commits, conflict_files, touched, merged_prs):
     lines.append("  2. cd /home/ubuntu/hermes-workspace")
     lines.append("  3. Review: git fetch origin && git log HEAD..origin/main --oneline")
     lines.append("  4. Decide per file: keep ours or adopt upstream")
-    lines.append("  5. python3 scripts/upstream-sync.py --apply")
+    lines.append("  5. Run scripts/fork_sync_assistant.py preview in a disposable assessment, then resolve and merge manually.")
     lines.append(f"\nSee NAVEEN_CUSTOMIZATIONS.md for the guide.")
-    return "\n".join(lines)
-
-def msg_build_failed(commits, build_output):
-    return "\n".join([
-        "❌ <b>hermes-workspace: build failed after rebase</b>",
-        f"Upstream rebase applied ({len(commits)} commits) but <code>vite build</code> failed.",
-        "Reverted to previous state. Manual fix needed.",
-        f"\n<b>Build error (last 800 chars):</b>",
-        f"<pre>{build_output[-800:]}</pre>",
-    ])
-
-def msg_restart_failed(commits, touched, merged_prs, build_time_s):
-    lines = [f"⚠️ <b>hermes-workspace: rebuilt but restart failed</b>"]
-    lines.append(
-        f"<b>{len(commits)} upstream commits</b> rebased + built ({build_time_s:.0f}s) "
-        f"but <code>systemctl restart hermes-workspace.service</code> did not come up cleanly."
-    )
-    lines.append(
-        "\nThe service may now be serving stale assets or be down. "
-        "SSH in and run <code>systemctl status hermes-workspace.service</code> "
-        "and <code>journalctl -u hermes-workspace.service -n 50</code> to diagnose."
-    )
-    if touched:
-        lines.append(f"\n⚡ <b>Custom files merged cleanly:</b>")
-        for f in touched:
-            lines.append(f"  • {f}")
-    return "\n".join(lines)
-
-def msg_success(commits, touched, merged_prs, build_time_s):
-    lines = [f"✅ <b>hermes-workspace updated</b>"]
-    lines.append(f"<b>{len(commits)} upstream commits</b> rebased + built + restarted ({build_time_s:.0f}s)")
-    if touched:
-        lines.append(f"\n⚡ <b>Custom files merged cleanly:</b>")
-        for f in touched:
-            lines.append(f"  • {f}")
-    if merged_prs:
-        lines.append(f"\n🎉 <b>Our PRs merged upstream:</b> {', '.join(merged_prs)}")
-        lines.append("  → Local commits now redundant; clean up when convenient")
-    lines.append(f"\n<b>Changes applied:</b>")
-    for h, s in commits[:10]:
-        lines.append(f"  <code>{h[:7]}</code> {s}")
-    if len(commits) > 10:
-        lines.append(f"  … and {len(commits)-10} more")
     return "\n".join(lines)
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -314,105 +207,45 @@ def msg_success(commits, touched, merged_prs, build_time_s):
 def main():
     parser = argparse.ArgumentParser(description="Sync hermes-workspace with upstream")
     parser.add_argument("--check", action="store_true", help="Check only, never apply")
-    parser.add_argument("--apply", action="store_true", help="Apply even if custom files touched")
+    parser.add_argument("--apply", action="store_true", help="Deprecated and disabled; use the isolated preview then merge manually")
     parser.add_argument("--status", action="store_true", help="Print status and exit")
-    parser.add_argument("--quiet", action="store_true", help="Suppress Telegram if up-to-date")
+    parser.add_argument("--notify", action="store_true", help="Explicitly send the report to Telegram")
     args = parser.parse_args()
+
+    if args.apply:
+        print("Refusing in-place update: automatic rebase/build/restart/push is retired. Run scripts/fork_sync_assistant.py preview, review the report, then merge manually.", file=sys.stderr)
+        return 2
 
     os.chdir(REPO_DIR)
     branch = current_branch()
-    log(f"Starting upstream sync (branch={branch})")
-
-    # 1. Fetch
-    log("Fetching upstream...")
-    git("fetch", UPSTREAM_REMOTE)
-
-    # 2. Check for new commits
-    commits = new_upstream_commits()
 
     if args.status:
+        commits = new_upstream_commits()
         touched = upstream_touched_our_files()
         merged_prs = detect_merged_prs(commits)
         print(f"Branch:          {branch}")
         print(f"Upstream commits ahead: {len(commits)}")
         print(f"Our custom files touched by upstream: {touched or 'none'}")
         print(f"Upstream may have merged our PRs: {merged_prs or 'none'}")
-        return
+        print("Status uses cached refs only; no fetch or merge was performed.")
+        return 0
+
+    # Checking may update local remote-tracking refs, but never edits the
+    # working tree, starts tests, restarts services, pushes, or sends messages.
+    git("fetch", UPSTREAM_REMOTE, "--no-tags")
+    commits = new_upstream_commits()
 
     if not commits:
-        log("Already up to date.")
-        if not args.quiet:
-            notify(TG_MONITORING, msg_up_to_date())
-        return
+        print("Already up to date; no worktree, build, service, push, or notification actions taken.")
+        return 0
 
-    log(f"Found {len(commits)} new upstream commits.")
     touched = upstream_touched_our_files()
     merged_prs = detect_merged_prs(commits)
-
-    if merged_prs:
-        log(f"Our PRs appear merged upstream: {merged_prs}")
-    if touched:
-        log(f"Upstream touches our custom files: {touched}")
-
-    # 3. Check-only mode
-    if args.check:
-        log("--check mode: reporting only, not applying.")
-        notify(TG_MONITORING, msg_check_only(commits, touched, merged_prs))
-        return
-
-    # 4. If upstream touched our files and we're not in --apply mode, ask for review
-    if touched and not args.apply:
-        log("Custom file conflict detected — sending review request, not auto-applying.")
-        # Do a trial rebase to find actual conflict files
-        stashed = stash_working_tree()
-        ok, conflict_files = do_rebase()
-        if stashed:
-            pop_stash()
-        if not ok:
-            notify(TG_APPROVALS, msg_conflict(commits, conflict_files, touched, merged_prs))
-            log("Review required. Notified Approvals topic.")
-            sys.exit(2)
-        # Rebase was actually clean even though files were touched (no overlap in lines)
-        log("Files touched but rebase was clean — proceeding.")
-
-    # 5. Apply
-    prev_head = git("rev-parse", "HEAD").stdout.strip()
-    stashed = stash_working_tree()
-
-    ok, conflict_files = do_rebase()
-    if stashed:
-        pop_stash()
-
-    if not ok:
-        log(f"Rebase failed. Conflicts: {conflict_files}")
-        notify(TG_APPROVALS, msg_conflict(commits, conflict_files, touched, merged_prs))
-        sys.exit(2)
-
-    log("Rebase clean. Building...")
-    t0 = datetime.now(timezone.utc)
-    build_ok, build_out = do_build()
-    build_time = (datetime.now(timezone.utc) - t0).total_seconds()
-
-    if not build_ok:
-        log("Build failed — reverting rebase.")
-        git("reset", "--hard", prev_head)
-        notify(TG_MONITORING, msg_build_failed(commits, build_out))
-        sys.exit(3)
-
-    log("Build succeeded. Restarting service...")
-    restart_ok = do_restart()
-
-    # 6. Push updated branch to Naveen's fork (code is good even if the live
-    # restart below failed — the failure is about the running process, not the commit)
-    push_to_naveen_fork()
-
-    if not restart_ok:
-        log("ERROR: service restart failed — check systemctl status hermes-workspace.service")
-        notify(TG_APPROVALS, msg_restart_failed(commits, touched, merged_prs, build_time))
-        sys.exit(4)
-
-    log(f"Sync complete ({len(commits)} commits, {build_time:.0f}s build).")
-    notify(TG_MONITORING, msg_success(commits, touched, merged_prs, build_time))
+    report = msg_check_only(commits, touched, merged_prs)
+    print(report)
+    if args.notify:
+        notify(TG_MONITORING, report)
+    return 0
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
