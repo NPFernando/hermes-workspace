@@ -111,7 +111,7 @@ export function AgoraProfileDrawer({
                 height={72}
                 className="rounded-full border-2 border-[var(--theme-border)]"
                 onError={(e) => {
-                  ;(e.currentTarget as HTMLImageElement).src =
+                  ;(e.currentTarget).src =
                     '/avatars/hermes.png'
                 }}
               />
@@ -231,7 +231,7 @@ export function AgoraProfileDrawer({
                         height={40}
                         className="rounded-full block"
                         onError={(e) => {
-                          ;(e.currentTarget as HTMLImageElement).src =
+                          ;(e.currentTarget).src =
                             '/avatars/hermes.png'
                         }}
                       />

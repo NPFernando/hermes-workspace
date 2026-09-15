@@ -1420,9 +1420,9 @@ export const Route = createFileRoute('/api/send-stream')({
                             > = []
                             try {
                               persistedMessages =
-                                (await getSessionMessagesFromAgent(
+                                await getSessionMessagesFromAgent(
                                   sid,
-                                )) as unknown as Array<Record<string, unknown>>
+                                )
                             } catch {
                               persistedMessages = []
                             }

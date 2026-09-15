@@ -69,7 +69,7 @@ export const Route = createFileRoute('/api/tasks-create-from-tg')({
           column: 'todo',
           created_by: 'telegram',
           source: 'human',
-        } as Parameters<typeof createTask>[0])
+        })
 
         // Send confirmation to Telegram
         const target = body.chat_id ? `telegram:${body.chat_id}` : DEFAULT_TG

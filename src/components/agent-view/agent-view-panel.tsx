@@ -1226,7 +1226,7 @@ export function AgentViewPanel() {
                       ) : cliAgents.length > 0 ? null : (
                         <p
                           ref={
-                            networkLayerRef as React.RefObject<HTMLParagraphElement>
+                            networkLayerRef
                           }
                           className="text-[11px] text-pretty text-[var(--theme-muted)] py-1"
                         ></p>

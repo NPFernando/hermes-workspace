@@ -403,7 +403,7 @@ function validatePayload(parsed: unknown): PresetValidation {
       category,
       ...(homepage !== undefined ? { homepage } : {}),
       ...(tags !== undefined ? { tags } : {}),
-      template: tmplResult.value as McpClientInput,
+      template: tmplResult.value,
     })
   }
 

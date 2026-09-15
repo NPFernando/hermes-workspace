@@ -139,7 +139,7 @@ export const Route = createFileRoute('/api/telegram-task-clarify')({
               if (i !== clearIdx) return q
               // Strip the answer fields to make this question pending again
               const { answer: _a, answered_at: _at, ...rest } = q
-              return rest as ClarificationQuestion
+              return rest
             },
           )
 

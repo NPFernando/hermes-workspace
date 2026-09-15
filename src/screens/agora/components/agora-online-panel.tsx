@@ -48,7 +48,7 @@ export function AgoraOnlinePanel({
                 height={28}
                 className="rounded-full border border-[var(--theme-border)]"
                 onError={(e) => {
-                  ;(e.currentTarget as HTMLImageElement).src =
+                  ;(e.currentTarget).src =
                     '/avatars/hermes.png'
                 }}
               />

@@ -61,7 +61,7 @@ export function VoiceContent() {
               onChange={(e) =>
                 saveTts('openai', {
                   ...(tts.openai
-                    ? (tts.openai as Record<string, unknown>)
+                    ? (tts.openai)
                     : {}),
                   voice: e.target.value,
                 })

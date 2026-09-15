@@ -86,7 +86,7 @@ export function AgoraScreen() {
               height={20}
               className="rounded-full"
               onError={(e) => {
-                ;(e.currentTarget as HTMLImageElement).src =
+                ;(e.currentTarget).src =
                   '/avatars/hermes.png'
               }}
             />

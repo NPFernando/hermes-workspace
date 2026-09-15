@@ -257,7 +257,7 @@ function normalizeAgentList(input: unknown): Array<GatewayConfigAgent> {
 
 function parseConfigPayload(payload: ConfigPayload): ConfigPayload {
   if (payload.payload && typeof payload.payload === 'object') {
-    return payload.payload as ConfigPayload
+    return payload.payload
   }
   return payload
 }

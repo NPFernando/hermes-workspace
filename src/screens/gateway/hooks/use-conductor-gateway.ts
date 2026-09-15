@@ -1423,7 +1423,7 @@ export function useConductorGateway() {
           createdAt: missionStatusQuery.data?.updatedAt ?? Date.now(),
           startedAt: missionStatusQuery.data?.updatedAt ?? Date.now(),
           updatedAt: Date.now(),
-        } as GatewaySession,
+        },
       }
     })
   }, [isNativeSwarm, swarmAssignments])

@@ -436,7 +436,7 @@ export function useRealtimeChatHistory({
                       queryClient,
                       effectiveFriendlyId,
                       effectiveSessionKey,
-                      completedAssistant as unknown as ChatMessage,
+                      completedAssistant,
                     )
                   }
                 }

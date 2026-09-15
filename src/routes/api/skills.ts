@@ -47,12 +47,9 @@ async function buildLocalSkillPathMap(): Promise<Map<string, LocalSkillMeta>> {
   const map = new Map<string, LocalSkillMeta>()
   let categoryEntries: Array<{ name: string; isDirectory: () => boolean }>
   try {
-    categoryEntries = (await fs.readdir(root, {
+    categoryEntries = await fs.readdir(root, {
       withFileTypes: true,
-    })) as unknown as Array<{
-      name: string
-      isDirectory: () => boolean
-    }>
+    })
   } catch {
     return map
   }
@@ -66,12 +63,9 @@ async function buildLocalSkillPathMap(): Promise<Map<string, LocalSkillMeta>> {
       isDirectory: () => boolean
     }>
     try {
-      skillEntries = (await fs.readdir(catPath, {
+      skillEntries = await fs.readdir(catPath, {
         withFileTypes: true,
-      })) as unknown as Array<{
-        name: string
-        isDirectory: () => boolean
-      }>
+      })
     } catch {
       continue
     }
