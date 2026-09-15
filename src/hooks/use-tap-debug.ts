@@ -154,7 +154,7 @@ export function useTapDebug(
 
     area.addEventListener('touchstart', handleTouchStart, { passive: true })
     area.addEventListener('pointerdown', handlePointerDown, { passive: true })
-    window.addEventListener(TAP_DEBUG_EVENT, handleToggleEvent as EventListener)
+    window.addEventListener(TAP_DEBUG_EVENT, handleToggleEvent)
 
     console.info(
       `[tap-debug:${label}] toggle via overlay or window.toggleChatTapDebug()`,
@@ -164,7 +164,7 @@ export function useTapDebug(
       area.removeEventListener('pointerdown', handlePointerDown)
       window.removeEventListener(
         TAP_DEBUG_EVENT,
-        handleToggleEvent as EventListener,
+        handleToggleEvent,
       )
       delete debugWindow.setChatTapDebug
       delete debugWindow.toggleChatTapDebug

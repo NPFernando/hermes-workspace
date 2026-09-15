@@ -35,7 +35,7 @@ function readOverrides(): WorkspaceOverrides {
     const raw = fs.readFileSync(overridesPath(), 'utf-8')
     const parsed = JSON.parse(raw) as unknown
     return parsed !== null && typeof parsed === 'object'
-      ? (parsed as WorkspaceOverrides)
+      ? (parsed)
       : {}
   } catch {
     return {}

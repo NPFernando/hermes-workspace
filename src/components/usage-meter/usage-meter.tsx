@@ -420,7 +420,7 @@ function getAlertState() {
     }
     return {
       date: today,
-      sent: parsed.sent ?? ({} as Record<number, boolean>),
+      sent: parsed.sent ?? ({}),
     }
   } catch {
     return { date: today, sent: {} as Record<number, boolean> }

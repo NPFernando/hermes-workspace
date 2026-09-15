@@ -120,7 +120,7 @@ export function createTerminalSession(params: {
         COLORTERM: 'truecolor',
         COLUMNS: String(cols),
         LINES: String(rows),
-      } as Record<string, string>,
+      },
       stdio: ['pipe', 'pipe', 'pipe'],
     })
   } else {
@@ -135,7 +135,7 @@ export function createTerminalSession(params: {
           COLORTERM: 'truecolor',
           COLUMNS: String(cols),
           LINES: String(rows),
-        } as Record<string, string>,
+        },
         stdio: ['pipe', 'pipe', 'pipe'],
       },
     )

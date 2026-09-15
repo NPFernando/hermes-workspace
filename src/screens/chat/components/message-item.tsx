@@ -1157,7 +1157,7 @@ function ToolCallPill({ toolCall }: { toolCall: StreamToolCall }) {
           {/* Show args (input) */}
           {toolCall.args != null &&
             typeof toolCall.args === 'object' &&
-            Object.keys(toolCall.args as Record<string, unknown>).length >
+            Object.keys(toolCall.args).length >
               0 && (
               <div className="px-2.5 py-1.5">
                 <div className="text-[9px] uppercase tracking-widest opacity-40 mb-0.5">

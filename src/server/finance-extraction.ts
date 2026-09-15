@@ -195,7 +195,7 @@ export function buildFinanceAnswerPrompt(
   // `currency`. Fall back to 'LKR' for any other caller shape.
   const currency =
     context && typeof context === 'object' && 'currency' in context
-      ? String((context as { currency: unknown }).currency)
+      ? String((context).currency)
       : 'LKR'
   const recentTurns = priorTurns.slice(-3)
   const conversationBlock =

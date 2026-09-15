@@ -150,7 +150,7 @@ async function readStateCounts(providerId: string): Promise<StateCounts> {
       return [state, response.total] as const
     }),
   )
-  return Object.fromEntries(entries) as StateCounts
+  return Object.fromEntries(entries)
 }
 
 export function ExternalMemoryBrowserScreen() {
