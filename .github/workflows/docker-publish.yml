@@ -82,6 +82,7 @@ jobs:
           cid=$(docker run -d \
             -p 127.0.0.1:3000:3000 \
             -e HERMES_API_URL=http://127.0.0.1:8642 \
+            -e HERMES_FINANCE_STORE=json \
             -e CLAUDE_PASSWORD=ci-smoke-test-password \
             hermes-workspace:smoke)
           trap 'docker logs "$cid" || true; docker rm -f "$cid" || true' EXIT
@@ -97,7 +98,9 @@ jobs:
 
             if curl -fsS -D /tmp/hermes-headers -o /dev/null http://127.0.0.1:3000/; then
               actual=$(tr -d '\r' < /tmp/hermes-headers | awk -F': ' 'tolower($1) == "x-workspace-build" { print $2 }')
-              test "$actual" = "${{ github.sha }}" || { echo "Build identity mismatch: $actual"; exit 1; }
+              expected="${{ github.sha }}"
+              expected="${expected:0:32}"
+              test "$actual" = "$expected" || { echo "Build identity mismatch: expected $expected, got $actual"; exit 1; }
               echo "Container served the expected commit $actual"
               exit 0
             fi
