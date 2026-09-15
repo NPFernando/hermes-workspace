@@ -41,9 +41,13 @@ export type PersonalFinancePayload = {
     level: 'info' | 'warning' | 'critical'
     title: string
     detail: string
-    /** Present only on alerts that can be snoozed (e.g. FX exposure) — the
-     *  key to pass back to the snooze action. */
+    /** Present only on alerts that can be snoozed (FX exposure, budget
+     *  pace, tax-record completeness) — the key to pass back to the
+     *  snooze_alert action. */
     dismissKey?: string
+    /** The alert's own magnitude at render time — passed back as-is on
+     *  snooze so the server can judge "meaningfully worse" later. */
+    dismissMagnitude?: number
   }>
   /** PF review item 7: server-computed dashboard derivations. Amounts are raw
    * LKR — scale by `fxToBase` for display. */

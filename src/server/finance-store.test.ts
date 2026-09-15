@@ -4107,11 +4107,11 @@ describe('getFxExposureAlerts', () => {
     db.exchange_rates.push(rate(300, '2026-01-01'), rate(250, '2026-06-01'))
     db.stock_holdings.push(holding({ id: 'h-snoozed' }))
     expect(getFxExposureAlerts(db)).toHaveLength(1)
-    ;(db.settings as Record<string, unknown>).fxExposureSnoozes = [
+    ;(db.settings as Record<string, unknown>).alertSnoozes = [
       {
-        holdingId: 'h-snoozed',
+        key: 'h-snoozed',
         snoozedAt: '2026-06-02T00:00:00.000Z',
-        fxPctAtSnooze: 16.67,
+        magnitudeAtSnooze: 16.67,
       },
     ]
     expect(getFxExposureAlerts(db)).toEqual([])
@@ -4121,11 +4121,11 @@ describe('getFxExposureAlerts', () => {
     const db = createEmptyFinanceDatabase()
     db.stock_holdings.push(holding({ id: 'h-worsening' }))
     // Snooze at the ~16.67% level from the earlier scenario.
-    ;(db.settings as Record<string, unknown>).fxExposureSnoozes = [
+    ;(db.settings as Record<string, unknown>).alertSnoozes = [
       {
-        holdingId: 'h-worsening',
+        key: 'h-worsening',
         snoozedAt: '2026-06-02T00:00:00.000Z',
-        fxPctAtSnooze: 16.67,
+        magnitudeAtSnooze: 16.67,
       },
     ]
     // Rate drops further, 300 -> 240: fxPct = (200*(240-300))/60,000 = -20%.
@@ -4140,36 +4140,48 @@ describe('getFxExposureAlerts', () => {
   })
 })
 
-describe('snoozeFxExposureAlert', () => {
-  it('persists the snooze onto settings.fxExposureSnoozes', async () => {
+describe('snoozeAlert', () => {
+  it('persists the snooze onto settings.alertSnoozes', async () => {
     const store = await freshFinanceStore()
     const db = store.readFinanceStore()
-    store.snoozeFxExposureAlert(db, 'h-persisted', 12.5)
+    store.snoozeAlert(db, 'h-persisted', 12.5)
     const after = store.readFinanceStore()
     const snoozes = (after.settings as Record<string, unknown>)
-      .fxExposureSnoozes as Array<{
-      holdingId: string
-      fxPctAtSnooze: number
+      .alertSnoozes as Array<{
+      key: string
+      magnitudeAtSnooze: number
     }>
     expect(snoozes).toEqual([
       expect.objectContaining({
-        holdingId: 'h-persisted',
-        fxPctAtSnooze: 12.5,
+        key: 'h-persisted',
+        magnitudeAtSnooze: 12.5,
       }),
     ])
   })
 
-  it('replaces a prior snooze of the same holding rather than duplicating it', async () => {
+  it('replaces a prior snooze of the same key rather than duplicating it', async () => {
     const store = await freshFinanceStore()
     const db1 = store.readFinanceStore()
-    store.snoozeFxExposureAlert(db1, 'h-repeated', 12.5)
+    store.snoozeAlert(db1, 'h-repeated', 12.5)
     const db2 = store.readFinanceStore()
-    store.snoozeFxExposureAlert(db2, 'h-repeated', 18)
+    store.snoozeAlert(db2, 'h-repeated', 18)
     const after = store.readFinanceStore()
     const snoozes = (after.settings as Record<string, unknown>)
-      .fxExposureSnoozes as Array<{ fxPctAtSnooze: number }>
+      .alertSnoozes as Array<{ magnitudeAtSnooze: number }>
     expect(snoozes).toHaveLength(1)
-    expect(snoozes[0].fxPctAtSnooze).toBe(18)
+    expect(snoozes[0].magnitudeAtSnooze).toBe(18)
+  })
+
+  it('keeps snoozes for different keys independent', async () => {
+    const store = await freshFinanceStore()
+    const db1 = store.readFinanceStore()
+    store.snoozeAlert(db1, 'key-a', 1)
+    const db2 = store.readFinanceStore()
+    store.snoozeAlert(db2, 'key-b', 2)
+    const after = store.readFinanceStore()
+    const snoozes = (after.settings as Record<string, unknown>)
+      .alertSnoozes as Array<{ key: string }>
+    expect(snoozes.map((s) => s.key).sort()).toEqual(['key-a', 'key-b'])
   })
 })
 
@@ -4673,6 +4685,32 @@ describe('financeAlerts — category budget thresholds', () => {
         expect(alert).toBeUndefined()
       }
     })
+
+    it('carries a dismissKey and dismissMagnitude, and honours a snooze', () => {
+      const db = createEmptyFinanceDatabase()
+      seedBudget(db, { budget: 10_000, spent: 8_000 })
+      if (!expectedPaceAlert(10_000, 8_000)) return
+      const now = new Date()
+      const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      const key = `budget-pace:Groceries:${month}`
+      const before = financeAlerts(db).find(
+        (a) => a.title === 'On pace to exceed budget: Groceries',
+      )
+      expect(before?.dismissKey).toBe(key)
+      expect(typeof before?.dismissMagnitude).toBe('number')
+      ;(db.settings as Record<string, unknown>).alertSnoozes = [
+        {
+          key,
+          snoozedAt: now.toISOString(),
+          magnitudeAtSnooze: before!.dismissMagnitude!,
+        },
+      ]
+      expect(
+        financeAlerts(db).some(
+          (a) => a.title === 'On pace to exceed budget: Groceries',
+        ),
+      ).toBe(false)
+    })
   })
 })
 
@@ -4756,6 +4794,36 @@ describe('financeAlerts — tax record completeness (getTaxRecordAlerts)', () =>
     expect(alert?.detail).not.toContain('projects to roughly')
   })
 
+  it('carries a dismissKey/dismissMagnitude and honours a snooze, resurfacing once income grows 20%+ past it', () => {
+    const db = createEmptyFinanceDatabase()
+    const year = new Date().getFullYear()
+    db.income_records.push(taxableIncome(`${year}-01-15`, 100_000))
+    const key = `tax-record:${year}`
+    const before = financeAlerts(db).find(
+      (a) => a.title === `No tax record for ${year} yet`,
+    )
+    expect(before?.dismissKey).toBe(key)
+    expect(before?.dismissMagnitude).toBe(100_000)
+
+    ;(db.settings as Record<string, unknown>).alertSnoozes = [
+      { key, snoozedAt: new Date().toISOString(), magnitudeAtSnooze: 100_000 },
+    ]
+    // Still under 100,000 * 1.2 — stays snoozed.
+    expect(
+      financeAlerts(db).some(
+        (a) => a.title === `No tax record for ${year} yet`,
+      ),
+    ).toBe(false)
+
+    // Crosses the 20% re-escalation threshold — resurfaces.
+    db.income_records.push(taxableIncome(`${year}-02-15`, 30_000))
+    expect(
+      financeAlerts(db).some(
+        (a) => a.title === `No tax record for ${year} yet`,
+      ),
+    ).toBe(true)
+  })
+
   it('stays silent for the year once a tax record exists for it', () => {
     const db = createEmptyFinanceDatabase()
     const year = new Date().getFullYear()
@@ -4813,6 +4881,35 @@ describe('financeAlerts — tax record completeness (getTaxRecordAlerts)', () =>
     )
     db.tax_records.push(taxRecord({ updatedAt: now.toISOString() }))
     const quarterIndex = Math.floor(quarterStartMonth / 3) + 1
+    expect(
+      financeAlerts(db).some(
+        (a) => a.title === `Q${quarterIndex} tax record not yet logged`,
+      ),
+    ).toBe(false)
+  })
+
+  it('honours a snooze on the quarterly nudge', () => {
+    const db = createEmptyFinanceDatabase()
+    const now = new Date()
+    const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3
+    const quarterEnd = new Date(now.getFullYear(), quarterStartMonth + 3, 0)
+    const daysLeftInQuarter = Math.ceil(
+      (quarterEnd.getTime() - now.getTime()) / 86_400_000,
+    )
+    if (daysLeftInQuarter > 20) return // outside the nudge window this run
+    const quarterFirstMonth = String(quarterStartMonth + 1).padStart(2, '0')
+    db.income_records.push(
+      taxableIncome(`${now.getFullYear()}-${quarterFirstMonth}-01`, 200_000),
+    )
+    const quarterIndex = Math.floor(quarterStartMonth / 3) + 1
+    const key = `tax-record-quarter:${now.getFullYear()}-Q${quarterIndex}`
+    const before = financeAlerts(db).find(
+      (a) => a.title === `Q${quarterIndex} tax record not yet logged`,
+    )
+    expect(before?.dismissKey).toBe(key)
+    ;(db.settings as Record<string, unknown>).alertSnoozes = [
+      { key, snoozedAt: now.toISOString(), magnitudeAtSnooze: 200_000 },
+    ]
     expect(
       financeAlerts(db).some(
         (a) => a.title === `Q${quarterIndex} tax record not yet logged`,

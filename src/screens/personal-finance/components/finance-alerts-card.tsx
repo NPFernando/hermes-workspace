@@ -8,16 +8,6 @@ const ALERT_TONE: Record<'info' | 'warning' | 'critical', string> = {
   critical: dangerTone,
 }
 
-/** |fxPct| from a "... moved against this holding by N.N% ..." detail
- *  string — the only place that number lives once financeAlerts() has
- *  already formatted it into text. Falls back to 0 (still snoozes, just
- *  re-surfaces at the base threshold instead of accounting for how far
- *  past it this particular alert already was). */
-function fxPctFromDetail(detail: string): number {
-  const match = /by (\d+(?:\.\d+)?)%/.exec(detail)
-  return match ? Number(match[1]) : 0
-}
-
 export function FinanceAlertsCard({
   payload,
 }: {
@@ -30,7 +20,7 @@ export function FinanceAlertsCard({
   )
   if (visible.length === 0) return null
 
-  async function snooze(dismissKey: string, detail: string) {
+  async function snooze(dismissKey: string, dismissMagnitude: number) {
     setSnoozed((prev) => new Set(prev).add(dismissKey))
     setBusyKey(dismissKey)
     try {
@@ -38,9 +28,9 @@ export function FinanceAlertsCard({
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          action: 'snooze_fx_exposure_alert',
-          holdingId: dismissKey,
-          fxPct: fxPctFromDetail(detail),
+          action: 'snooze_alert',
+          key: dismissKey,
+          magnitude: dismissMagnitude,
         }),
       })
     } catch {
@@ -75,9 +65,11 @@ export function FinanceAlertsCard({
                   <button
                     type="button"
                     disabled={busyKey === dismissKey}
-                    onClick={() => void snooze(dismissKey, alert.detail)}
+                    onClick={() =>
+                      void snooze(dismissKey, alert.dismissMagnitude ?? 0)
+                    }
                     className={`${buttonClass} shrink-0`}
-                    title="Stop showing this until the exposure gets meaningfully worse"
+                    title="Stop showing this until it gets meaningfully worse"
                   >
                     Snooze
                   </button>
