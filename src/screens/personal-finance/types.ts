@@ -299,4 +299,8 @@ export type UnregisteredSenderCandidate = {
   domain: string
   occurrences: number
   lastSeenAt: string
+  /** occurrences >= the server's highConfidenceOccurrences threshold (5 by
+   *  default) — powers a "Register all high-confidence" bulk action, still
+   *  gated behind an explicit click. */
+  highConfidence: boolean
 }

@@ -2351,6 +2351,15 @@ export type UnregisteredSenderCandidate = {
   occurrences: number
   /** Most recent occurrence, so the UI can show "last seen …". */
   lastSeenAt: string
+  /** occurrences >= highConfidenceOccurrences — the UI's "Register all
+   *  high-confidence" bulk action only ever touches these. Deliberately
+   *  still requires an explicit click, same as any other candidate: an
+   *  unattended background sync silently writing a new known-sender entry
+   *  (which widens the live Gmail search query and can auto-unlock a
+   *  password-protected attachment) is a real behavior change, not a
+   *  passive suggestion — a spam/phishing sender that happens to arrive
+   *  repeatedly shouldn't get auto-registered with nobody deciding that. */
+  highConfidence: boolean
 }
 
 /**
@@ -2366,6 +2375,7 @@ export type UnregisteredSenderCandidate = {
 export function getUnregisteredSenderCandidates(
   db: FinanceDatabase,
   minOccurrences = 2,
+  highConfidenceOccurrences = 5,
 ): Array<UnregisteredSenderCandidate> {
   // Reads known senders off the SAME db passed in, not the global store —
   // listKnownSenders() would silently ignore a synthetic/test db and read
@@ -2402,7 +2412,12 @@ export function getUnregisteredSenderCandidates(
     if (info.occurrences < minOccurrences) continue
     const domain = senderAddress.split('@')[1]
     if (!domain) continue
-    results.push({ senderAddress, domain, ...info })
+    results.push({
+      senderAddress,
+      domain,
+      ...info,
+      highConfidence: info.occurrences >= highConfidenceOccurrences,
+    })
   }
   return results.sort((a, b) => b.occurrences - a.occurrences)
 }

@@ -1160,6 +1160,7 @@ describe('getUnregisteredSenderCandidates', () => {
         domain: 'newbiller.test',
         occurrences: 2,
         lastSeenAt: '2026-01-01T00:00:00.000Z',
+        highConfidence: false,
       },
     ])
   })
@@ -1258,6 +1259,36 @@ describe('getUnregisteredSenderCandidates', () => {
       'billing@highvolume.test',
       'billing@lowvolume.test',
     ])
+  })
+
+  it('flags a candidate as highConfidence once it reaches the default threshold of 5 occurrences', () => {
+    const db = createEmptyFinanceDatabase()
+    for (let i = 0; i < 4; i++) {
+      db.pending_ingestions.push(
+        pendingFromGmail({ senderAddress: 'billing@ramping.test' }),
+      )
+    }
+    expect(getUnregisteredSenderCandidates(db)[0].highConfidence).toBe(false)
+
+    db.pending_ingestions.push(
+      pendingFromGmail({ senderAddress: 'billing@ramping.test' }),
+    )
+    expect(getUnregisteredSenderCandidates(db)[0].highConfidence).toBe(true)
+  })
+
+  it('respects a custom highConfidenceOccurrences threshold', () => {
+    const db = createEmptyFinanceDatabase()
+    db.pending_ingestions.push(
+      pendingFromGmail({ senderAddress: 'billing@newbiller.test' }),
+      pendingFromGmail({ senderAddress: 'billing@newbiller.test' }),
+      pendingFromGmail({ senderAddress: 'billing@newbiller.test' }),
+    )
+    expect(
+      getUnregisteredSenderCandidates(db, 2, 3)[0].highConfidence,
+    ).toBe(true)
+    expect(
+      getUnregisteredSenderCandidates(db, 2, 4)[0].highConfidence,
+    ).toBe(false)
   })
 })
 
