@@ -27,7 +27,7 @@ const GOALS: Array<Goal> = [
   { id: 11, title: 'Shared usage budgets', state: 'deployed', detail: 'Warnings and provider history are live.' },
   { id: 12, title: 'Fork sync protection', state: 'completed', detail: 'Dry-run and custom-change safeguards are present.' },
   { id: 13, title: 'Deployment recovery controls', state: 'deployed', detail: 'Stale-run and exact-SHA guards are live.' },
-  { id: 14, title: 'HARP readiness diagnostics', state: 'active', detail: 'Safe suite passes; real canary remains gated.' },
+  { id: 14, title: 'HARP readiness diagnostics', state: 'deployed', detail: 'Freshness, health, quality, and conflict gates are surfaced; execution remains disabled.' },
   { id: 15, title: 'Astrology UX refinement', state: 'active', detail: 'Saved profiles, bilingual SEO, PWA, and accessibility.' },
   { id: 16, title: 'Finance institution reuse', state: 'deployed', detail: 'Bank/branch autocomplete and stable catalog links are live.' },
   { id: 17, title: 'Production observability', state: 'deployed', detail: 'Uptime, memory pressure, OOM, and error alerts.' },
