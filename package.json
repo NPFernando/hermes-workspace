@@ -96,7 +96,7 @@
     "@tanstack/eslint-config": "0.4.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/react": "^16.3.3",
-    "@types/node": "^22.10.2",
+    "@types/node": "^26.5.1",
     "@types/pg": "^8.23.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
