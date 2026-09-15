@@ -5,6 +5,13 @@ updates:
     schedule:
       interval: 'daily'
     open-pull-requests-limit: 10
+    groups:
+      npm-non-major:
+        patterns:
+          - '*'
+        update-types:
+          - 'minor'
+          - 'patch'
     reviewers:
       - 'naveen'
     labels:
