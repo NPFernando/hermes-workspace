@@ -10,8 +10,23 @@ function command(file, args, cwd) {
 }
 
 function parseServiceShow(raw) {
-  const values = raw.split(/\r?\n/)
-  return { activeState: values[0] || 'unknown', pid: values[1] || '0', execStatus: values[2] || '', result: values[3] || '' }
+  const fields = Object.fromEntries(
+    raw
+      .split(/\r?\n/)
+      .filter((line) => line.includes('='))
+      .map((line) => {
+        const separator = line.indexOf('=')
+        return [line.slice(0, separator), line.slice(separator + 1)]
+      }),
+  )
+  // systemd does not guarantee the order of --value output, so parse named
+  // fields instead of relying on the requested property order.
+  return {
+    activeState: fields.ActiveState || 'unknown',
+    pid: fields.MainPID || '0',
+    execStatus: fields.ExecMainStatus || '',
+    result: fields.Result || '',
+  }
 }
 
 export async function collectOperationalStatus({
@@ -25,7 +40,7 @@ export async function collectOperationalStatus({
   try { buildMtimeMs = (await stat(buildPath)).mtimeMs } catch { /* reported below */ }
   let previous = {}
   try { previous = JSON.parse(await readFile(statePath, 'utf8')) } catch { /* first run */ }
-  const serviceShow = parseServiceShow(exec('systemctl', ['show', service, '--property=ActiveState,MainPID,ExecMainStatus,Result', '--value'], repo))
+  const serviceShow = parseServiceShow(exec('systemctl', ['show', service, '--property=ActiveState,MainPID,ExecMainStatus,Result'], repo))
   const issues = []
   if (serviceShow.activeState === 'failed' || serviceShow.result === 'failed' || (serviceShow.execStatus && serviceShow.execStatus !== '0')) issues.push({ level: 'critical', code: 'failed_deploy', detail: `${service} is ${serviceShow.activeState} (result=${serviceShow.result || 'unknown'}, exit=${serviceShow.execStatus || 'unknown'}).` })
   if (!buildMtimeMs) issues.push({ level: 'critical', code: 'missing_build', detail: 'dist/server/server.js is missing.' })
