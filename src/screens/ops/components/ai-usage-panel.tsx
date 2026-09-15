@@ -29,6 +29,14 @@ type ProviderUsageResponse = {
   updatedAt: number
   providers: Array<ProviderUsage>
   history?: Array<UsageHistoryPoint>
+  sharedBudget?: {
+    level: 'unconfigured' | 'no_data' | 'ok' | 'warning' | 'critical' | 'exhausted'
+    limitUsd: number | null
+    usedUsd: number | null
+    remainingUsd: number | null
+    percentUsed: number | null
+    message: string
+  }
   error?: string
 }
 
@@ -390,6 +398,7 @@ export function AiUsagePanel({
   const codex = providers.find((provider) => provider.provider === 'codex')
   const claude = providers.find((provider) => provider.provider === 'claude')
   const lastUpdated = query.data?.updatedAt
+  const sharedBudget = query.data?.sharedBudget
   const days = lastSevenUtcDays()
   const trendSeries: Array<{
     key: string
@@ -576,6 +585,22 @@ export function AiUsagePanel({
           }
         />
       </div>
+
+      {sharedBudget ? (
+        <div className="rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card2)] p-3" aria-label="Shared AI usage budget">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-xs font-semibold text-[var(--theme-text)]">Shared daily budget</h3>
+              <p className="mt-1 text-[10px] text-[var(--theme-muted)]">Advisory cross-provider signal; unavailable readings are not treated as zero.</p>
+            </div>
+            <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${sharedBudget.level === 'exhausted' || sharedBudget.level === 'critical' ? 'bg-red-500/15 text-red-300' : sharedBudget.level === 'warning' ? 'bg-amber-500/15 text-amber-300' : 'bg-emerald-500/15 text-emerald-300'}`}>
+              {sharedBudget.level === 'unconfigured' ? 'Not configured' : sharedBudget.level.replace('_', ' ')}
+            </span>
+          </div>
+          <p className="mt-2 text-xs text-[var(--theme-text)]">{sharedBudget.usedUsd == null || sharedBudget.limitUsd == null ? sharedBudget.message : `$${sharedBudget.usedUsd.toFixed(2)} observed / $${sharedBudget.limitUsd.toFixed(2)} limit · $${sharedBudget.remainingUsd?.toFixed(2)} remaining`}</p>
+          <p className="mt-1 text-[10px] text-[var(--theme-muted)]">{sharedBudget.message}</p>
+        </div>
+      ) : null}
 
       {trendSeries.length > 0 ? (
         <section aria-label="Daily AI usage trends" className="space-y-2">
