@@ -15,6 +15,9 @@ function DifyRoute() {
   return <main className="min-h-dvh overflow-y-auto bg-[var(--theme-bg)] p-4 text-[var(--theme-text)] md:p-8">
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--theme-success)]">Workbench</p><h1 className="mt-1 text-3xl font-semibold">Dify Workbench</h1></div><span className={`rounded-full px-3 py-1 text-xs font-medium ${status.available ? 'bg-[var(--theme-success)]/15 text-[var(--theme-success)]' : 'bg-[var(--theme-warning)]/15 text-[var(--theme-warning)]'}`}>{status.available ? 'Provider healthy' : 'Provider unavailable'}</span></div>
     {!status.available && <p className="mb-4 rounded-2xl border border-[var(--theme-warning)]/40 bg-[var(--theme-warning)]/10 p-3 text-sm text-[var(--theme-muted)]">{status.detail}</p>}
-    {status.available && status.url && <iframe title="Dify Workbench" src={status.url} className="min-h-[calc(100dvh-10rem)] w-full rounded-2xl border border-[var(--theme-border)] bg-white" />}
+    {status.url && <section className="max-w-2xl rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-5">
+      <p className="text-sm text-[var(--theme-muted)]">Dify manages its own sign-in and workflow data. Open it in a separate tab; the Dify UI blocks embedding in other sites.</p>
+      {status.available ? <a href={status.url} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[var(--theme-success)] px-4 py-2 font-semibold text-[var(--theme-bg)] hover:opacity-90">Open Dify Workbench</a> : <p className="mt-4 text-sm font-medium text-[var(--theme-warning)]">The workbench link is disabled until the provider is reachable.</p>}
+    </section>}
   </main>
 }
