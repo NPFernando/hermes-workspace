@@ -59,6 +59,7 @@ type QueueStatus = {
   active: null | {
     id: string
     assignmentCount: number
+    priority: number
     queuedAt: number
     startedAt: number | null
     status: string
@@ -71,6 +72,7 @@ type QueueStatus = {
     id: string
     position: number
     assignmentCount: number
+    priority: number
     queuedAt: number
     startedAt: number | null
     status: string
@@ -82,6 +84,7 @@ type QueueStatus = {
   recent: Array<{
     id: string
     assignmentCount: number
+    priority: number
     queuedAt: number
     startedAt: number | null
     status: string
@@ -155,6 +158,7 @@ export function RouterChat({
   const [unassigned, setUnassigned] = useState<Array<string>>([])
   const [dispatching, setDispatching] = useState(false)
   const [serialDispatch, setSerialDispatch] = useState(false)
+  const [queuePriority, setQueuePriority] = useState(0)
   const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null)
   const [dispatchError, setDispatchError] = useState<string | null>(null)
   const [cancellingQueueId, setCancellingQueueId] = useState<string | null>(
@@ -345,6 +349,7 @@ export function RouterChat({
         body: JSON.stringify({
           assignments: plan,
           dispatchMode: serialDispatch ? 'serial' : 'parallel',
+          priority: serialDispatch ? queuePriority : undefined,
           timeoutSeconds: 300,
           waitForCheckpoint: false,
         }),
@@ -752,6 +757,24 @@ export function RouterChat({
                     queue; parallel requests remain unchanged.
                   </span>
                 </label>
+                {serialDispatch ? (
+                  <label className="mt-2 flex items-center gap-2 text-[11px] text-[var(--theme-text)]">
+                    <span>Priority</span>
+                    <select
+                      value={queuePriority}
+                      disabled={dispatching}
+                      onChange={(event) =>
+                        setQueuePriority(Number(event.target.value))
+                      }
+                      className="rounded border border-[var(--theme-border)] bg-[var(--theme-card)] px-1.5 py-0.5"
+                    >
+                      <option value={0}>Normal (0)</option>
+                      <option value={3}>Elevated (3)</option>
+                      <option value={6}>High (6)</option>
+                      <option value={9}>Urgent (9)</option>
+                    </select>
+                  </label>
+                ) : null}
                 {queueStatus &&
                 (queueStatus.active ||
                   queueStatus.waiting.length > 0 ||
@@ -760,7 +783,7 @@ export function RouterChat({
                     <>
                       <div>
                         {queueStatus.active
-                          ? `Shared queue active · ${queueStatus.active.assignmentCount} task${queueStatus.active.assignmentCount === 1 ? '' : 's'}${queueStatus.active.cancelRequestedAt ? ' · cancellation requested' : ''}`
+                          ? `Shared queue active · P${queueStatus.active.priority} · ${queueStatus.active.assignmentCount} task${queueStatus.active.assignmentCount === 1 ? '' : 's'}${queueStatus.active.cancelRequestedAt ? ' · cancellation requested' : ''}`
                           : 'No serial batch is running right now.'}
                       </div>
                       {queueStatus.active &&
@@ -792,7 +815,7 @@ export function RouterChat({
                           className="mt-1 flex items-center justify-between gap-3"
                         >
                           <span>
-                            #{job.position} · {job.assignmentCount} task
+                            #{job.position} · P{job.priority} · {job.assignmentCount} task
                             {job.assignmentCount === 1 ? '' : 's'} · pending
                           </span>
                           <button
@@ -815,7 +838,7 @@ export function RouterChat({
                         >
                           <span>
                             Recent: {job.deadLetterAt ? 'dead letter · ' : ''}
-                            {job.status} · {job.assignmentCount} task
+                            P{job.priority} · {job.status} · {job.assignmentCount} task
                             {job.assignmentCount === 1 ? '' : 's'} ·{' '}
                             {job.id.slice(0, 8)}
                           </span>

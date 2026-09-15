@@ -17,7 +17,7 @@ The server refuses to fall back to an in-memory or finance/research queue if the
 database is missing or unavailable. Serial dispatch is authenticated and remains
 opt-in; parallel dispatch is unchanged.
 
-Queue jobs persist their payload, status, timestamps, result, error, retry link,
+Queue jobs persist their payload, status, priority, timestamps, result, error, retry link,
 and dead-letter time. A session-level Postgres advisory lock is held while the
 serial worker runs, so other server instances cannot claim jobs concurrently.
 Each running job also has a 15-second lease renewed every second. The worker
@@ -25,6 +25,11 @@ uses a per-claim fencing token when renewing and finishing; a worker that loses
 its lease aborts its signal and cannot overwrite the newer queue state. A new
 worker waits for a still-valid lease to expire before recovering abandoned work.
 Pending jobs survive restarts and resume when the server starts.
+
+Serial POST requests may set `priority` to an integer from `0` (normal) through
+`9` (highest). Higher-priority pending jobs run first; jobs with the same
+priority retain FIFO ordering. Retries preserve the source job's priority.
+Invalid priorities are rejected with HTTP 400.
 
 Failed and interrupted jobs are retained as dead letters. They are never
 automatically replayed because dispatch may have reached some agents before a
@@ -59,6 +64,6 @@ pnpm test:queue:isolated
 ```
 
 The integration suite covers concurrent duplicate submissions, independent
-worker processes, FIFO ordering, lease renewal and expiry, restart recovery,
+worker processes, priority/FIFO ordering, lease renewal and expiry, restart recovery,
 cancellation, dead-letter handling, explicit retry, and retry idempotency. It
 never inserts or dispatches synthetic jobs into a production database.
