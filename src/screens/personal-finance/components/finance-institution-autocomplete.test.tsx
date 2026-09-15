@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import React, { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { createRoot } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccountsPanel } from './accounts-panel'
 import { FixedDepositsPanel } from './fixed-deposits-panel'
+import type { Root } from 'react-dom/client'
 import type { PersonalFinancePayload } from '../types'
 
 const { runMock } = vi.hoisted(() => ({ runMock: vi.fn() }))
@@ -73,7 +74,9 @@ describe('reusable institution and branch suggestions', () => {
     await changeInput('input[placeholder="Current balance"]', '1000')
     await changeInput('input[placeholder="Branch (optional)"]', 'Colombo 03')
 
-    const addButton = [...document.querySelectorAll('button')].find((button) => button.textContent?.includes('Add account'))
+    const addButton = [...document.querySelectorAll('button')].find((button) =>
+      button.textContent.includes('Add account'),
+    )
     if (!addButton) throw new Error('Missing Add account button')
     await act(async () => addButton.click())
 
@@ -101,7 +104,9 @@ describe('reusable institution and branch suggestions', () => {
     await changeInput('input[placeholder="Principal"]', '50000')
     await changeInput('input[title="Maturity date"]', '2027-01-01')
 
-    const addButton = [...document.querySelectorAll('button')].find((button) => button.textContent?.includes('Add fixed deposit'))
+    const addButton = [...document.querySelectorAll('button')].find((button) =>
+      button.textContent.includes('Add fixed deposit'),
+    )
     if (!addButton) throw new Error('Missing Add fixed deposit button')
     await act(async () => addButton.click())
 
