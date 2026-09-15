@@ -143,6 +143,38 @@ export function KnownSendersCard() {
     }
   }
 
+  async function registerAllHighConfidence() {
+    const targets = candidates.filter((c) => c.highConfidence)
+    if (targets.length === 0) return
+    setBusyId('candidates-bulk')
+    setNote(null)
+    try {
+      // Sequential, not Promise.all — these are writes (upsert_known_sender)
+      // and each one changes what future Gmail syncs match on, so keep them
+      // ordered and let one failure short-circuit the rest rather than
+      // firing every request at once.
+      for (const c of targets) {
+        const res = await fetch('/api/finance', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            action: 'upsert_known_sender',
+            label: c.domain,
+            matchDomain: c.domain,
+          }),
+        })
+        const data = (await res.json()) as { ok: boolean; error?: string }
+        if (!data.ok) {
+          setNote(data.error || `Could not register ${c.senderAddress}`)
+          break
+        }
+      }
+      await load()
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   function dismissCandidate(candidate: UnregisteredSenderCandidate) {
     // Purely client-side for now — the candidate reappears next load since
     // nothing is persisted. Registering it (which removes it from the
@@ -322,13 +354,29 @@ export function KnownSendersCard() {
 
       {candidates.length > 0 && (
         <div className="mt-3 rounded-xl border border-[var(--theme-border)]/60 bg-[color-mix(in_srgb,var(--theme-warning)_8%,transparent)] p-3">
-          <p className="text-xs font-medium text-[var(--theme-text)]">
-            Detected, not registered yet
-          </p>
-          <p className="mt-0.5 text-xs text-[var(--theme-muted)]">
-            These senders have shown up repeatedly in emails that didn't
-            match anything registered — worth adding them?
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-medium text-[var(--theme-text)]">
+                Detected, not registered yet
+              </p>
+              <p className="mt-0.5 text-xs text-[var(--theme-muted)]">
+                These senders have shown up repeatedly in emails that didn't
+                match anything registered — worth adding them?
+              </p>
+            </div>
+            {candidates.some((c) => c.highConfidence) && (
+              <button
+                type="button"
+                disabled={busyId === 'candidates-bulk'}
+                onClick={() => void registerAllHighConfidence()}
+                className={confirmButtonClass}
+              >
+                {busyId === 'candidates-bulk'
+                  ? 'Registering…'
+                  : `Register all high-confidence (${candidates.filter((c) => c.highConfidence).length})`}
+              </button>
+            )}
+          </div>
           <div className="mt-2 grid gap-2">
             {candidates.map((c) => (
               <div
@@ -341,6 +389,11 @@ export function KnownSendersCard() {
                     — seen {c.occurrences}×, last{' '}
                     {new Date(c.lastSeenAt).toLocaleDateString()}
                   </span>
+                  {c.highConfidence && (
+                    <span className={`ml-1 ${positiveTone}`}>
+                      · high confidence
+                    </span>
+                  )}
                 </span>
                 <div className="flex gap-2">
                   <button
