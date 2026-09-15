@@ -106,7 +106,7 @@ export const DEFAULT_GRID_ENGINE_CONFIG: GridEngineConfig = {
   maxEfficiencyRatio: 0.25,
   fetchCandleLimit: 500,
   rearmOutsideRangeCandles: 0,
-  absoluteStopFloorEnabled: false,
+  absoluteStopFloorEnabled: true,
   executionMode: 'paper',
   maxDailyLossQuote: 25,
   maxRealOrdersPerCycle: 12,
