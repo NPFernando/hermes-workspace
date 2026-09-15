@@ -22,7 +22,16 @@ function encoded(value: Buffer): string {
 }
 
 function decoded(value: string): Buffer {
-  return Buffer.from(value, 'base64url')
+  if (!/^[A-Za-z0-9_-]+$/.test(value)) {
+    throw new Error('Backup contains malformed encoded data.')
+  }
+  const bytes = Buffer.from(value, 'base64url')
+  // Node's decoder accepts non-canonical trailing bits/characters. Re-encode
+  // to ensure tampering cannot be silently normalized into the original bytes.
+  if (encoded(bytes) !== value) {
+    throw new Error('Backup contains malformed encoded data.')
+  }
+  return bytes
 }
 
 function keyFor(passphrase: string, salt: Buffer): Buffer {
