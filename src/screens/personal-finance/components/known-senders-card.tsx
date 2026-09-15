@@ -175,14 +175,29 @@ export function KnownSendersCard() {
     }
   }
 
-  function dismissCandidate(candidate: UnregisteredSenderCandidate) {
-    // Purely client-side for now — the candidate reappears next load since
-    // nothing is persisted. Registering it (which removes it from the
-    // unmatched pool) is the real dismissal; this just clears the current
-    // view without a server round trip for a "not interested" click.
+  async function dismissCandidate(candidate: UnregisteredSenderCandidate) {
+    // Persisted server-side (dismissSenderCandidate) so it doesn't come
+    // right back on the next reload — it resurfaces on its own if the
+    // sender's occurrences keep climbing well past this point, so a bad
+    // dismissal of something that turns out to matter isn't permanent.
     setCandidates((prev) =>
       prev.filter((c) => c.senderAddress !== candidate.senderAddress),
     )
+    try {
+      await fetch('/api/finance', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'dismiss_sender_candidate',
+          senderAddress: candidate.senderAddress,
+          occurrences: candidate.occurrences,
+        }),
+      })
+    } catch {
+      // Best-effort — the optimistic client-side removal above already
+      // gives the immediate feedback; a failed persist just means it may
+      // reappear next reload, no different from the old client-only state.
+    }
   }
 
   async function remove(id: string) {
@@ -406,7 +421,7 @@ export function KnownSendersCard() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => dismissCandidate(c)}
+                    onClick={() => void dismissCandidate(c)}
                     className={buttonClass}
                   >
                     Dismiss

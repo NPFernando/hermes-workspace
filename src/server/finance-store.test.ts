@@ -35,6 +35,7 @@ import {
 import type {
   BudgetCategory,
   FinanceAccount,
+  FinanceDatabase,
   PendingIngestion,
   RecurringBill,
 } from './finance-store'
@@ -1289,6 +1290,111 @@ describe('getUnregisteredSenderCandidates', () => {
     expect(
       getUnregisteredSenderCandidates(db, 2, 4)[0].highConfidence,
     ).toBe(false)
+  })
+
+  function withDismissed(
+    db: FinanceDatabase,
+    dismissals: Array<{ senderAddress: string; occurrencesAtDismissal: number }>,
+  ) {
+    ;(db.settings as Record<string, unknown>).gmailIngest = {
+      dismissedSenderCandidates: dismissals.map((d) => ({
+        ...d,
+        dismissedAt: '2026-01-01T00:00:00.000Z',
+      })),
+    }
+  }
+
+  it('drops a dismissed candidate from the results', () => {
+    const db = createEmptyFinanceDatabase()
+    db.pending_ingestions.push(
+      pendingFromGmail({ senderAddress: 'billing@dismissed.test' }),
+      pendingFromGmail({ senderAddress: 'billing@dismissed.test' }),
+    )
+    expect(getUnregisteredSenderCandidates(db)).toHaveLength(1)
+    withDismissed(db, [
+      { senderAddress: 'billing@dismissed.test', occurrencesAtDismissal: 2 },
+    ])
+    expect(getUnregisteredSenderCandidates(db)).toHaveLength(0)
+  })
+
+  it('resurfaces a dismissed candidate once occurrences grow well past the dismissal count', () => {
+    const db = createEmptyFinanceDatabase()
+    for (let i = 0; i < 3; i++) {
+      db.pending_ingestions.push(
+        pendingFromGmail({ senderAddress: 'billing@growing.test' }),
+      )
+    }
+    withDismissed(db, [
+      { senderAddress: 'billing@growing.test', occurrencesAtDismissal: 3 },
+    ])
+    expect(getUnregisteredSenderCandidates(db)).toHaveLength(0)
+
+    // Still below the resurface threshold (3 + 10 = 13) — stays dismissed.
+    for (let i = 0; i < 9; i++) {
+      db.pending_ingestions.push(
+        pendingFromGmail({ senderAddress: 'billing@growing.test' }),
+      )
+    }
+    expect(getUnregisteredSenderCandidates(db)).toHaveLength(0)
+
+    // Crosses the threshold — resurfaces.
+    db.pending_ingestions.push(
+      pendingFromGmail({ senderAddress: 'billing@growing.test' }),
+    )
+    expect(getUnregisteredSenderCandidates(db)).toHaveLength(1)
+  })
+
+  it('dismissing one address does not affect a different candidate', () => {
+    const db = createEmptyFinanceDatabase()
+    db.pending_ingestions.push(
+      pendingFromGmail({ senderAddress: 'billing@dismissed.test' }),
+      pendingFromGmail({ senderAddress: 'billing@dismissed.test' }),
+      pendingFromGmail({ senderAddress: 'billing@untouched.test' }),
+      pendingFromGmail({ senderAddress: 'billing@untouched.test' }),
+    )
+    withDismissed(db, [
+      { senderAddress: 'billing@dismissed.test', occurrencesAtDismissal: 2 },
+    ])
+    expect(
+      getUnregisteredSenderCandidates(db).map((c) => c.senderAddress),
+    ).toEqual(['billing@untouched.test'])
+  })
+})
+
+describe('dismissSenderCandidate', () => {
+  it('persists the dismissal onto settings.gmailIngest.dismissedSenderCandidates', async () => {
+    const store = await freshFinanceStore()
+    const db = store.readFinanceStore()
+    store.dismissSenderCandidate(db, 'billing@persisted.test', 4)
+    const after = store.readFinanceStore()
+    const gmailIngest = (after.settings as Record<string, unknown>)
+      .gmailIngest as {
+      dismissedSenderCandidates?: Array<{
+        senderAddress: string
+        occurrencesAtDismissal: number
+      }>
+    }
+    expect(gmailIngest.dismissedSenderCandidates).toEqual([
+      expect.objectContaining({
+        senderAddress: 'billing@persisted.test',
+        occurrencesAtDismissal: 4,
+      }),
+    ])
+  })
+
+  it('replaces a prior dismissal of the same address rather than duplicating it', async () => {
+    const store = await freshFinanceStore()
+    const db1 = store.readFinanceStore()
+    store.dismissSenderCandidate(db1, 'billing@repeated.test', 4)
+    const db2 = store.readFinanceStore()
+    store.dismissSenderCandidate(db2, 'billing@repeated.test', 9)
+    const after = store.readFinanceStore()
+    const gmailIngest = (after.settings as Record<string, unknown>)
+      .gmailIngest as {
+      dismissedSenderCandidates?: Array<{ occurrencesAtDismissal: number }>
+    }
+    expect(gmailIngest.dismissedSenderCandidates).toHaveLength(1)
+    expect(gmailIngest.dismissedSenderCandidates?.[0].occurrencesAtDismissal).toBe(9)
   })
 })
 

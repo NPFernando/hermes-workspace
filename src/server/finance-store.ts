@@ -2372,6 +2372,67 @@ export type UnregisteredSenderCandidate = {
  * registered, matchKnownSender() would tag future emails from it, so it
  * naturally drops off this list on its own.
  */
+type DismissedSenderCandidate = {
+  senderAddress: string
+  dismissedAt: string
+  /** occurrences at the moment of dismissal — if it keeps showing up well
+   *  past that (see REDISMISS_GROWTH_THRESHOLD below), it resurfaces rather
+   *  than staying hidden forever on the strength of a single old decision. */
+  occurrencesAtDismissal: number
+}
+
+function readDismissedSenderCandidates(
+  settings: Record<string, unknown>,
+): Array<DismissedSenderCandidate> {
+  const gmailIngest =
+    settings.gmailIngest && typeof settings.gmailIngest === 'object'
+      ? (settings.gmailIngest as Record<string, unknown>)
+      : {}
+  return Array.isArray(gmailIngest.dismissedSenderCandidates)
+    ? (gmailIngest.dismissedSenderCandidates as Array<DismissedSenderCandidate>)
+    : []
+}
+
+/**
+ * Records an explicit "not interested" on an unregistered-sender candidate
+ * so it stops reappearing on every reload — previously this was tracked
+ * only in component state (known-senders-card.tsx), so it came right back
+ * the moment the page refreshed. Keyed by senderAddress, not domain: two
+ * addresses on the same domain are dismissed independently, same
+ * granularity getUnregisteredSenderCandidates already surfaces them at.
+ */
+export function dismissSenderCandidate(
+  db: FinanceDatabase,
+  senderAddress: string,
+  occurrencesAtDismissal: number,
+): void {
+  const settings = db.settings as Record<string, unknown>
+  const gmailIngest = (
+    settings.gmailIngest && typeof settings.gmailIngest === 'object'
+      ? { ...(settings.gmailIngest as Record<string, unknown>) }
+      : {}
+  ) as Record<string, unknown>
+  const existing = readDismissedSenderCandidates(settings).filter(
+    (d) => d.senderAddress !== senderAddress,
+  )
+  gmailIngest.dismissedSenderCandidates = [
+    ...existing,
+    {
+      senderAddress,
+      dismissedAt: new Date().toISOString(),
+      occurrencesAtDismissal,
+    },
+  ]
+  settings.gmailIngest = gmailIngest
+  writeFinanceStore(db)
+}
+
+/** A dismissal resurfaces once occurrences have grown this much past the
+ *  count at dismissal time — a candidate that keeps showing up well beyond
+ *  what was dismissed is worth a second look, not permanently silenced by
+ *  one old click. */
+const REDISMISS_GROWTH_THRESHOLD = 10
+
 export function getUnregisteredSenderCandidates(
   db: FinanceDatabase,
   minOccurrences = 2,
@@ -2388,6 +2449,12 @@ export function getUnregisteredSenderCandidates(
         (s.matchAddress && address.includes(s.matchAddress.toLowerCase())) ||
         (s.matchDomain && address.includes(s.matchDomain.toLowerCase())),
     )
+  const dismissed = new Map(
+    readDismissedSenderCandidates(db.settings).map((d) => [
+      d.senderAddress,
+      d,
+    ]),
+  )
 
   const byAddress = new Map<
     string,
@@ -2410,6 +2477,14 @@ export function getUnregisteredSenderCandidates(
   const results: Array<UnregisteredSenderCandidate> = []
   for (const [senderAddress, info] of byAddress) {
     if (info.occurrences < minOccurrences) continue
+    const dismissal = dismissed.get(senderAddress)
+    if (
+      dismissal &&
+      info.occurrences <
+        dismissal.occurrencesAtDismissal + REDISMISS_GROWTH_THRESHOLD
+    ) {
+      continue
+    }
     const domain = senderAddress.split('@')[1]
     if (!domain) continue
     results.push({
