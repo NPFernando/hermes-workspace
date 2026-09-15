@@ -47,6 +47,18 @@ export function SavingsGoalsPanel({
     setError: setErr,
   } = useFinanceAction<PersonalFinancePayload>(onPayload)
 
+  // Reuses the net-worth forecast's own trailing-months savings stddev/mean
+  // as a variability ratio for goal timelines too — same underlying signal
+  // ("how much has actual monthly savings wobbled recently"), no separate
+  // server computation needed. 0 (no band shown) when the forecast has no
+  // data yet, or its own monthly delta isn't positive (a ratio computed
+  // against a ~0 or negative base would be meaningless/huge).
+  const forecast = payload.netWorthForecast
+  const contributionVolatilityRatio =
+    forecast.hasData && forecast.monthlyDeltaBase > 0
+      ? Math.abs(forecast.monthlyDeltaStdDevBase / forecast.monthlyDeltaBase)
+      : 0
+
   const [name, setName] = useState('')
   const [targetAmount, setTargetAmount] = useState('')
   const [currency, setCurrency] = useState(payload.baseCurrency)
@@ -208,13 +220,17 @@ export function SavingsGoalsPanel({
           const id = stringField(g, 'id') || String(index)
           const isEditing = editOpenId === id
           const cur = stringField(g, 'currency') || 'LKR'
-          const timeline = savingsGoalTimeline({
-            currentAmount: numberField(g, 'currentAmount'),
-            targetAmount: numberField(g, 'targetAmount'),
-            monthlyContribution: numberField(g, 'monthlyContribution'),
-            targetDate: stringField(g, 'targetDate'),
-            status: stringField(g, 'status'),
-          })
+          const timeline = savingsGoalTimeline(
+            {
+              currentAmount: numberField(g, 'currentAmount'),
+              targetAmount: numberField(g, 'targetAmount'),
+              monthlyContribution: numberField(g, 'monthlyContribution'),
+              targetDate: stringField(g, 'targetDate'),
+              status: stringField(g, 'status'),
+            },
+            new Date(),
+            contributionVolatilityRatio,
+          )
           return (
             <div
               key={id}
@@ -410,6 +426,20 @@ export function SavingsGoalsPanel({
                     ` To reach the target date, about ${formatLkr(timeline.requiredMonthlyContribution, cur)}/month is needed.`}
                 </p>
               )}
+              {!isEditing &&
+                timeline.state === 'projected' &&
+                (timeline.optimisticDate || timeline.pessimisticDate) && (
+                  <p className="mt-0.5 text-xs text-[var(--theme-muted)]">
+                    Based on how much your actual monthly savings has
+                    recently varied:{' '}
+                    {timeline.optimisticDate &&
+                      `as soon as ${timeline.optimisticDate} `}
+                    {timeline.optimisticDate && timeline.pessimisticDate && '— '}
+                    {timeline.pessimisticDate &&
+                      `as late as ${timeline.pessimisticDate}`}
+                    .
+                  </p>
+                )}
             </div>
           )
         })}
