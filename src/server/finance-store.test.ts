@@ -19,6 +19,7 @@ import {
   getBudgetVsActual,
   getCurrencyExposure,
   getFinanceTrends,
+  getFxConcentrationAlerts,
   getFxExposureAlerts,
   getFxGainLoss,
   getMonthlySummary,
@@ -4176,6 +4177,132 @@ describe('getFxExposureAlerts', () => {
     // = -33.3% — past the re-escalation threshold, resurfaces.
     db.exchange_rates.push(rate(200, '2026-09-01'))
     expect(getFxExposureAlerts(db)).toHaveLength(1)
+  })
+})
+
+describe('getFxConcentrationAlerts', () => {
+  function holding(over: Partial<Record<string, unknown>> = {}) {
+    return {
+      id: 'h1',
+      symbol: 'AAPL',
+      platform: 'IBKR',
+      quantity: 2,
+      buyPrice: 100,
+      buyDate: '2026-01-01',
+      currency: 'USD' as const,
+      lastKnownPrice: 150,
+      priceSource: 'manual' as const,
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      ...over,
+    }
+  }
+  function rate(rateValue: number, date: string) {
+    return {
+      base: 'USD' as const,
+      target: 'LKR' as const,
+      rate: rateValue,
+      date,
+      updatedAt: `${date}T00:00:00.000Z`,
+    }
+  }
+
+  it('fires when a foreign holding dominates net worth, with a 10% stress figure', () => {
+    const db = createEmptyFinanceDatabase()
+    // Only asset in the whole db, so it's ~100% of net worth — comfortably
+    // past the default 20% threshold regardless of rounding.
+    db.exchange_rates.push(rate(300, '2026-01-01'), rate(300, '2026-06-01'))
+    db.stock_holdings.push(holding())
+
+    const alerts = getFxConcentrationAlerts(db)
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0]).toMatchObject({
+      level: 'info',
+      title: 'Concentrated FX exposure',
+      dismissKey: 'fx-concentration',
+    })
+    expect(alerts[0].detail).toContain('100%')
+    expect(alerts[0].detail).toContain('10%')
+  })
+
+  it('stays silent when foreign holdings are a small share of net worth', () => {
+    const db = createEmptyFinanceDatabase()
+    db.exchange_rates.push(rate(300, '2026-01-01'), rate(300, '2026-06-01'))
+    db.stock_holdings.push(holding())
+    // A large LKR cash balance dilutes the foreign holding's share of net
+    // worth well under the 20% default threshold.
+    db.finance_accounts.push({
+      id: 'a1',
+      name: 'Savings',
+      type: 'bank',
+      currency: 'LKR',
+      balance: 10_000_000,
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    expect(getFxConcentrationAlerts(db)).toEqual([])
+  })
+
+  it('stays silent when there are no foreign holdings at all', () => {
+    const db = createEmptyFinanceDatabase()
+    expect(getFxConcentrationAlerts(db)).toEqual([])
+  })
+
+  it('respects a custom thresholdPct and stressMovePct', () => {
+    const db = createEmptyFinanceDatabase()
+    db.exchange_rates.push(rate(300, '2026-01-01'), rate(300, '2026-06-01'))
+    db.stock_holdings.push(holding())
+    expect(getFxConcentrationAlerts(db, 101)).toEqual([])
+    const [alert] = getFxConcentrationAlerts(db, 20, 25)
+    expect(alert.detail).toContain('25%')
+  })
+
+  it('honours a snooze at the current concentration level', () => {
+    const db = createEmptyFinanceDatabase()
+    db.exchange_rates.push(rate(300, '2026-01-01'), rate(300, '2026-06-01'))
+    db.stock_holdings.push(holding())
+    const before = getFxConcentrationAlerts(db)[0]
+    ;(db.settings as Record<string, unknown>).alertSnoozes = [
+      {
+        key: 'fx-concentration',
+        snoozedAt: '2026-06-02T00:00:00.000Z',
+        magnitudeAtSnooze: before.dismissMagnitude ?? 0,
+      },
+    ]
+    expect(getFxConcentrationAlerts(db)).toEqual([])
+  })
+
+  it('resurfaces once concentration grows past the re-escalation threshold', () => {
+    const db = createEmptyFinanceDatabase()
+    db.exchange_rates.push(rate(300, '2026-01-01'), rate(300, '2026-06-01'))
+    db.stock_holdings.push(holding())
+    // Dilute concentration to ~50% first, so there's room to grow back up.
+    db.finance_accounts.push({
+      id: 'a1',
+      name: 'Savings',
+      type: 'bank',
+      currency: 'LKR',
+      balance: 90_000,
+      source: 'test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    const before = getFxConcentrationAlerts(db)[0]
+    ;(db.settings as Record<string, unknown>).alertSnoozes = [
+      {
+        key: 'fx-concentration',
+        snoozedAt: '2026-06-02T00:00:00.000Z',
+        magnitudeAtSnooze: before.dismissMagnitude ?? 0,
+      },
+    ]
+    expect(getFxConcentrationAlerts(db)).toEqual([])
+
+    // Remove the diluting balance — concentration jumps back to ~100%,
+    // comfortably past the +10 point re-escalation threshold.
+    db.finance_accounts.pop()
+    expect(getFxConcentrationAlerts(db)).toHaveLength(1)
   })
 })
 

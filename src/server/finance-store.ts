@@ -3612,6 +3612,7 @@ export function financeAlerts(db: FinanceDatabase): Array<{
   }
   alerts.push(...getTaxRecordAlerts(db))
   alerts.push(...getFxExposureAlerts(db))
+  alerts.push(...getFxConcentrationAlerts(db))
   return alerts
 }
 
@@ -4868,6 +4869,70 @@ export function getFxExposureAlerts(
     })
   }
   return alerts
+}
+
+const FX_CONCENTRATION_SNOOZE_REESCALATION_PCT = 10
+
+/**
+ * Forward-looking counterpart to getFxExposureAlerts (which only fires
+ * after a move has already happened) and to the FX rate-move scenario card
+ * (fx-rate-scenario.ts's fxRateScenario, a manual what-if slider with no
+ * alert of its own). This fires proactively on *concentration*: how much
+ * of net worth sits in currently-unhedged non-LKR holdings, independent of
+ * whether the rate has moved yet — a stress test at a fixed, representative
+ * move (stressMovePct) rather than waiting for a real move to happen.
+ * `costLkrAtBuy + assetGainLkr + fxGainLkr` is each entry's current LKR
+ * market value — already computed by getFxGainLoss, so this doesn't
+ * re-derive a rate lookup the way the client-side scenario helper does.
+ */
+export function getFxConcentrationAlerts(
+  db: FinanceDatabase,
+  thresholdPct = 20,
+  stressMovePct = 10,
+): Array<{
+  level: 'info' | 'warning' | 'critical'
+  title: string
+  detail: string
+  dismissKey?: string
+  dismissMagnitude?: number
+}> {
+  const { entries } = getFxGainLoss(db)
+  const lkr = (n: number) => `LKR ${Math.round(n).toLocaleString('en-LK')}`
+
+  let exposedValueLkr = 0
+  for (const entry of entries) {
+    if (entry.insufficientHistory) continue
+    exposedValueLkr += entry.costLkrAtBuy + entry.assetGainLkr + entry.fxGainLkr
+  }
+  if (exposedValueLkr <= 0) return []
+
+  const netWorthBase = financeSummary(db).netWorthBase
+  if (!(netWorthBase > 0)) return []
+  const concentrationPct = (exposedValueLkr / netWorthBase) * 100
+  if (concentrationPct < thresholdPct) return []
+
+  const key = 'fx-concentration'
+  const snooze = readAlertSnoozes(db.settings as Record<string, unknown>).find(
+    (s) => s.key === key,
+  )
+  if (
+    snooze &&
+    concentrationPct <
+      snooze.magnitudeAtSnooze + FX_CONCENTRATION_SNOOZE_REESCALATION_PCT
+  ) {
+    return []
+  }
+
+  const stressSwingLkr = exposedValueLkr * (stressMovePct / 100)
+  return [
+    {
+      level: 'info',
+      title: 'Concentrated FX exposure',
+      detail: `${concentrationPct.toFixed(0)}% of net worth (${lkr(exposedValueLkr)}) sits in non-LKR holdings. A ${stressMovePct}% adverse currency move from here — not a prediction, just a stress test — would swing that by roughly ${lkr(stressSwingLkr)}.`,
+      dismissKey: key,
+      dismissMagnitude: concentrationPct,
+    },
+  ]
 }
 
 /**
