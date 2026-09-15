@@ -67,7 +67,10 @@ export async function collectOperationalStatus({
   // created in another timezone). Never call a build stale solely because a
   // future-dated commit compares newer than the artifact.
   else if (commitSeconds && commitSeconds <= now / 1000 && buildMtimeMs < commitSeconds * 1000) issues.push({ level: 'critical', code: 'stale_build', detail: 'Build artifact predates the current git HEAD.' })
-  if (oomLog.trim()) issues.push({ level: 'critical', code: 'oom_event', detail: 'Kernel journal contains a recent out-of-memory or process-kill event.' })
+  if (oomLog.trim()) {
+    const serviceOom = oomLog.toLowerCase().includes(service.toLowerCase()) || oomLog.includes(serviceShow.pid)
+    issues.push({ level: serviceOom ? 'critical' : 'warning', code: 'oom_event', detail: serviceOom ? 'Kernel journal contains a recent OOM event affecting this service.' : 'Kernel journal contains a recent OOM event affecting another workload.' })
+  }
   if (errorLog.trim()) issues.push({ level: 'warning', code: 'service_errors', detail: `${errorLog.trim().split(/\r?\n/).length} recent service error log line(s) found.` })
   if (previous.pid && serviceShow.pid !== '0' && previous.pid !== serviceShow.pid) issues.push({ level: 'warning', code: 'pid_changed', detail: `Service PID changed from ${previous.pid} to ${serviceShow.pid}.` })
   const parkedStashes = stashLines ? stashLines.split(/\r?\n/).filter(Boolean).length : 0
