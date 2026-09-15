@@ -22,18 +22,18 @@ const GOALS: Array<Goal> = [
   { id: 6, title: 'Vault recovery tests', state: 'completed', detail: 'Backup, migration, and rollback coverage present.' },
   { id: 7, title: 'HARP observability hooks', state: 'deployed', detail: 'Unsupported-hook warnings removed from live startup.' },
   { id: 8, title: 'Hindsight daemon guard', state: 'deployed', detail: 'Cron duplicate-spawn regression covered.' },
-  { id: 9, title: 'AI usage dashboard', state: 'active', detail: 'Provider usage and history are integrated.' },
-  { id: 10, title: '/queue dispatch control', state: 'active', detail: 'Persistence, retry, cancel, and serial dispatch covered.' },
-  { id: 11, title: 'Shared usage budgets', state: 'active', detail: 'Warnings and provider history need production rollout.' },
+  { id: 9, title: 'AI usage dashboard', state: 'deployed', detail: 'Provider usage and history are integrated.' },
+  { id: 10, title: '/queue dispatch control', state: 'deployed', detail: 'Persistence, retry, cancel, priorities, and serial dispatch are live.' },
+  { id: 11, title: 'Shared usage budgets', state: 'deployed', detail: 'Warnings and provider history are live.' },
   { id: 12, title: 'Fork sync protection', state: 'completed', detail: 'Dry-run and custom-change safeguards are present.' },
   { id: 13, title: 'Deployment recovery controls', state: 'deployed', detail: 'Stale-run and exact-SHA guards are live.' },
   { id: 14, title: 'HARP readiness diagnostics', state: 'active', detail: 'Safe suite passes; real canary remains gated.' },
   { id: 15, title: 'Astrology UX refinement', state: 'active', detail: 'Saved profiles, bilingual SEO, PWA, and accessibility.' },
-  { id: 16, title: 'Finance institution reuse', state: 'active', detail: 'Bank/branch autocomplete and persistence are under validation.' },
+  { id: 16, title: 'Finance institution reuse', state: 'deployed', detail: 'Bank/branch autocomplete and stable catalog links are live.' },
   { id: 17, title: 'Production observability', state: 'deployed', detail: 'Uptime, memory pressure, OOM, and error alerts.' },
   { id: 18, title: 'Private-data-safe Dify pilot', state: 'active', detail: 'Optional workbench remains isolated from private data.' },
   { id: 19, title: 'Dependency review automation', state: 'completed', detail: 'Weekly Dependabot coverage configured.' },
-  { id: 20, title: 'Unified project dashboard', state: 'active', detail: 'This control-plane view is the first release.' },
+  { id: 20, title: 'Unified project dashboard', state: 'deployed', detail: 'This control-plane view is live with acceptance-state filters.' },
 ]
 
 const STATE_LABEL: Record<GoalState, string> = {
