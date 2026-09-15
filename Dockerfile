@@ -49,9 +49,11 @@ COPY --from=build --chown=workspace:workspace /app/server-entry.js ./server-entr
 COPY --from=build --chown=workspace:workspace /app/skills ./skills
 COPY --chown=workspace:workspace docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
+ARG HERMES_BUILD_ID=unknown
 ENV NODE_ENV=production \
     PORT=3000 \
     HOST=0.0.0.0 \
+    HERMES_BUILD_ID=$HERMES_BUILD_ID \
     HERMES_API_URL=http://hermes-agent:8642
 
 EXPOSE 3000
