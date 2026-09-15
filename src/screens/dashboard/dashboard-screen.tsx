@@ -25,6 +25,7 @@ import { OperatorTipCard } from './components/operator-tip-card'
 import { ProactiveSuggestionsCard } from './components/proactive-suggestions-card'
 import { OpsStrip } from './components/ops-strip'
 import { ProviderMixCard } from './components/provider-mix-card'
+import { ProjectGoalsCard } from './components/project-goals-card'
 import { SessionsIntelligenceCard } from './components/sessions-intelligence-card'
 import { SkillsUsageCard } from './components/skills-usage-card'
 import { TokenMixHourCard } from './components/token-mix-hour-card'
@@ -947,6 +948,8 @@ export function DashboardScreen() {
         kanban={overview?.kanban ?? null}
         platforms={overview?.platforms ?? []}
       />
+
+      <ProjectGoalsCard />
 
       {/* ── Hero Metrics: 3 analytics tiles + Active Model KPI in slot 4 ── */}
       <HeroMetrics
