@@ -13,6 +13,7 @@ import { StatCard } from '../finance/components/stat-card'
 import { BaseCurrencySelect } from './components/base-currency-select'
 import { GmailConnectionCard } from './components/gmail-connection-card'
 import { KnownSendersCard } from './components/known-senders-card'
+import { SnoozeManagementCard } from './components/snooze-management-card'
 import { CsvImportPanel } from './components/csv-import-panel'
 import { FxGainLossCard } from './components/fx-gain-loss-card'
 import { BudgetPanel } from './components/budget-panel'
@@ -396,6 +397,7 @@ export function PersonalFinanceScreen() {
               <BaseCurrencySelect payload={payload} onPayload={setPayload} />
               <GmailConnectionCard />
               <KnownSendersCard />
+              <SnoozeManagementCard />
               <AssistantMemoryCard />
               <DataHealthCard payload={payload} />
             </div>
