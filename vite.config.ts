@@ -1,9 +1,8 @@
 import { URL, fileURLToPath } from 'node:url'
 import { execSync, spawn } from 'node:child_process'
-import type { ChildProcess } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import net from 'node:net'
-import { resolve, dirname } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import os from 'node:os'
 
 // devtools removed
@@ -13,6 +12,7 @@ import tailwindcss from '@tailwindcss/vite'
 // nitro plugin removed (tanstackStart handles server runtime)
 import { defineConfig, loadEnv } from 'vite'
 import viteTsConfigPaths from 'vite-tsconfig-paths'
+import type { ChildProcess } from 'node:child_process'
 
 // ---------------------------------------------------------------------------
 // Hermes Agent auto-start helpers
@@ -26,10 +26,15 @@ import viteTsConfigPaths from 'vite-tsconfig-paths'
  *  Returns null if none found.
  */
 function resolveClaudeAgentDir(env: Record<string, string>): string | null {
-  const candidates: string[] = []
+  const candidates: Array<string> = []
 
+  // env is typed Record<string, string> but a key that was never actually
+  // set in the loaded .env still reads as undefined at runtime — the type
+  // doesn't reflect that, so the optional chains here are load-bearing.
+  /* eslint-disable @typescript-eslint/no-unnecessary-condition */
   const explicitAgentPath =
     env.HERMES_AGENT_PATH?.trim() || env.CLAUDE_AGENT_PATH?.trim()
+  /* eslint-enable @typescript-eslint/no-unnecessary-condition */
   if (explicitAgentPath) {
     candidates.push(explicitAgentPath)
   }
@@ -98,6 +103,9 @@ const config = defineConfig(({ mode, command }) => {
       process.env[key] = env[key]
     }
   }
+  // Same Record<string, string>-doesn't-reflect-runtime-reality case as
+  // resolveClaudeAgentDir above.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   const claudeApiUrl = env.CLAUDE_API_URL?.trim() || 'http://127.0.0.1:8642'
   // /api/connection-status is handled by the real route file at
   // src/routes/api/connection-status.ts; the dev server no longer
@@ -136,7 +144,7 @@ const config = defineConfig(({ mode, command }) => {
     // entrypoint). Fall back to launching uvicorn against the source tree if
     // only a directory is present (dev / cloned-in-place setups).
     let launchCmd: string
-    let commandArgs: string[]
+    let commandArgs: Array<string>
     let launchCwd: string | undefined
 
     if (claudeBin) {
@@ -193,11 +201,14 @@ const config = defineConfig(({ mode, command }) => {
     claudeAgentChild = child
     claudeAgentStarted = true
 
-    child.stdout?.on('data', (d: Buffer) => {
+    // stdio: 'pipe' above matches SpawnOptionsWithoutStdio, so spawn()
+    // resolves to ChildProcessWithoutNullStreams — stdout/stderr are
+    // guaranteed non-null, the optional chain really is dead here.
+    child.stdout.on('data', (d: Buffer) => {
       const line = d.toString().trim()
       if (line) console.log(`[hermes-agent] ${line}`)
     })
-    child.stderr?.on('data', (d: Buffer) => {
+    child.stderr.on('data', (d: Buffer) => {
       const line = d.toString().trim()
       if (line) console.log(`[hermes-agent] ${line}`)
     })
@@ -267,11 +278,13 @@ const config = defineConfig(({ mode, command }) => {
     odysseusChild = child
     odysseusStarted = true
 
-    child.stdout?.on('data', (d: Buffer) => {
+    // Same as the hermes-agent spawn above: stdio: 'pipe' guarantees
+    // non-null stdout/stderr, so the optional chain is dead here.
+    child.stdout.on('data', (d: Buffer) => {
       const line = d.toString().trim()
       if (line) console.log(`[odysseus] ${line}`)
     })
-    child.stderr?.on('data', (d: Buffer) => {
+    child.stderr.on('data', (d: Buffer) => {
       const line = d.toString().trim()
       if (line) console.log(`[odysseus] ${line}`)
     })
@@ -488,9 +501,11 @@ const config = defineConfig(({ mode, command }) => {
 
   // Allow access from Tailscale, LAN, or custom domains via env var
   // e.g. CLAUDE_ALLOWED_HOSTS=my-server.tail1234.ts.net,192.168.1.50
-  const _allowedHosts: string[] | true = env.CLAUDE_ALLOWED_HOSTS?.trim()
-    ? env
-        .CLAUDE_ALLOWED_HOSTS!.split(',')
+  // Same Record<string, string>-doesn't-reflect-runtime-reality case as
+  // resolveClaudeAgentDir above.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  const _allowedHosts: Array<string> | true = env.CLAUDE_ALLOWED_HOSTS?.trim()
+    ? env.CLAUDE_ALLOWED_HOSTS.split(',')
         .map((h) => h.trim())
         .filter(Boolean)
     : ['.ts.net'] // allow all Tailscale hostnames by default
@@ -522,6 +537,16 @@ const config = defineConfig(({ mode, command }) => {
       ],
       // Reset the in-process finance-store test backend before every test.
       setupFiles: ['./src/test/setup-finance-store.ts'],
+      // Works around a known Vitest 4/5 regression (v3 unaffected — this
+      // repo hit it right after the vitest 3.2.4->5.0.0 bump): a console
+      // write that lands just as a test file's worker environment is
+      // tearing down races the console-intercept RPC, throwing
+      // "EnvironmentTeardownError: Closing rpc while 'onUserConsoleLog' was
+      // pending" and failing the whole run's exit code even though every
+      // test passed. Load-sensitive, so it doesn't reproduce reliably
+      // locally — it hit kanban-backend.test.ts twice in CI this week on
+      // unrelated PRs. https://github.com/vitest-dev/vitest/issues/11153
+      disableConsoleIntercept: true,
       // Force vitest to run React through its own transform pipeline so ESM
       // `import` and CJS `require('react')` share a single module instance.
       // Without this, react-dom sets the dispatcher on its CJS React copy while
@@ -796,6 +821,11 @@ const config = defineConfig(({ mode, command }) => {
           workspaceDaemonStarting = true
           void (async () => {
             const running = await isPortInUse(Number(workspaceDaemonPort))
+            // Re-check after the await: another overlapping invocation could
+            // have started (and finished starting) the daemon in the
+            // meantime — TS's flow analysis can't see across an await, but
+            // this genuinely can flip during it.
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
             if (workspaceDaemonStarted) {
               workspaceDaemonStarting = false
               return
@@ -828,7 +858,9 @@ const config = defineConfig(({ mode, command }) => {
         name: 'client-process-env',
         enforce: 'pre',
         transform(code, _id) {
-          const envName = this.environment?.name
+          // Vite 8's PluginContext.environment is non-optional now — the
+          // chain is dead, this.environment.name is always defined.
+          const envName = this.environment.name
           if (envName !== 'client') return null
           if (
             !code.includes('process.env') &&
