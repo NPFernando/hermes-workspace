@@ -4094,6 +4094,83 @@ describe('getFxExposureAlerts', () => {
     expect(getFxExposureAlerts(db, 1)).toHaveLength(1)
     expect(getFxExposureAlerts(db, 10)).toEqual([])
   })
+
+  it('sets dismissKey to the holding id', () => {
+    const db = createEmptyFinanceDatabase()
+    db.exchange_rates.push(rate(300, '2026-01-01'), rate(250, '2026-06-01'))
+    db.stock_holdings.push(holding({ id: 'h-snoozable' }))
+    expect(getFxExposureAlerts(db)[0].dismissKey).toBe('h-snoozable')
+  })
+
+  it('drops a snoozed holding from the results', () => {
+    const db = createEmptyFinanceDatabase()
+    db.exchange_rates.push(rate(300, '2026-01-01'), rate(250, '2026-06-01'))
+    db.stock_holdings.push(holding({ id: 'h-snoozed' }))
+    expect(getFxExposureAlerts(db)).toHaveLength(1)
+    ;(db.settings as Record<string, unknown>).fxExposureSnoozes = [
+      {
+        holdingId: 'h-snoozed',
+        snoozedAt: '2026-06-02T00:00:00.000Z',
+        fxPctAtSnooze: 16.67,
+      },
+    ]
+    expect(getFxExposureAlerts(db)).toEqual([])
+  })
+
+  it('resurfaces a snoozed holding once its exposure worsens by more than the re-escalation threshold', () => {
+    const db = createEmptyFinanceDatabase()
+    db.stock_holdings.push(holding({ id: 'h-worsening' }))
+    // Snooze at the ~16.67% level from the earlier scenario.
+    ;(db.settings as Record<string, unknown>).fxExposureSnoozes = [
+      {
+        holdingId: 'h-worsening',
+        snoozedAt: '2026-06-02T00:00:00.000Z',
+        fxPctAtSnooze: 16.67,
+      },
+    ]
+    // Rate drops further, 300 -> 240: fxPct = (200*(240-300))/60,000 = -20%.
+    // Still under 16.67 + 5 = 21.67 — stays snoozed.
+    db.exchange_rates.push(rate(300, '2026-01-01'), rate(240, '2026-06-01'))
+    expect(getFxExposureAlerts(db)).toEqual([])
+
+    // Rate drops much further, 300 -> 200: fxPct = (200*(200-300))/60,000
+    // = -33.3% — past the re-escalation threshold, resurfaces.
+    db.exchange_rates.push(rate(200, '2026-09-01'))
+    expect(getFxExposureAlerts(db)).toHaveLength(1)
+  })
+})
+
+describe('snoozeFxExposureAlert', () => {
+  it('persists the snooze onto settings.fxExposureSnoozes', async () => {
+    const store = await freshFinanceStore()
+    const db = store.readFinanceStore()
+    store.snoozeFxExposureAlert(db, 'h-persisted', 12.5)
+    const after = store.readFinanceStore()
+    const snoozes = (after.settings as Record<string, unknown>)
+      .fxExposureSnoozes as Array<{
+      holdingId: string
+      fxPctAtSnooze: number
+    }>
+    expect(snoozes).toEqual([
+      expect.objectContaining({
+        holdingId: 'h-persisted',
+        fxPctAtSnooze: 12.5,
+      }),
+    ])
+  })
+
+  it('replaces a prior snooze of the same holding rather than duplicating it', async () => {
+    const store = await freshFinanceStore()
+    const db1 = store.readFinanceStore()
+    store.snoozeFxExposureAlert(db1, 'h-repeated', 12.5)
+    const db2 = store.readFinanceStore()
+    store.snoozeFxExposureAlert(db2, 'h-repeated', 18)
+    const after = store.readFinanceStore()
+    const snoozes = (after.settings as Record<string, unknown>)
+      .fxExposureSnoozes as Array<{ fxPctAtSnooze: number }>
+    expect(snoozes).toHaveLength(1)
+    expect(snoozes[0].fxPctAtSnooze).toBe(18)
+  })
 })
 
 describe('ledger-derived account balances (item 3 + 4)', () => {

@@ -47,6 +47,7 @@ import {
   recordNetWorthSnapshot,
   setKnownSenderPassword,
   setNonLiveExecutionMode,
+  snoozeFxExposureAlert,
   storeIntelligenceRecords,
   tradingPerformanceSummary,
   updateExchangeRate,
@@ -2494,6 +2495,21 @@ export const Route = createFileRoute('/api/finance')({
               recordGmailSyncError(message)
               return json({ ok: false, error: message }, { status: 502 })
             }
+          }
+          if (action === 'snooze_fx_exposure_alert') {
+            const holdingId =
+              typeof body.holdingId === 'string' ? body.holdingId : ''
+            if (!holdingId.trim()) {
+              return json(
+                { ok: false, error: 'holdingId is required.' },
+                { status: 400 },
+              )
+            }
+            const fxPctAtSnooze =
+              typeof body.fxPct === 'number' ? Math.abs(body.fxPct) : 0
+            const db = ensureFinanceStore()
+            snoozeFxExposureAlert(db, holdingId, fxPctAtSnooze)
+            return json({ ok: true })
           }
           if (action === 'list_known_senders') {
             // Never returns encryptedPassword — hasPassword is the only

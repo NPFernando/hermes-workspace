@@ -3404,12 +3404,14 @@ export function financeAlerts(db: FinanceDatabase): Array<{
   level: 'info' | 'warning' | 'critical'
   title: string
   detail: string
+  dismissKey?: string
 }> {
   const summary = financeSummary(db)
   const alerts: Array<{
     level: 'info' | 'warning' | 'critical'
     title: string
     detail: string
+    dismissKey?: string
   }> = []
   if (
     summary.totalExpensesBase > summary.totalIncomeBase &&
@@ -4681,26 +4683,90 @@ export function getFxGainLoss(db: FinanceDatabase): {
  * on) and LKR-denominated holdings (fxGainLkr is always 0 for those by
  * construction — no currency risk to report).
  */
+type FxExposureSnooze = {
+  holdingId: string
+  snoozedAt: string
+  /** |fxPct| at the moment of snoozing — re-surfaces once the exposure has
+   *  worsened by SNOOZE_REESCALATION_PCT past this, so snoozing a holding
+   *  you've decided to hold through doesn't also hide a later, materially
+   *  worse move in the same direction. */
+  fxPctAtSnooze: number
+}
+
+function readFxExposureSnoozes(
+  settings: Record<string, unknown>,
+): Array<FxExposureSnooze> {
+  return Array.isArray(settings.fxExposureSnoozes)
+    ? (settings.fxExposureSnoozes as Array<FxExposureSnooze>)
+    : []
+}
+
+/**
+ * Records an explicit "I've seen this, don't keep telling me" on one
+ * holding's FX exposure alert — mirrors dismissSenderCandidate's shape and
+ * its non-permanence: the same holding resurfaces if the exposure gets
+ * meaningfully worse, rather than a single click silencing it forever
+ * while the currency keeps moving further against it.
+ */
+export function snoozeFxExposureAlert(
+  db: FinanceDatabase,
+  holdingId: string,
+  fxPctAtSnooze: number,
+): void {
+  const settings = db.settings as Record<string, unknown>
+  const existing = readFxExposureSnoozes(settings).filter(
+    (s) => s.holdingId !== holdingId,
+  )
+  settings.fxExposureSnoozes = [
+    ...existing,
+    { holdingId, snoozedAt: new Date().toISOString(), fxPctAtSnooze },
+  ]
+  writeFinanceStore(db)
+}
+
+const SNOOZE_REESCALATION_PCT = 5
+
 export function getFxExposureAlerts(
   db: FinanceDatabase,
   thresholdPct = 10,
-): Array<{ level: 'info' | 'warning' | 'critical'; title: string; detail: string }> {
+): Array<{
+  level: 'info' | 'warning' | 'critical'
+  title: string
+  detail: string
+  /** Present only on snoozable alerts — the holding id to pass back to
+   *  snoozeFxExposureAlert(). Alert types with nothing to snooze omit it. */
+  dismissKey?: string
+}> {
   const { entries } = getFxGainLoss(db)
   const alerts: Array<{
     level: 'info' | 'warning' | 'critical'
     title: string
     detail: string
+    dismissKey?: string
   }> = []
   const lkr = (n: number) => `LKR ${Math.round(n).toLocaleString('en-LK')}`
+  const snoozed = new Map(
+    readFxExposureSnoozes(db.settings as Record<string, unknown>).map(
+      (s) => [s.holdingId, s],
+    ),
+  )
 
   for (const entry of entries) {
     if (entry.insufficientHistory || entry.costLkrAtBuy <= 0) continue
     const fxPct = (entry.fxGainLkr / entry.costLkrAtBuy) * 100
     if (fxPct >= -thresholdPct) continue
+    const snooze = snoozed.get(entry.id)
+    if (
+      snooze &&
+      Math.abs(fxPct) < snooze.fxPctAtSnooze + SNOOZE_REESCALATION_PCT
+    ) {
+      continue
+    }
     alerts.push({
       level: 'warning',
       title: `FX exposure: ${entry.symbol}`,
       detail: `${entry.currency} has moved against this holding by ${Math.abs(fxPct).toFixed(1)}% of its cost basis since purchase (${lkr(entry.fxGainLkr)}), separate from how the asset itself performed.`,
+      dismissKey: entry.id,
     })
   }
   return alerts

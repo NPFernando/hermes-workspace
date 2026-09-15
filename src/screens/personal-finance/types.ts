@@ -41,6 +41,9 @@ export type PersonalFinancePayload = {
     level: 'info' | 'warning' | 'critical'
     title: string
     detail: string
+    /** Present only on alerts that can be snoozed (e.g. FX exposure) — the
+     *  key to pass back to the snooze action. */
+    dismissKey?: string
   }>
   /** PF review item 7: server-computed dashboard derivations. Amounts are raw
    * LKR — scale by `fxToBase` for display. */
