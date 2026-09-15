@@ -36,6 +36,9 @@ artifact_build_id() {
   sha256sum dist/server/server.js | cut -c1-16
 }
 
+RUNTIME_DIR="${HERMES_RUNTIME_STATE_DIR:-.runtime}"
+BUILD_MARKER="$RUNTIME_DIR/build-commit"
+
 if [ -n "$(git status --porcelain)" ]; then
   echo "error: deploy directory has uncommitted changes — refusing deployment." >&2
   git status --short >&2
@@ -49,24 +52,29 @@ TARGET=$(git rev-parse origin/main)
 if [ "$CURRENT" = "$TARGET" ]; then
   [ -f dist/server/server.js ] || { echo "error: build artifact is missing" >&2; exit 1; }
   EXPECTED_BUILD="$(artifact_build_id)"
-  if [ "$QUIET_IF_UNCHANGED" = "1" ]; then
-    RELEASE_SMOKE_EXPECTED_BUILD="$EXPECTED_BUILD" node scripts/release-smoke.mjs http://127.0.0.1:3000 >/dev/null
+  if [ -f "$BUILD_MARKER" ] && grep -Fxq "$CURRENT" "$BUILD_MARKER"; then
+    if [ "$QUIET_IF_UNCHANGED" = "1" ]; then
+      RELEASE_SMOKE_EXPECTED_BUILD="$EXPECTED_BUILD" node scripts/release-smoke.mjs http://127.0.0.1:3000 >/dev/null
+      exit 0
+    fi
+    echo "==> already up to date at $CURRENT"
+    RELEASE_SMOKE_EXPECTED_BUILD="$EXPECTED_BUILD" node scripts/release-smoke.mjs http://127.0.0.1:3000
     exit 0
   fi
-  echo "==> already up to date at $CURRENT"
-  RELEASE_SMOKE_EXPECTED_BUILD="$EXPECTED_BUILD" node scripts/release-smoke.mjs http://127.0.0.1:3000
-  exit 0
+  echo "==> build marker missing or mismatched; rebuilding $CURRENT"
 fi
 
-echo "==> updating $CURRENT -> $TARGET"
-if git merge-base --is-ancestor "$TARGET" "$CURRENT"; then
-  if [ "$ALLOW_LOCAL_AHEAD" != "1" ]; then
-    echo "error: local HEAD is ahead of origin/main; rerun explicitly with --allow-local-ahead" >&2
-    exit 1
+if [ "$CURRENT" != "$TARGET" ]; then
+  echo "==> updating $CURRENT -> $TARGET"
+  if git merge-base --is-ancestor "$TARGET" "$CURRENT"; then
+    if [ "$ALLOW_LOCAL_AHEAD" != "1" ]; then
+      echo "error: local HEAD is ahead of origin/main; rerun explicitly with --allow-local-ahead" >&2
+      exit 1
+    fi
+    echo "==> retaining explicitly approved local-ahead release"
+  else
+    git merge --ff-only origin/main
   fi
-  echo "==> retaining explicitly approved local-ahead release"
-else
-  git merge --ff-only origin/main
 fi
 
 echo "==> pnpm install"
@@ -91,6 +99,8 @@ for i in $(seq 1 15); do
       exit 1
     fi
     RELEASE_SMOKE_EXPECTED_BUILD="$EXPECTED_BUILD" node scripts/release-smoke.mjs http://127.0.0.1:3000
+    mkdir -p "$RUNTIME_DIR"
+    printf '%s\n' "$(git rev-parse HEAD)" > "$BUILD_MARKER"
     echo "==> deployed $(git rev-parse --short HEAD), service healthy (pid=${NEW_PID:-unknown})"
     exit 0
   fi
