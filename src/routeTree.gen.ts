@@ -9,380 +9,260 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TradingRouteImport } from './routes/trading'
-import { Route as TerminalRouteImport } from './routes/terminal'
-import { Route as TasksRouteImport } from './routes/tasks'
-import { Route as Swarm2RouteImport } from './routes/swarm2'
-import { Route as SwarmRouteImport } from './routes/swarm'
-import { Route as SkillsRouteImport } from './routes/skills'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as ResearchRouteImport } from './routes/research'
-import { Route as ProfilesRouteImport } from './routes/profiles'
-import { Route as PersonalFinanceRouteImport } from './routes/personal-finance'
-import { Route as OpsCostRouteImport } from './routes/ops-cost'
-import { Route as OperationsRouteImport } from './routes/operations'
-import { Route as MemoryRouteImport } from './routes/memory'
-import { Route as McpRouteImport } from './routes/mcp'
-import { Route as JobsRouteImport } from './routes/jobs'
-import { Route as FinanceRouteImport } from './routes/finance'
-import { Route as FilesRouteImport } from './routes/files'
-import { Route as EchoStudioRouteImport } from './routes/echo-studio'
-import { Route as DownloadApkRouteImport } from './routes/download-apk'
-import { Route as DifyRouteImport } from './routes/dify'
-import { Route as DashboardRouteImport } from './routes/dashboard'
-import { Route as ConductorRouteImport } from './routes/conductor'
-import { Route as CommandRouteImport } from './routes/command'
-import { Route as AgoraRouteImport } from './routes/agora'
-import { Route as AgentsRouteImport } from './routes/agents'
-import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as SettingsIndexRouteImport } from './routes/settings/index'
-import { Route as ChatIndexRouteImport } from './routes/chat/index'
-import { Route as SettingsProvidersRouteImport } from './routes/settings/providers'
-import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
-import { Route as ApiWorkspaceVersionRouteImport } from './routes/api/workspace-version'
-import { Route as ApiWorkspaceSessionHealthRouteImport } from './routes/api/workspace-session-health'
-import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
-import { Route as ApiWorkflowTemplatesRouteImport } from './routes/api/workflow-templates'
-import { Route as ApiValidateProviderRouteImport } from './routes/api/validate-provider'
-import { Route as ApiUserSettingsRouteImport } from './routes/api/user-settings'
-import { Route as ApiUserProfileRouteImport } from './routes/api/user-profile'
-import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
-import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
-import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
-import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-input'
-import { Route as ApiTerminalCloseRouteImport } from './routes/api/terminal-close'
-import { Route as ApiTelegramTaskClarifyRouteImport } from './routes/api/telegram-task-clarify'
-import { Route as ApiTelegramFindRouteImport } from './routes/api/telegram-find'
-import { Route as ApiTelegramBoardSummaryRouteImport } from './routes/api/telegram-board-summary'
-import { Route as ApiTelegramBoardRouteImport } from './routes/api/telegram-board'
-import { Route as ApiTasksUnlockPrereqRouteImport } from './routes/api/tasks-unlock-prereq'
-import { Route as ApiTasksSweepStatsRouteImport } from './routes/api/tasks-sweep-stats'
-import { Route as ApiTasksStaleRouteImport } from './routes/api/tasks-stale'
-import { Route as ApiTasksRescueTimedoutRouteImport } from './routes/api/tasks-rescue-timedout'
-import { Route as ApiTasksReplanStubsRouteImport } from './routes/api/tasks-replan-stubs'
-import { Route as ApiTasksPruneRouteImport } from './routes/api/tasks-prune'
-import { Route as ApiTasksProgressPingRouteImport } from './routes/api/tasks-progress-ping'
-import { Route as ApiTasksInjectIdeasRouteImport } from './routes/api/tasks-inject-ideas'
-import { Route as ApiTasksGenerateIdeasRouteImport } from './routes/api/tasks-generate-ideas'
-import { Route as ApiTasksFromTextRouteImport } from './routes/api/tasks-from-text'
-import { Route as ApiTasksExecLogRouteImport } from './routes/api/tasks-exec-log'
-import { Route as ApiTasksDrainNowRouteImport } from './routes/api/tasks-drain-now'
-import { Route as ApiTasksDeployAgentsRouteImport } from './routes/api/tasks-deploy-agents'
-import { Route as ApiTasksCreateFromTgRouteImport } from './routes/api/tasks-create-from-tg'
-import { Route as ApiTasksCompletionTrendRouteImport } from './routes/api/tasks-completion-trend'
-import { Route as ApiTasksCompletionCheckRouteImport } from './routes/api/tasks-completion-check'
-import { Route as ApiTasksClarifyNudgeRouteImport } from './routes/api/tasks-clarify-nudge'
-import { Route as ApiTasksBlockersRouteImport } from './routes/api/tasks-blockers'
-import { Route as ApiTasksBatchExecuteRouteImport } from './routes/api/tasks-batch-execute'
-import { Route as ApiTasksAstraReviewRouteImport } from './routes/api/tasks-astra-review'
-import { Route as ApiTasksAskAstraRouteImport } from './routes/api/tasks-ask-astra'
-import { Route as ApiTasksRouteImport } from './routes/api/tasks'
-import { Route as ApiSystemMetricsRouteImport } from './routes/api/system-metrics'
-import { Route as ApiSwarmTmuxStopRouteImport } from './routes/api/swarm-tmux-stop'
-import { Route as ApiSwarmTmuxStartRouteImport } from './routes/api/swarm-tmux-start'
-import { Route as ApiSwarmTmuxScrollRouteImport } from './routes/api/swarm-tmux-scroll'
-import { Route as ApiSwarmRuntimeRouteImport } from './routes/api/swarm-runtime'
-import { Route as ApiSwarmRosterRouteImport } from './routes/api/swarm-roster'
-import { Route as ApiSwarmReportsRouteImport } from './routes/api/swarm-reports'
-import { Route as ApiSwarmProjectRouteImport } from './routes/api/swarm-project'
-import { Route as ApiSwarmOrchestratorLoopRouteImport } from './routes/api/swarm-orchestrator-loop'
-import { Route as ApiSwarmMissionsRouteImport } from './routes/api/swarm-missions'
-import { Route as ApiSwarmMemoryRouteImport } from './routes/api/swarm-memory'
-import { Route as ApiSwarmLifecycleRouteImport } from './routes/api/swarm-lifecycle'
-import { Route as ApiSwarmKanbanRouteImport } from './routes/api/swarm-kanban'
-import { Route as ApiSwarmHealthRouteImport } from './routes/api/swarm-health'
-import { Route as ApiSwarmEnvironmentRouteImport } from './routes/api/swarm-environment'
-import { Route as ApiSwarmDispatchRouteImport } from './routes/api/swarm-dispatch'
-import { Route as ApiSwarmDirectChatRouteImport } from './routes/api/swarm-direct-chat'
-import { Route as ApiSwarmDecomposeRouteImport } from './routes/api/swarm-decompose'
-import { Route as ApiSwarmCheckpointRouteImport } from './routes/api/swarm-checkpoint'
-import { Route as ApiSwarmChatRouteImport } from './routes/api/swarm-chat'
-import { Route as ApiStartClaudeRouteImport } from './routes/api/start-claude'
-import { Route as ApiStartAgentRouteImport } from './routes/api/start-agent'
-import { Route as ApiSkillsRouteImport } from './routes/api/skills'
-import { Route as ApiSistersImproveRouteImport } from './routes/api/sisters-improve'
-import { Route as ApiSistersGrowthRouteImport } from './routes/api/sisters-growth'
-import { Route as ApiSistersBootstrapRouteImport } from './routes/api/sisters-bootstrap'
-import { Route as ApiSistersRouteImport } from './routes/api/sisters'
-import { Route as ApiSessionsRouteImport } from './routes/api/sessions'
-import { Route as ApiSessionStatusRouteImport } from './routes/api/session-status'
-import { Route as ApiSessionSendRouteImport } from './routes/api/session-send'
-import { Route as ApiSessionHistoryRouteImport } from './routes/api/session-history'
-import { Route as ApiSendStreamRouteImport } from './routes/api/send-stream'
-import { Route as ApiSendRouteImport } from './routes/api/send'
-import { Route as ApiRouteSisterRouteImport } from './routes/api/route-sister'
-import { Route as ApiRiskCheckRouteImport } from './routes/api/risk-check'
-import { Route as ApiProviderUsageRouteImport } from './routes/api/provider-usage'
-import { Route as ApiPreviewFileRouteImport } from './routes/api/preview-file'
-import { Route as ApiPluginsRouteImport } from './routes/api/plugins'
-import { Route as ApiPingRouteImport } from './routes/api/ping'
-import { Route as ApiPersonalitySwarmRouteImport } from './routes/api/personality-swarm'
-import { Route as ApiPathsRouteImport } from './routes/api/paths'
-import { Route as ApiOrchestrateRouteImport } from './routes/api/orchestrate'
-import { Route as ApiOpsObservabilityRouteImport } from './routes/api/ops-observability'
-import { Route as ApiOpenrouterCreditsRouteImport } from './routes/api/openrouter-credits'
-import { Route as ApiOdysseusBootstrapRouteImport } from './routes/api/odysseus-bootstrap'
-import { Route as ApiModelsRouteImport } from './routes/api/models'
-import { Route as ApiModelSwitchRouteImport } from './routes/api/model-switch'
-import { Route as ApiMemoryRouteImport } from './routes/api/memory'
-import { Route as ApiMediaRouteImport } from './routes/api/media'
-import { Route as ApiMcpRouteImport } from './routes/api/mcp'
-import { Route as ApiLocalProvidersRouteImport } from './routes/api/local-providers'
-import { Route as ApiIntegrationsRouteImport } from './routes/api/integrations'
-import { Route as ApiHistoryRouteImport } from './routes/api/history'
-import { Route as ApiHermesTasksAssigneesRouteImport } from './routes/api/hermes-tasks-assignees'
-import { Route as ApiHermesTasksRouteImport } from './routes/api/hermes-tasks'
-import { Route as ApiHermesConfigRouteImport } from './routes/api/hermes-config'
-import { Route as ApiHealthRouteImport } from './routes/api/health'
-import { Route as ApiHarpSelectorPreviewRouteImport } from './routes/api/harp-selector-preview'
-import { Route as ApiHarpObservabilityRouteImport } from './routes/api/harp-observability'
-import { Route as ApiHarpConfigRouteImport } from './routes/api/harp-config'
-import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-status'
-import { Route as ApiGatewayReprobeRouteImport } from './routes/api/gateway-reprobe'
-import { Route as ApiFinanceUploadRouteImport } from './routes/api/finance-upload'
-import { Route as ApiFinanceExportRouteImport } from './routes/api/finance-export'
-import { Route as ApiFinanceDocumentRouteImport } from './routes/api/finance-document'
-import { Route as ApiFinanceBackupRouteImport } from './routes/api/finance-backup'
-import { Route as ApiFinanceRouteImport } from './routes/api/finance'
-import { Route as ApiFilesRouteImport } from './routes/api/files'
-import { Route as ApiEventsRouteImport } from './routes/api/events'
-import { Route as ApiEnvResetRouteImport } from './routes/api/env-reset'
-import { Route as ApiDownloadApkRouteImport } from './routes/api/download-apk'
-import { Route as ApiDifyStatusRouteImport } from './routes/api/dify-status'
-import { Route as ApiDemoTradingRebalanceRouteImport } from './routes/api/demo-trading-rebalance'
-import { Route as ApiDemoTradingLlmRouteImport } from './routes/api/demo-trading-llm'
-import { Route as ApiDemoTradingGridRouteImport } from './routes/api/demo-trading-grid'
-import { Route as ApiDemoTradingRouteImport } from './routes/api/demo-trading'
-import { Route as ApiDebugAnalyzeRouteImport } from './routes/api/debug-analyze'
-import { Route as ApiCrewStatusRouteImport } from './routes/api/crew-status'
-import { Route as ApiContextUsageRouteImport } from './routes/api/context-usage'
-import { Route as ApiConnectionStatusRouteImport } from './routes/api/connection-status'
-import { Route as ApiConnectionSettingsRouteImport } from './routes/api/connection-settings'
-import { Route as ApiConfigPatchRouteImport } from './routes/api/config-patch'
-import { Route as ApiConfigGetRouteImport } from './routes/api/config-get'
-import { Route as ApiConductorStopRouteImport } from './routes/api/conductor-stop'
-import { Route as ApiConductorSpawnRouteImport } from './routes/api/conductor-spawn'
-import { Route as ApiCommandsRouteImport } from './routes/api/commands'
-import { Route as ApiCliAgentsRouteImport } from './routes/api/cli-agents'
-import { Route as ApiClaudeUpdateRouteImport } from './routes/api/claude-update'
-import { Route as ApiClaudeTasksAssigneesRouteImport } from './routes/api/claude-tasks-assignees'
-import { Route as ApiClaudeTasksRouteImport } from './routes/api/claude-tasks'
-import { Route as ApiClaudeJobsRouteImport } from './routes/api/claude-jobs'
-import { Route as ApiClaudeConfigRouteImport } from './routes/api/claude-config'
-import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
-import { Route as ApiAutoRefinementRouteImport } from './routes/api/auto-refinement'
-import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
-import { Route as ApiAuthRouteImport } from './routes/api/auth'
-import { Route as ApiArtifactsRouteImport } from './routes/api/artifacts'
-import { Route as ApiAppVersionRouteImport } from './routes/api/app-version'
-import { Route as ApiAgentPauseRouteImport } from './routes/api/agent-pause'
-import { Route as ApiAgentDispatchRouteImport } from './routes/api/agent-dispatch'
+import { Route as SplatRouteImport } from './routes/$'
+import { Route as AgentsRouteImport } from './routes/agents'
+import { Route as AgoraRouteImport } from './routes/agora'
+import { Route as CommandRouteImport } from './routes/command'
+import { Route as ConductorRouteImport } from './routes/conductor'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as DifyRouteImport } from './routes/dify'
+import { Route as DownloadApkRouteImport } from './routes/download-apk'
+import { Route as EchoStudioRouteImport } from './routes/echo-studio'
+import { Route as FilesRouteImport } from './routes/files'
+import { Route as FinanceRouteImport } from './routes/finance'
+import { Route as JobsRouteImport } from './routes/jobs'
+import { Route as McpRouteImport } from './routes/mcp'
+import { Route as MemoryRouteImport } from './routes/memory'
+import { Route as OperationsRouteImport } from './routes/operations'
+import { Route as OpsCostRouteImport } from './routes/ops-cost'
+import { Route as PersonalFinanceRouteImport } from './routes/personal-finance'
+import { Route as ProfilesRouteImport } from './routes/profiles'
+import { Route as ResearchRouteImport } from './routes/research'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SkillsRouteImport } from './routes/skills'
+import { Route as SwarmRouteImport } from './routes/swarm'
+import { Route as Swarm2RouteImport } from './routes/swarm2'
+import { Route as TasksRouteImport } from './routes/tasks'
+import { Route as TerminalRouteImport } from './routes/terminal'
+import { Route as TradingRouteImport } from './routes/trading'
 import { Route as ApiAgentBusRouteImport } from './routes/api/agent-bus'
-import { Route as ApiWorkspaceStatsRouteImport } from './routes/api/workspace/stats'
-import { Route as ApiWorkspaceSkillsRouteImport } from './routes/api/workspace/skills'
-import { Route as ApiWorkspaceMemoryFilesRouteImport } from './routes/api/workspace/memory-files'
-import { Route as ApiUpdateWorkspaceRouteImport } from './routes/api/update/workspace'
-import { Route as ApiUpdateStatusRouteImport } from './routes/api/update/status'
-import { Route as ApiUpdateNaveenStatusRouteImport } from './routes/api/update/naveen-status'
-import { Route as ApiUpdateNaveenApplyRouteImport } from './routes/api/update/naveen-apply'
-import { Route as ApiUpdateNaveenAiAnalysisRouteImport } from './routes/api/update/naveen-ai-analysis'
-import { Route as ApiUpdateAgentRouteImport } from './routes/api/update/agent'
-import { Route as ApiTradingSummaryRouteImport } from './routes/api/trading/summary'
-import { Route as ApiTradingLedgerRouteImport } from './routes/api/trading/ledger'
-import { Route as ApiSwarmRuntimeResetRouteImport } from './routes/api/swarm-runtime.reset'
-import { Route as ApiSwarmMemorySearchRouteImport } from './routes/api/swarm-memory/search'
-import { Route as ApiSkillsUninstallRouteImport } from './routes/api/skills/uninstall'
-import { Route as ApiSkillsToggleRouteImport } from './routes/api/skills/toggle'
-import { Route as ApiSkillsInstallRouteImport } from './routes/api/skills/install'
-import { Route as ApiSkillsHubSearchRouteImport } from './routes/api/skills/hub-search'
-import { Route as ApiSessionsSendRouteImport } from './routes/api/sessions/send'
-import { Route as ApiSessionsSearchRouteImport } from './routes/api/sessions/search'
-import { Route as ApiSessionsGenerateTitleRouteImport } from './routes/api/sessions/generate-title'
-import { Route as ApiRunsActiveRouteImport } from './routes/api/runs/active'
-import { Route as ApiProfilesUpdateRouteImport } from './routes/api/profiles/update'
-import { Route as ApiProfilesToggleSkillRouteImport } from './routes/api/profiles/toggle-skill'
-import { Route as ApiProfilesSkillsRouteImport } from './routes/api/profiles/skills'
-import { Route as ApiProfilesRenameRouteImport } from './routes/api/profiles/rename'
-import { Route as ApiProfilesReadRouteImport } from './routes/api/profiles/read'
-import { Route as ApiProfilesListRouteImport } from './routes/api/profiles/list'
-import { Route as ApiProfilesDeleteRouteImport } from './routes/api/profiles/delete'
-import { Route as ApiProfilesCreateRouteImport } from './routes/api/profiles/create'
-import { Route as ApiProfilesActivateRouteImport } from './routes/api/profiles/activate'
-import { Route as ApiOdysseusSplatRouteImport } from './routes/api/odysseus.$'
-import { Route as ApiOauthPollTokenRouteImport } from './routes/api/oauth.poll-token'
-import { Route as ApiOauthDeviceCodeRouteImport } from './routes/api/oauth.device-code'
-import { Route as ApiModelInfoRouteImport } from './routes/api/model/info'
-import { Route as ApiMemoryWriteRouteImport } from './routes/api/memory/write'
-import { Route as ApiMemorySearchRouteImport } from './routes/api/memory/search'
-import { Route as ApiMemoryReadRouteImport } from './routes/api/memory/read'
-import { Route as ApiMemoryListRouteImport } from './routes/api/memory/list'
-import { Route as ApiMcpTestRouteImport } from './routes/api/mcp/test'
-import { Route as ApiMcpPresetsRouteImport } from './routes/api/mcp/presets'
-import { Route as ApiMcpHubSourcesRouteImport } from './routes/api/mcp/hub-sources'
-import { Route as ApiMcpHubSearchRouteImport } from './routes/api/mcp/hub-search'
-import { Route as ApiMcpDiscoverRouteImport } from './routes/api/mcp/discover'
-import { Route as ApiMcpConfigureRouteImport } from './routes/api/mcp/configure'
-import { Route as ApiMcpNameRouteImport } from './routes/api/mcp/$name'
-import { Route as ApiKnowledgeSyncRouteImport } from './routes/api/knowledge/sync'
-import { Route as ApiKnowledgeSearchRouteImport } from './routes/api/knowledge/search'
-import { Route as ApiKnowledgeReadRouteImport } from './routes/api/knowledge/read'
-import { Route as ApiKnowledgeListRouteImport } from './routes/api/knowledge/list'
-import { Route as ApiKnowledgeGraphRouteImport } from './routes/api/knowledge/graph'
-import { Route as ApiKnowledgeConfigRouteImport } from './routes/api/knowledge/config'
-import { Route as ApiHindsightStatusRouteImport } from './routes/api/hindsight/status'
-import { Route as ApiHindsightRetainRouteImport } from './routes/api/hindsight/retain'
-import { Route as ApiHindsightRecallRouteImport } from './routes/api/hindsight/recall'
-import { Route as ApiHindsightOperationsRouteImport } from './routes/api/hindsight/operations'
-import { Route as ApiHindsightMemoriesRouteImport } from './routes/api/hindsight/memories'
-import { Route as ApiHindsightDeleteRouteImport } from './routes/api/hindsight/delete'
-import { Route as ApiHermesTasksTaskIdRouteImport } from './routes/api/hermes-tasks.$taskId'
-import { Route as ApiGatewaySessionsRouteImport } from './routes/api/gateway/sessions'
-import { Route as ApiGatewayAgentsRouteImport } from './routes/api/gateway/agents'
-import { Route as ApiFinanceSummaryRouteImport } from './routes/api/finance/summary'
-import { Route as ApiExternalMemorySearchRouteImport } from './routes/api/external-memory/search'
-import { Route as ApiExternalMemoryProvidersRouteImport } from './routes/api/external-memory/providers'
-import { Route as ApiExternalMemoryCandidatesRouteImport } from './routes/api/external-memory/candidates'
-import { Route as ApiDashboardOverviewRouteImport } from './routes/api/dashboard/overview'
-import { Route as ApiClaudeTasksTaskIdRouteImport } from './routes/api/claude-tasks.$taskId'
-import { Route as ApiClaudeProxySplatRouteImport } from './routes/api/claude-proxy/$'
-import { Route as ApiClaudeJobsJobIdRouteImport } from './routes/api/claude-jobs.$jobId'
-import { Route as ApiAuthGoogleRouteImport } from './routes/api/auth.google'
-import { Route as ApiAuthGmailConnectRouteImport } from './routes/api/auth.gmail-connect'
+import { Route as ApiAgentDispatchRouteImport } from './routes/api/agent-dispatch'
+import { Route as ApiAgentPauseRouteImport } from './routes/api/agent-pause'
+import { Route as ApiAppVersionRouteImport } from './routes/api/app-version'
+import { Route as ApiArtifactsRouteImport } from './routes/api/artifacts'
+import { Route as ApiAuthRouteImport } from './routes/api/auth'
+import { Route as ApiAuthCheckRouteImport } from './routes/api/auth-check'
+import { Route as ApiAutoRefinementRouteImport } from './routes/api/auto-refinement'
+import { Route as ApiChatEventsRouteImport } from './routes/api/chat-events'
+import { Route as ApiClaudeConfigRouteImport } from './routes/api/claude-config'
+import { Route as ApiClaudeJobsRouteImport } from './routes/api/claude-jobs'
+import { Route as ApiClaudeTasksRouteImport } from './routes/api/claude-tasks'
+import { Route as ApiClaudeTasksAssigneesRouteImport } from './routes/api/claude-tasks-assignees'
+import { Route as ApiClaudeUpdateRouteImport } from './routes/api/claude-update'
+import { Route as ApiCliAgentsRouteImport } from './routes/api/cli-agents'
+import { Route as ApiCommandsRouteImport } from './routes/api/commands'
+import { Route as ApiConductorSpawnRouteImport } from './routes/api/conductor-spawn'
+import { Route as ApiConductorStopRouteImport } from './routes/api/conductor-stop'
+import { Route as ApiConfigGetRouteImport } from './routes/api/config-get'
+import { Route as ApiConfigPatchRouteImport } from './routes/api/config-patch'
+import { Route as ApiConnectionSettingsRouteImport } from './routes/api/connection-settings'
+import { Route as ApiConnectionStatusRouteImport } from './routes/api/connection-status'
+import { Route as ApiContextUsageRouteImport } from './routes/api/context-usage'
+import { Route as ApiCrewStatusRouteImport } from './routes/api/crew-status'
+import { Route as ApiDebugAnalyzeRouteImport } from './routes/api/debug-analyze'
+import { Route as ApiDemoTradingRouteImport } from './routes/api/demo-trading'
+import { Route as ApiDemoTradingGridRouteImport } from './routes/api/demo-trading-grid'
+import { Route as ApiDemoTradingLlmRouteImport } from './routes/api/demo-trading-llm'
+import { Route as ApiDemoTradingRebalanceRouteImport } from './routes/api/demo-trading-rebalance'
+import { Route as ApiDifyStatusRouteImport } from './routes/api/dify-status'
+import { Route as ApiDownloadApkRouteImport } from './routes/api/download-apk'
+import { Route as ApiEnvResetRouteImport } from './routes/api/env-reset'
+import { Route as ApiEventsRouteImport } from './routes/api/events'
+import { Route as ApiFilesRouteImport } from './routes/api/files'
+import { Route as ApiFinanceRouteImport } from './routes/api/finance'
+import { Route as ApiFinanceBackupRouteImport } from './routes/api/finance-backup'
+import { Route as ApiFinanceDocumentRouteImport } from './routes/api/finance-document'
+import { Route as ApiFinanceExportRouteImport } from './routes/api/finance-export'
+import { Route as ApiFinanceUploadRouteImport } from './routes/api/finance-upload'
+import { Route as ApiGatewayReprobeRouteImport } from './routes/api/gateway-reprobe'
+import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-status'
+import { Route as ApiHarpConfigRouteImport } from './routes/api/harp-config'
+import { Route as ApiHarpObservabilityRouteImport } from './routes/api/harp-observability'
+import { Route as ApiHarpSelectorPreviewRouteImport } from './routes/api/harp-selector-preview'
+import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as ApiHermesConfigRouteImport } from './routes/api/hermes-config'
+import { Route as ApiHermesTasksRouteImport } from './routes/api/hermes-tasks'
+import { Route as ApiHermesTasksAssigneesRouteImport } from './routes/api/hermes-tasks-assignees'
+import { Route as ApiHistoryRouteImport } from './routes/api/history'
+import { Route as ApiIntegrationsRouteImport } from './routes/api/integrations'
+import { Route as ApiLocalProvidersRouteImport } from './routes/api/local-providers'
+import { Route as ApiMcpRouteImport } from './routes/api/mcp'
+import { Route as ApiMediaRouteImport } from './routes/api/media'
+import { Route as ApiMemoryRouteImport } from './routes/api/memory'
+import { Route as ApiModelSwitchRouteImport } from './routes/api/model-switch'
+import { Route as ApiModelsRouteImport } from './routes/api/models'
+import { Route as ApiOdysseusBootstrapRouteImport } from './routes/api/odysseus-bootstrap'
+import { Route as ApiOpenrouterCreditsRouteImport } from './routes/api/openrouter-credits'
+import { Route as ApiOpsObservabilityRouteImport } from './routes/api/ops-observability'
+import { Route as ApiOrchestrateRouteImport } from './routes/api/orchestrate'
+import { Route as ApiPathsRouteImport } from './routes/api/paths'
+import { Route as ApiPersonalitySwarmRouteImport } from './routes/api/personality-swarm'
+import { Route as ApiPingRouteImport } from './routes/api/ping'
+import { Route as ApiPluginsRouteImport } from './routes/api/plugins'
+import { Route as ApiPreviewFileRouteImport } from './routes/api/preview-file'
+import { Route as ApiProviderUsageRouteImport } from './routes/api/provider-usage'
+import { Route as ApiRiskCheckRouteImport } from './routes/api/risk-check'
+import { Route as ApiRouteSisterRouteImport } from './routes/api/route-sister'
+import { Route as ApiSendRouteImport } from './routes/api/send'
+import { Route as ApiSendStreamRouteImport } from './routes/api/send-stream'
+import { Route as ApiSessionHistoryRouteImport } from './routes/api/session-history'
+import { Route as ApiSessionSendRouteImport } from './routes/api/session-send'
+import { Route as ApiSessionStatusRouteImport } from './routes/api/session-status'
+import { Route as ApiSessionsRouteImport } from './routes/api/sessions'
+import { Route as ApiSistersRouteImport } from './routes/api/sisters'
+import { Route as ApiSistersBootstrapRouteImport } from './routes/api/sisters-bootstrap'
+import { Route as ApiSistersGrowthRouteImport } from './routes/api/sisters-growth'
+import { Route as ApiSistersImproveRouteImport } from './routes/api/sisters-improve'
+import { Route as ApiSkillsRouteImport } from './routes/api/skills'
+import { Route as ApiStartAgentRouteImport } from './routes/api/start-agent'
+import { Route as ApiStartClaudeRouteImport } from './routes/api/start-claude'
+import { Route as ApiSwarmChatRouteImport } from './routes/api/swarm-chat'
+import { Route as ApiSwarmCheckpointRouteImport } from './routes/api/swarm-checkpoint'
+import { Route as ApiSwarmDecomposeRouteImport } from './routes/api/swarm-decompose'
+import { Route as ApiSwarmDirectChatRouteImport } from './routes/api/swarm-direct-chat'
+import { Route as ApiSwarmDispatchRouteImport } from './routes/api/swarm-dispatch'
+import { Route as ApiSwarmEnvironmentRouteImport } from './routes/api/swarm-environment'
+import { Route as ApiSwarmHealthRouteImport } from './routes/api/swarm-health'
+import { Route as ApiSwarmKanbanRouteImport } from './routes/api/swarm-kanban'
+import { Route as ApiSwarmLifecycleRouteImport } from './routes/api/swarm-lifecycle'
+import { Route as ApiSwarmMemoryRouteImport } from './routes/api/swarm-memory'
+import { Route as ApiSwarmMissionsRouteImport } from './routes/api/swarm-missions'
+import { Route as ApiSwarmOrchestratorLoopRouteImport } from './routes/api/swarm-orchestrator-loop'
+import { Route as ApiSwarmProjectRouteImport } from './routes/api/swarm-project'
+import { Route as ApiSwarmReportsRouteImport } from './routes/api/swarm-reports'
+import { Route as ApiSwarmRosterRouteImport } from './routes/api/swarm-roster'
+import { Route as ApiSwarmRuntimeRouteImport } from './routes/api/swarm-runtime'
+import { Route as ApiSwarmTmuxScrollRouteImport } from './routes/api/swarm-tmux-scroll'
+import { Route as ApiSwarmTmuxStartRouteImport } from './routes/api/swarm-tmux-start'
+import { Route as ApiSwarmTmuxStopRouteImport } from './routes/api/swarm-tmux-stop'
+import { Route as ApiSystemMetricsRouteImport } from './routes/api/system-metrics'
+import { Route as ApiTasksRouteImport } from './routes/api/tasks'
+import { Route as ApiTasksAskAstraRouteImport } from './routes/api/tasks-ask-astra'
+import { Route as ApiTasksAstraReviewRouteImport } from './routes/api/tasks-astra-review'
+import { Route as ApiTasksBatchExecuteRouteImport } from './routes/api/tasks-batch-execute'
+import { Route as ApiTasksBlockersRouteImport } from './routes/api/tasks-blockers'
+import { Route as ApiTasksClarifyNudgeRouteImport } from './routes/api/tasks-clarify-nudge'
+import { Route as ApiTasksCompletionCheckRouteImport } from './routes/api/tasks-completion-check'
+import { Route as ApiTasksCompletionTrendRouteImport } from './routes/api/tasks-completion-trend'
+import { Route as ApiTasksCreateFromTgRouteImport } from './routes/api/tasks-create-from-tg'
+import { Route as ApiTasksDeployAgentsRouteImport } from './routes/api/tasks-deploy-agents'
+import { Route as ApiTasksDrainNowRouteImport } from './routes/api/tasks-drain-now'
+import { Route as ApiTasksExecLogRouteImport } from './routes/api/tasks-exec-log'
+import { Route as ApiTasksFromTextRouteImport } from './routes/api/tasks-from-text'
+import { Route as ApiTasksGenerateIdeasRouteImport } from './routes/api/tasks-generate-ideas'
+import { Route as ApiTasksInjectIdeasRouteImport } from './routes/api/tasks-inject-ideas'
+import { Route as ApiTasksProgressPingRouteImport } from './routes/api/tasks-progress-ping'
+import { Route as ApiTasksPruneRouteImport } from './routes/api/tasks-prune'
+import { Route as ApiTasksReplanStubsRouteImport } from './routes/api/tasks-replan-stubs'
+import { Route as ApiTasksRescueTimedoutRouteImport } from './routes/api/tasks-rescue-timedout'
+import { Route as ApiTasksStaleRouteImport } from './routes/api/tasks-stale'
+import { Route as ApiTasksSweepStatsRouteImport } from './routes/api/tasks-sweep-stats'
+import { Route as ApiTasksUnlockPrereqRouteImport } from './routes/api/tasks-unlock-prereq'
+import { Route as ApiTelegramBoardRouteImport } from './routes/api/telegram-board'
+import { Route as ApiTelegramBoardSummaryRouteImport } from './routes/api/telegram-board-summary'
+import { Route as ApiTelegramFindRouteImport } from './routes/api/telegram-find'
+import { Route as ApiTelegramTaskClarifyRouteImport } from './routes/api/telegram-task-clarify'
+import { Route as ApiTerminalCloseRouteImport } from './routes/api/terminal-close'
+import { Route as ApiTerminalInputRouteImport } from './routes/api/terminal-input'
+import { Route as ApiTerminalResizeRouteImport } from './routes/api/terminal-resize'
+import { Route as ApiTerminalStreamRouteImport } from './routes/api/terminal-stream'
+import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
+import { Route as ApiUserProfileRouteImport } from './routes/api/user-profile'
+import { Route as ApiUserSettingsRouteImport } from './routes/api/user-settings'
+import { Route as ApiValidateProviderRouteImport } from './routes/api/validate-provider'
+import { Route as ApiWorkflowTemplatesRouteImport } from './routes/api/workflow-templates'
+import { Route as ApiWorkspaceRouteImport } from './routes/api/workspace'
+import { Route as ApiWorkspaceSessionHealthRouteImport } from './routes/api/workspace-session-health'
+import { Route as ApiWorkspaceVersionRouteImport } from './routes/api/workspace-version'
+import { Route as ChatIndexRouteImport } from './routes/chat/index'
+import { Route as ChatSessionKeyRouteImport } from './routes/chat/$sessionKey'
+import { Route as SettingsIndexRouteImport } from './routes/settings/index'
+import { Route as SettingsProvidersRouteImport } from './routes/settings/providers'
 import { Route as ApiArtifactsArtifactIdRouteImport } from './routes/api/artifacts.$artifactId'
-import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
-import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
-import { Route as ApiMcpHubSourcesIdRouteImport } from './routes/api/mcp/hub-sources.$id'
-import { Route as ApiMcpNameLogsRouteImport } from './routes/api/mcp/$name.logs'
-import { Route as ApiFinanceReportIncomeRouteImport } from './routes/api/finance/report/income'
-import { Route as ApiFinanceReportExpenseRouteImport } from './routes/api/finance/report/expense'
+import { Route as ApiAuthGmailConnectRouteImport } from './routes/api/auth.gmail-connect'
+import { Route as ApiAuthGoogleRouteImport } from './routes/api/auth.google'
+import { Route as ApiClaudeJobsJobIdRouteImport } from './routes/api/claude-jobs.$jobId'
+import { Route as ApiClaudeProxySplatRouteImport } from './routes/api/claude-proxy/$'
+import { Route as ApiClaudeTasksTaskIdRouteImport } from './routes/api/claude-tasks.$taskId'
+import { Route as ApiDashboardOverviewRouteImport } from './routes/api/dashboard/overview'
+import { Route as ApiExternalMemoryCandidatesRouteImport } from './routes/api/external-memory/candidates'
+import { Route as ApiExternalMemoryProvidersRouteImport } from './routes/api/external-memory/providers'
+import { Route as ApiExternalMemorySearchRouteImport } from './routes/api/external-memory/search'
+import { Route as ApiFinanceSummaryRouteImport } from './routes/api/finance/summary'
+import { Route as ApiGatewayAgentsRouteImport } from './routes/api/gateway/agents'
+import { Route as ApiGatewaySessionsRouteImport } from './routes/api/gateway/sessions'
+import { Route as ApiHermesTasksTaskIdRouteImport } from './routes/api/hermes-tasks.$taskId'
+import { Route as ApiHindsightDeleteRouteImport } from './routes/api/hindsight/delete'
+import { Route as ApiHindsightMemoriesRouteImport } from './routes/api/hindsight/memories'
+import { Route as ApiHindsightOperationsRouteImport } from './routes/api/hindsight/operations'
+import { Route as ApiHindsightRecallRouteImport } from './routes/api/hindsight/recall'
+import { Route as ApiHindsightRetainRouteImport } from './routes/api/hindsight/retain'
+import { Route as ApiHindsightStatusRouteImport } from './routes/api/hindsight/status'
+import { Route as ApiKnowledgeConfigRouteImport } from './routes/api/knowledge/config'
+import { Route as ApiKnowledgeGraphRouteImport } from './routes/api/knowledge/graph'
+import { Route as ApiKnowledgeListRouteImport } from './routes/api/knowledge/list'
+import { Route as ApiKnowledgeReadRouteImport } from './routes/api/knowledge/read'
+import { Route as ApiKnowledgeSearchRouteImport } from './routes/api/knowledge/search'
+import { Route as ApiKnowledgeSyncRouteImport } from './routes/api/knowledge/sync'
+import { Route as ApiMcpNameRouteImport } from './routes/api/mcp/$name'
+import { Route as ApiMcpConfigureRouteImport } from './routes/api/mcp/configure'
+import { Route as ApiMcpDiscoverRouteImport } from './routes/api/mcp/discover'
+import { Route as ApiMcpHubSearchRouteImport } from './routes/api/mcp/hub-search'
+import { Route as ApiMcpHubSourcesRouteImport } from './routes/api/mcp/hub-sources'
+import { Route as ApiMcpPresetsRouteImport } from './routes/api/mcp/presets'
+import { Route as ApiMcpTestRouteImport } from './routes/api/mcp/test'
+import { Route as ApiMemoryListRouteImport } from './routes/api/memory/list'
+import { Route as ApiMemoryReadRouteImport } from './routes/api/memory/read'
+import { Route as ApiMemorySearchRouteImport } from './routes/api/memory/search'
+import { Route as ApiMemoryWriteRouteImport } from './routes/api/memory/write'
+import { Route as ApiModelInfoRouteImport } from './routes/api/model/info'
+import { Route as ApiOauthDeviceCodeRouteImport } from './routes/api/oauth.device-code'
+import { Route as ApiOauthPollTokenRouteImport } from './routes/api/oauth.poll-token'
+import { Route as ApiOdysseusSplatRouteImport } from './routes/api/odysseus.$'
+import { Route as ApiProfilesActivateRouteImport } from './routes/api/profiles/activate'
+import { Route as ApiProfilesCreateRouteImport } from './routes/api/profiles/create'
+import { Route as ApiProfilesDeleteRouteImport } from './routes/api/profiles/delete'
+import { Route as ApiProfilesListRouteImport } from './routes/api/profiles/list'
+import { Route as ApiProfilesReadRouteImport } from './routes/api/profiles/read'
+import { Route as ApiProfilesRenameRouteImport } from './routes/api/profiles/rename'
+import { Route as ApiProfilesSkillsRouteImport } from './routes/api/profiles/skills'
+import { Route as ApiProfilesToggleSkillRouteImport } from './routes/api/profiles/toggle-skill'
+import { Route as ApiProfilesUpdateRouteImport } from './routes/api/profiles/update'
+import { Route as ApiRunsActiveRouteImport } from './routes/api/runs/active'
+import { Route as ApiSessionsGenerateTitleRouteImport } from './routes/api/sessions/generate-title'
+import { Route as ApiSessionsSearchRouteImport } from './routes/api/sessions/search'
+import { Route as ApiSessionsSendRouteImport } from './routes/api/sessions/send'
+import { Route as ApiSkillsHubSearchRouteImport } from './routes/api/skills/hub-search'
+import { Route as ApiSkillsInstallRouteImport } from './routes/api/skills/install'
+import { Route as ApiSkillsToggleRouteImport } from './routes/api/skills/toggle'
+import { Route as ApiSkillsUninstallRouteImport } from './routes/api/skills/uninstall'
+import { Route as ApiSwarmMemorySearchRouteImport } from './routes/api/swarm-memory/search'
+import { Route as ApiSwarmRuntimeResetRouteImport } from './routes/api/swarm-runtime.reset'
+import { Route as ApiTradingLedgerRouteImport } from './routes/api/trading/ledger'
+import { Route as ApiTradingSummaryRouteImport } from './routes/api/trading/summary'
+import { Route as ApiUpdateAgentRouteImport } from './routes/api/update/agent'
+import { Route as ApiUpdateNaveenAiAnalysisRouteImport } from './routes/api/update/naveen-ai-analysis'
+import { Route as ApiUpdateNaveenApplyRouteImport } from './routes/api/update/naveen-apply'
+import { Route as ApiUpdateNaveenStatusRouteImport } from './routes/api/update/naveen-status'
+import { Route as ApiUpdateStatusRouteImport } from './routes/api/update/status'
+import { Route as ApiUpdateWorkspaceRouteImport } from './routes/api/update/workspace'
+import { Route as ApiWorkspaceMemoryFilesRouteImport } from './routes/api/workspace/memory-files'
+import { Route as ApiWorkspaceSkillsRouteImport } from './routes/api/workspace/skills'
+import { Route as ApiWorkspaceStatsRouteImport } from './routes/api/workspace/stats'
 import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api/auth.google.callback'
-import { Route as ApiWorkspaceSkillsSkillIdContentRouteImport } from './routes/api/workspace/skills.$skillId.content'
+import { Route as ApiFinanceReportExpenseRouteImport } from './routes/api/finance/report/expense'
+import { Route as ApiFinanceReportIncomeRouteImport } from './routes/api/finance/report/income'
+import { Route as ApiMcpNameLogsRouteImport } from './routes/api/mcp/$name.logs'
+import { Route as ApiMcpHubSourcesIdRouteImport } from './routes/api/mcp/hub-sources.$id'
+import { Route as ApiSessionsSessionKeyActiveRunRouteImport } from './routes/api/sessions/$sessionKey.active-run'
+import { Route as ApiSessionsSessionKeyStatusRouteImport } from './routes/api/sessions/$sessionKey.status'
 import { Route as ApiRunsSessionKeyRunIdAbandonRouteImport } from './routes/api/runs/$sessionKey.$runId.abandon'
+import { Route as ApiWorkspaceSkillsSkillIdContentRouteImport } from './routes/api/workspace/skills.$skillId.content'
 
-const TradingRoute = TradingRouteImport.update({
-  id: '/trading',
-  path: '/trading',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TerminalRoute = TerminalRouteImport.update({
-  id: '/terminal',
-  path: '/terminal',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TasksRoute = TasksRouteImport.update({
-  id: '/tasks',
-  path: '/tasks',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const Swarm2Route = Swarm2RouteImport.update({
-  id: '/swarm2',
-  path: '/swarm2',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SwarmRoute = SwarmRouteImport.update({
-  id: '/swarm',
-  path: '/swarm',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SkillsRoute = SkillsRouteImport.update({
-  id: '/skills',
-  path: '/skills',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResearchRoute = ResearchRouteImport.update({
-  id: '/research',
-  path: '/research',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProfilesRoute = ProfilesRouteImport.update({
-  id: '/profiles',
-  path: '/profiles',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PersonalFinanceRoute = PersonalFinanceRouteImport.update({
-  id: '/personal-finance',
-  path: '/personal-finance',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OpsCostRoute = OpsCostRouteImport.update({
-  id: '/ops-cost',
-  path: '/ops-cost',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OperationsRoute = OperationsRouteImport.update({
-  id: '/operations',
-  path: '/operations',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MemoryRoute = MemoryRouteImport.update({
-  id: '/memory',
-  path: '/memory',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const McpRoute = McpRouteImport.update({
-  id: '/mcp',
-  path: '/mcp',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const JobsRoute = JobsRouteImport.update({
-  id: '/jobs',
-  path: '/jobs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FinanceRoute = FinanceRouteImport.update({
-  id: '/finance',
-  path: '/finance',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FilesRoute = FilesRouteImport.update({
-  id: '/files',
-  path: '/files',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EchoStudioRoute = EchoStudioRouteImport.update({
-  id: '/echo-studio',
-  path: '/echo-studio',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DownloadApkRoute = DownloadApkRouteImport.update({
-  id: '/download-apk',
-  path: '/download-apk',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DifyRoute = DifyRouteImport.update({
-  id: '/dify',
-  path: '/dify',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ConductorRoute = ConductorRouteImport.update({
-  id: '/conductor',
-  path: '/conductor',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CommandRoute = CommandRouteImport.update({
-  id: '/command',
-  path: '/command',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AgoraRoute = AgoraRouteImport.update({
-  id: '/agora',
-  path: '/agora',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AgentsRoute = AgentsRouteImport.update({
-  id: '/agents',
-  path: '/agents',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SplatRoute = SplatRouteImport.update({
@@ -390,260 +270,589 @@ const SplatRoute = SplatRouteImport.update({
   path: '/$',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AgentsRoute = AgentsRouteImport.update({
+  id: '/agents',
+  path: '/agents',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsIndexRoute = SettingsIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => SettingsRoute,
-} as any)
-const ChatIndexRoute = ChatIndexRouteImport.update({
-  id: '/chat/',
-  path: '/chat/',
+const AgoraRoute = AgoraRouteImport.update({
+  id: '/agora',
+  path: '/agora',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsProvidersRoute = SettingsProvidersRouteImport.update({
-  id: '/providers',
-  path: '/providers',
-  getParentRoute: () => SettingsRoute,
-} as any)
-const ChatSessionKeyRoute = ChatSessionKeyRouteImport.update({
-  id: '/chat/$sessionKey',
-  path: '/chat/$sessionKey',
+const CommandRoute = CommandRouteImport.update({
+  id: '/command',
+  path: '/command',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiWorkspaceVersionRoute = ApiWorkspaceVersionRouteImport.update({
-  id: '/api/workspace-version',
-  path: '/api/workspace-version',
+const ConductorRoute = ConductorRouteImport.update({
+  id: '/conductor',
+  path: '/conductor',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiWorkspaceSessionHealthRoute =
-  ApiWorkspaceSessionHealthRouteImport.update({
-    id: '/api/workspace-session-health',
-    path: '/api/workspace-session-health',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiWorkspaceRoute = ApiWorkspaceRouteImport.update({
-  id: '/api/workspace',
-  path: '/api/workspace',
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiWorkflowTemplatesRoute = ApiWorkflowTemplatesRouteImport.update({
-  id: '/api/workflow-templates',
-  path: '/api/workflow-templates',
+const DifyRoute = DifyRouteImport.update({
+  id: '/dify',
+  path: '/dify',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiValidateProviderRoute = ApiValidateProviderRouteImport.update({
-  id: '/api/validate-provider',
-  path: '/api/validate-provider',
+const DownloadApkRoute = DownloadApkRouteImport.update({
+  id: '/download-apk',
+  path: '/download-apk',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiUserSettingsRoute = ApiUserSettingsRouteImport.update({
-  id: '/api/user-settings',
-  path: '/api/user-settings',
+const EchoStudioRoute = EchoStudioRouteImport.update({
+  id: '/echo-studio',
+  path: '/echo-studio',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiUserProfileRoute = ApiUserProfileRouteImport.update({
-  id: '/api/user-profile',
-  path: '/api/user-profile',
+const FilesRoute = FilesRouteImport.update({
+  id: '/files',
+  path: '/files',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
-  id: '/api/transcribe',
-  path: '/api/transcribe',
+const FinanceRoute = FinanceRouteImport.update({
+  id: '/finance',
+  path: '/finance',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTerminalStreamRoute = ApiTerminalStreamRouteImport.update({
-  id: '/api/terminal-stream',
-  path: '/api/terminal-stream',
+const JobsRoute = JobsRouteImport.update({
+  id: '/jobs',
+  path: '/jobs',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTerminalResizeRoute = ApiTerminalResizeRouteImport.update({
-  id: '/api/terminal-resize',
-  path: '/api/terminal-resize',
+const McpRoute = McpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTerminalInputRoute = ApiTerminalInputRouteImport.update({
-  id: '/api/terminal-input',
-  path: '/api/terminal-input',
+const MemoryRoute = MemoryRouteImport.update({
+  id: '/memory',
+  path: '/memory',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTerminalCloseRoute = ApiTerminalCloseRouteImport.update({
-  id: '/api/terminal-close',
-  path: '/api/terminal-close',
+const OperationsRoute = OperationsRouteImport.update({
+  id: '/operations',
+  path: '/operations',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTelegramTaskClarifyRoute = ApiTelegramTaskClarifyRouteImport.update({
-  id: '/api/telegram-task-clarify',
-  path: '/api/telegram-task-clarify',
+const OpsCostRoute = OpsCostRouteImport.update({
+  id: '/ops-cost',
+  path: '/ops-cost',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTelegramFindRoute = ApiTelegramFindRouteImport.update({
-  id: '/api/telegram-find',
-  path: '/api/telegram-find',
+const PersonalFinanceRoute = PersonalFinanceRouteImport.update({
+  id: '/personal-finance',
+  path: '/personal-finance',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTelegramBoardSummaryRoute = ApiTelegramBoardSummaryRouteImport.update({
-  id: '/api/telegram-board-summary',
-  path: '/api/telegram-board-summary',
+const ProfilesRoute = ProfilesRouteImport.update({
+  id: '/profiles',
+  path: '/profiles',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTelegramBoardRoute = ApiTelegramBoardRouteImport.update({
-  id: '/api/telegram-board',
-  path: '/api/telegram-board',
+const ResearchRoute = ResearchRouteImport.update({
+  id: '/research',
+  path: '/research',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTasksUnlockPrereqRoute = ApiTasksUnlockPrereqRouteImport.update({
-  id: '/api/tasks-unlock-prereq',
-  path: '/api/tasks-unlock-prereq',
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTasksSweepStatsRoute = ApiTasksSweepStatsRouteImport.update({
-  id: '/api/tasks-sweep-stats',
-  path: '/api/tasks-sweep-stats',
+const SkillsRoute = SkillsRouteImport.update({
+  id: '/skills',
+  path: '/skills',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTasksStaleRoute = ApiTasksStaleRouteImport.update({
-  id: '/api/tasks-stale',
-  path: '/api/tasks-stale',
+const SwarmRoute = SwarmRouteImport.update({
+  id: '/swarm',
+  path: '/swarm',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTasksRescueTimedoutRoute = ApiTasksRescueTimedoutRouteImport.update({
-  id: '/api/tasks-rescue-timedout',
-  path: '/api/tasks-rescue-timedout',
+const Swarm2Route = Swarm2RouteImport.update({
+  id: '/swarm2',
+  path: '/swarm2',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTasksReplanStubsRoute = ApiTasksReplanStubsRouteImport.update({
-  id: '/api/tasks-replan-stubs',
-  path: '/api/tasks-replan-stubs',
+const TasksRoute = TasksRouteImport.update({
+  id: '/tasks',
+  path: '/tasks',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTasksPruneRoute = ApiTasksPruneRouteImport.update({
-  id: '/api/tasks-prune',
-  path: '/api/tasks-prune',
+const TerminalRoute = TerminalRouteImport.update({
+  id: '/terminal',
+  path: '/terminal',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTasksProgressPingRoute = ApiTasksProgressPingRouteImport.update({
-  id: '/api/tasks-progress-ping',
-  path: '/api/tasks-progress-ping',
+const TradingRoute = TradingRouteImport.update({
+  id: '/trading',
+  path: '/trading',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTasksInjectIdeasRoute = ApiTasksInjectIdeasRouteImport.update({
-  id: '/api/tasks-inject-ideas',
-  path: '/api/tasks-inject-ideas',
+const ApiAgentBusRoute = ApiAgentBusRouteImport.update({
+  id: '/api/agent-bus',
+  path: '/api/agent-bus',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTasksGenerateIdeasRoute = ApiTasksGenerateIdeasRouteImport.update({
-  id: '/api/tasks-generate-ideas',
-  path: '/api/tasks-generate-ideas',
+const ApiAgentDispatchRoute = ApiAgentDispatchRouteImport.update({
+  id: '/api/agent-dispatch',
+  path: '/api/agent-dispatch',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTasksFromTextRoute = ApiTasksFromTextRouteImport.update({
-  id: '/api/tasks-from-text',
-  path: '/api/tasks-from-text',
+const ApiAgentPauseRoute = ApiAgentPauseRouteImport.update({
+  id: '/api/agent-pause',
+  path: '/api/agent-pause',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTasksExecLogRoute = ApiTasksExecLogRouteImport.update({
-  id: '/api/tasks-exec-log',
-  path: '/api/tasks-exec-log',
+const ApiAppVersionRoute = ApiAppVersionRouteImport.update({
+  id: '/api/app-version',
+  path: '/api/app-version',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTasksDrainNowRoute = ApiTasksDrainNowRouteImport.update({
-  id: '/api/tasks-drain-now',
-  path: '/api/tasks-drain-now',
+const ApiArtifactsRoute = ApiArtifactsRouteImport.update({
+  id: '/api/artifacts',
+  path: '/api/artifacts',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTasksDeployAgentsRoute = ApiTasksDeployAgentsRouteImport.update({
-  id: '/api/tasks-deploy-agents',
-  path: '/api/tasks-deploy-agents',
+const ApiAuthRoute = ApiAuthRouteImport.update({
+  id: '/api/auth',
+  path: '/api/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTasksCreateFromTgRoute = ApiTasksCreateFromTgRouteImport.update({
-  id: '/api/tasks-create-from-tg',
-  path: '/api/tasks-create-from-tg',
+const ApiAuthCheckRoute = ApiAuthCheckRouteImport.update({
+  id: '/api/auth-check',
+  path: '/api/auth-check',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTasksCompletionTrendRoute = ApiTasksCompletionTrendRouteImport.update({
-  id: '/api/tasks-completion-trend',
-  path: '/api/tasks-completion-trend',
+const ApiAutoRefinementRoute = ApiAutoRefinementRouteImport.update({
+  id: '/api/auto-refinement',
+  path: '/api/auto-refinement',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTasksCompletionCheckRoute = ApiTasksCompletionCheckRouteImport.update({
-  id: '/api/tasks-completion-check',
-  path: '/api/tasks-completion-check',
+const ApiChatEventsRoute = ApiChatEventsRouteImport.update({
+  id: '/api/chat-events',
+  path: '/api/chat-events',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTasksClarifyNudgeRoute = ApiTasksClarifyNudgeRouteImport.update({
-  id: '/api/tasks-clarify-nudge',
-  path: '/api/tasks-clarify-nudge',
+const ApiClaudeConfigRoute = ApiClaudeConfigRouteImport.update({
+  id: '/api/claude-config',
+  path: '/api/claude-config',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTasksBlockersRoute = ApiTasksBlockersRouteImport.update({
-  id: '/api/tasks-blockers',
-  path: '/api/tasks-blockers',
+const ApiClaudeJobsRoute = ApiClaudeJobsRouteImport.update({
+  id: '/api/claude-jobs',
+  path: '/api/claude-jobs',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTasksBatchExecuteRoute = ApiTasksBatchExecuteRouteImport.update({
-  id: '/api/tasks-batch-execute',
-  path: '/api/tasks-batch-execute',
+const ApiClaudeTasksRoute = ApiClaudeTasksRouteImport.update({
+  id: '/api/claude-tasks',
+  path: '/api/claude-tasks',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTasksAstraReviewRoute = ApiTasksAstraReviewRouteImport.update({
-  id: '/api/tasks-astra-review',
-  path: '/api/tasks-astra-review',
+const ApiClaudeTasksAssigneesRoute = ApiClaudeTasksAssigneesRouteImport.update({
+  id: '/api/claude-tasks-assignees',
+  path: '/api/claude-tasks-assignees',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTasksAskAstraRoute = ApiTasksAskAstraRouteImport.update({
-  id: '/api/tasks-ask-astra',
-  path: '/api/tasks-ask-astra',
+const ApiClaudeUpdateRoute = ApiClaudeUpdateRouteImport.update({
+  id: '/api/claude-update',
+  path: '/api/claude-update',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTasksRoute = ApiTasksRouteImport.update({
-  id: '/api/tasks',
-  path: '/api/tasks',
+const ApiCliAgentsRoute = ApiCliAgentsRouteImport.update({
+  id: '/api/cli-agents',
+  path: '/api/cli-agents',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSystemMetricsRoute = ApiSystemMetricsRouteImport.update({
-  id: '/api/system-metrics',
-  path: '/api/system-metrics',
+const ApiCommandsRoute = ApiCommandsRouteImport.update({
+  id: '/api/commands',
+  path: '/api/commands',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSwarmTmuxStopRoute = ApiSwarmTmuxStopRouteImport.update({
-  id: '/api/swarm-tmux-stop',
-  path: '/api/swarm-tmux-stop',
+const ApiConductorSpawnRoute = ApiConductorSpawnRouteImport.update({
+  id: '/api/conductor-spawn',
+  path: '/api/conductor-spawn',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSwarmTmuxStartRoute = ApiSwarmTmuxStartRouteImport.update({
-  id: '/api/swarm-tmux-start',
-  path: '/api/swarm-tmux-start',
+const ApiConductorStopRoute = ApiConductorStopRouteImport.update({
+  id: '/api/conductor-stop',
+  path: '/api/conductor-stop',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSwarmTmuxScrollRoute = ApiSwarmTmuxScrollRouteImport.update({
-  id: '/api/swarm-tmux-scroll',
-  path: '/api/swarm-tmux-scroll',
+const ApiConfigGetRoute = ApiConfigGetRouteImport.update({
+  id: '/api/config-get',
+  path: '/api/config-get',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSwarmRuntimeRoute = ApiSwarmRuntimeRouteImport.update({
-  id: '/api/swarm-runtime',
-  path: '/api/swarm-runtime',
+const ApiConfigPatchRoute = ApiConfigPatchRouteImport.update({
+  id: '/api/config-patch',
+  path: '/api/config-patch',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSwarmRosterRoute = ApiSwarmRosterRouteImport.update({
-  id: '/api/swarm-roster',
-  path: '/api/swarm-roster',
+const ApiConnectionSettingsRoute = ApiConnectionSettingsRouteImport.update({
+  id: '/api/connection-settings',
+  path: '/api/connection-settings',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSwarmReportsRoute = ApiSwarmReportsRouteImport.update({
-  id: '/api/swarm-reports',
-  path: '/api/swarm-reports',
+const ApiConnectionStatusRoute = ApiConnectionStatusRouteImport.update({
+  id: '/api/connection-status',
+  path: '/api/connection-status',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSwarmProjectRoute = ApiSwarmProjectRouteImport.update({
-  id: '/api/swarm-project',
-  path: '/api/swarm-project',
+const ApiContextUsageRoute = ApiContextUsageRouteImport.update({
+  id: '/api/context-usage',
+  path: '/api/context-usage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCrewStatusRoute = ApiCrewStatusRouteImport.update({
+  id: '/api/crew-status',
+  path: '/api/crew-status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDebugAnalyzeRoute = ApiDebugAnalyzeRouteImport.update({
+  id: '/api/debug-analyze',
+  path: '/api/debug-analyze',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDemoTradingRoute = ApiDemoTradingRouteImport.update({
+  id: '/api/demo-trading',
+  path: '/api/demo-trading',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDemoTradingGridRoute = ApiDemoTradingGridRouteImport.update({
+  id: '/api/demo-trading-grid',
+  path: '/api/demo-trading-grid',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDemoTradingLlmRoute = ApiDemoTradingLlmRouteImport.update({
+  id: '/api/demo-trading-llm',
+  path: '/api/demo-trading-llm',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDemoTradingRebalanceRoute = ApiDemoTradingRebalanceRouteImport.update({
+  id: '/api/demo-trading-rebalance',
+  path: '/api/demo-trading-rebalance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDifyStatusRoute = ApiDifyStatusRouteImport.update({
+  id: '/api/dify-status',
+  path: '/api/dify-status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDownloadApkRoute = ApiDownloadApkRouteImport.update({
+  id: '/api/download-apk',
+  path: '/api/download-apk',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiEnvResetRoute = ApiEnvResetRouteImport.update({
+  id: '/api/env-reset',
+  path: '/api/env-reset',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiEventsRoute = ApiEventsRouteImport.update({
+  id: '/api/events',
+  path: '/api/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiFilesRoute = ApiFilesRouteImport.update({
+  id: '/api/files',
+  path: '/api/files',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiFinanceRoute = ApiFinanceRouteImport.update({
+  id: '/api/finance',
+  path: '/api/finance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiFinanceBackupRoute = ApiFinanceBackupRouteImport.update({
+  id: '/api/finance-backup',
+  path: '/api/finance-backup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiFinanceDocumentRoute = ApiFinanceDocumentRouteImport.update({
+  id: '/api/finance-document',
+  path: '/api/finance-document',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiFinanceExportRoute = ApiFinanceExportRouteImport.update({
+  id: '/api/finance-export',
+  path: '/api/finance-export',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiFinanceUploadRoute = ApiFinanceUploadRouteImport.update({
+  id: '/api/finance-upload',
+  path: '/api/finance-upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGatewayReprobeRoute = ApiGatewayReprobeRouteImport.update({
+  id: '/api/gateway-reprobe',
+  path: '/api/gateway-reprobe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGatewayStatusRoute = ApiGatewayStatusRouteImport.update({
+  id: '/api/gateway-status',
+  path: '/api/gateway-status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHarpConfigRoute = ApiHarpConfigRouteImport.update({
+  id: '/api/harp-config',
+  path: '/api/harp-config',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHarpObservabilityRoute = ApiHarpObservabilityRouteImport.update({
+  id: '/api/harp-observability',
+  path: '/api/harp-observability',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHarpSelectorPreviewRoute = ApiHarpSelectorPreviewRouteImport.update({
+  id: '/api/harp-selector-preview',
+  path: '/api/harp-selector-preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHealthRoute = ApiHealthRouteImport.update({
+  id: '/api/health',
+  path: '/api/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHermesConfigRoute = ApiHermesConfigRouteImport.update({
+  id: '/api/hermes-config',
+  path: '/api/hermes-config',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHermesTasksRoute = ApiHermesTasksRouteImport.update({
+  id: '/api/hermes-tasks',
+  path: '/api/hermes-tasks',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHermesTasksAssigneesRoute = ApiHermesTasksAssigneesRouteImport.update({
+  id: '/api/hermes-tasks-assignees',
+  path: '/api/hermes-tasks-assignees',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHistoryRoute = ApiHistoryRouteImport.update({
+  id: '/api/history',
+  path: '/api/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiIntegrationsRoute = ApiIntegrationsRouteImport.update({
+  id: '/api/integrations',
+  path: '/api/integrations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLocalProvidersRoute = ApiLocalProvidersRouteImport.update({
+  id: '/api/local-providers',
+  path: '/api/local-providers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMcpRoute = ApiMcpRouteImport.update({
+  id: '/api/mcp',
+  path: '/api/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMediaRoute = ApiMediaRouteImport.update({
+  id: '/api/media',
+  path: '/api/media',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMemoryRoute = ApiMemoryRouteImport.update({
+  id: '/api/memory',
+  path: '/api/memory',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiModelSwitchRoute = ApiModelSwitchRouteImport.update({
+  id: '/api/model-switch',
+  path: '/api/model-switch',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiModelsRoute = ApiModelsRouteImport.update({
+  id: '/api/models',
+  path: '/api/models',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOdysseusBootstrapRoute = ApiOdysseusBootstrapRouteImport.update({
+  id: '/api/odysseus-bootstrap',
+  path: '/api/odysseus-bootstrap',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOpenrouterCreditsRoute = ApiOpenrouterCreditsRouteImport.update({
+  id: '/api/openrouter-credits',
+  path: '/api/openrouter-credits',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOpsObservabilityRoute = ApiOpsObservabilityRouteImport.update({
+  id: '/api/ops-observability',
+  path: '/api/ops-observability',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOrchestrateRoute = ApiOrchestrateRouteImport.update({
+  id: '/api/orchestrate',
+  path: '/api/orchestrate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPathsRoute = ApiPathsRouteImport.update({
+  id: '/api/paths',
+  path: '/api/paths',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPersonalitySwarmRoute = ApiPersonalitySwarmRouteImport.update({
+  id: '/api/personality-swarm',
+  path: '/api/personality-swarm',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPingRoute = ApiPingRouteImport.update({
+  id: '/api/ping',
+  path: '/api/ping',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPluginsRoute = ApiPluginsRouteImport.update({
+  id: '/api/plugins',
+  path: '/api/plugins',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPreviewFileRoute = ApiPreviewFileRouteImport.update({
+  id: '/api/preview-file',
+  path: '/api/preview-file',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProviderUsageRoute = ApiProviderUsageRouteImport.update({
+  id: '/api/provider-usage',
+  path: '/api/provider-usage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRiskCheckRoute = ApiRiskCheckRouteImport.update({
+  id: '/api/risk-check',
+  path: '/api/risk-check',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRouteSisterRoute = ApiRouteSisterRouteImport.update({
+  id: '/api/route-sister',
+  path: '/api/route-sister',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSendRoute = ApiSendRouteImport.update({
+  id: '/api/send',
+  path: '/api/send',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSendStreamRoute = ApiSendStreamRouteImport.update({
+  id: '/api/send-stream',
+  path: '/api/send-stream',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSessionHistoryRoute = ApiSessionHistoryRouteImport.update({
+  id: '/api/session-history',
+  path: '/api/session-history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSessionSendRoute = ApiSessionSendRouteImport.update({
+  id: '/api/session-send',
+  path: '/api/session-send',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSessionStatusRoute = ApiSessionStatusRouteImport.update({
+  id: '/api/session-status',
+  path: '/api/session-status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSessionsRoute = ApiSessionsRouteImport.update({
+  id: '/api/sessions',
+  path: '/api/sessions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSistersRoute = ApiSistersRouteImport.update({
+  id: '/api/sisters',
+  path: '/api/sisters',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSistersBootstrapRoute = ApiSistersBootstrapRouteImport.update({
+  id: '/api/sisters-bootstrap',
+  path: '/api/sisters-bootstrap',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSistersGrowthRoute = ApiSistersGrowthRouteImport.update({
+  id: '/api/sisters-growth',
+  path: '/api/sisters-growth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSistersImproveRoute = ApiSistersImproveRouteImport.update({
+  id: '/api/sisters-improve',
+  path: '/api/sisters-improve',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSkillsRoute = ApiSkillsRouteImport.update({
+  id: '/api/skills',
+  path: '/api/skills',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiStartAgentRoute = ApiStartAgentRouteImport.update({
+  id: '/api/start-agent',
+  path: '/api/start-agent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiStartClaudeRoute = ApiStartClaudeRouteImport.update({
+  id: '/api/start-claude',
+  path: '/api/start-claude',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmChatRoute = ApiSwarmChatRouteImport.update({
+  id: '/api/swarm-chat',
+  path: '/api/swarm-chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmCheckpointRoute = ApiSwarmCheckpointRouteImport.update({
+  id: '/api/swarm-checkpoint',
+  path: '/api/swarm-checkpoint',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmDecomposeRoute = ApiSwarmDecomposeRouteImport.update({
+  id: '/api/swarm-decompose',
+  path: '/api/swarm-decompose',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmDirectChatRoute = ApiSwarmDirectChatRouteImport.update({
+  id: '/api/swarm-direct-chat',
+  path: '/api/swarm-direct-chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmDispatchRoute = ApiSwarmDispatchRouteImport.update({
+  id: '/api/swarm-dispatch',
+  path: '/api/swarm-dispatch',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmEnvironmentRoute = ApiSwarmEnvironmentRouteImport.update({
+  id: '/api/swarm-environment',
+  path: '/api/swarm-environment',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmHealthRoute = ApiSwarmHealthRouteImport.update({
+  id: '/api/swarm-health',
+  path: '/api/swarm-health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmKanbanRoute = ApiSwarmKanbanRouteImport.update({
+  id: '/api/swarm-kanban',
+  path: '/api/swarm-kanban',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmLifecycleRoute = ApiSwarmLifecycleRouteImport.update({
+  id: '/api/swarm-lifecycle',
+  path: '/api/swarm-lifecycle',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmMemoryRoute = ApiSwarmMemoryRouteImport.update({
+  id: '/api/swarm-memory',
+  path: '/api/swarm-memory',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSwarmMissionsRoute = ApiSwarmMissionsRouteImport.update({
+  id: '/api/swarm-missions',
+  path: '/api/swarm-missions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSwarmOrchestratorLoopRoute =
@@ -652,499 +861,573 @@ const ApiSwarmOrchestratorLoopRoute =
     path: '/api/swarm-orchestrator-loop',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiSwarmMissionsRoute = ApiSwarmMissionsRouteImport.update({
-  id: '/api/swarm-missions',
-  path: '/api/swarm-missions',
+const ApiSwarmProjectRoute = ApiSwarmProjectRouteImport.update({
+  id: '/api/swarm-project',
+  path: '/api/swarm-project',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSwarmMemoryRoute = ApiSwarmMemoryRouteImport.update({
-  id: '/api/swarm-memory',
-  path: '/api/swarm-memory',
+const ApiSwarmReportsRoute = ApiSwarmReportsRouteImport.update({
+  id: '/api/swarm-reports',
+  path: '/api/swarm-reports',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSwarmLifecycleRoute = ApiSwarmLifecycleRouteImport.update({
-  id: '/api/swarm-lifecycle',
-  path: '/api/swarm-lifecycle',
+const ApiSwarmRosterRoute = ApiSwarmRosterRouteImport.update({
+  id: '/api/swarm-roster',
+  path: '/api/swarm-roster',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSwarmKanbanRoute = ApiSwarmKanbanRouteImport.update({
-  id: '/api/swarm-kanban',
-  path: '/api/swarm-kanban',
+const ApiSwarmRuntimeRoute = ApiSwarmRuntimeRouteImport.update({
+  id: '/api/swarm-runtime',
+  path: '/api/swarm-runtime',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSwarmHealthRoute = ApiSwarmHealthRouteImport.update({
-  id: '/api/swarm-health',
-  path: '/api/swarm-health',
+const ApiSwarmTmuxScrollRoute = ApiSwarmTmuxScrollRouteImport.update({
+  id: '/api/swarm-tmux-scroll',
+  path: '/api/swarm-tmux-scroll',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSwarmEnvironmentRoute = ApiSwarmEnvironmentRouteImport.update({
-  id: '/api/swarm-environment',
-  path: '/api/swarm-environment',
+const ApiSwarmTmuxStartRoute = ApiSwarmTmuxStartRouteImport.update({
+  id: '/api/swarm-tmux-start',
+  path: '/api/swarm-tmux-start',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSwarmDispatchRoute = ApiSwarmDispatchRouteImport.update({
-  id: '/api/swarm-dispatch',
-  path: '/api/swarm-dispatch',
+const ApiSwarmTmuxStopRoute = ApiSwarmTmuxStopRouteImport.update({
+  id: '/api/swarm-tmux-stop',
+  path: '/api/swarm-tmux-stop',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSwarmDirectChatRoute = ApiSwarmDirectChatRouteImport.update({
-  id: '/api/swarm-direct-chat',
-  path: '/api/swarm-direct-chat',
+const ApiSystemMetricsRoute = ApiSystemMetricsRouteImport.update({
+  id: '/api/system-metrics',
+  path: '/api/system-metrics',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSwarmDecomposeRoute = ApiSwarmDecomposeRouteImport.update({
-  id: '/api/swarm-decompose',
-  path: '/api/swarm-decompose',
+const ApiTasksRoute = ApiTasksRouteImport.update({
+  id: '/api/tasks',
+  path: '/api/tasks',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSwarmCheckpointRoute = ApiSwarmCheckpointRouteImport.update({
-  id: '/api/swarm-checkpoint',
-  path: '/api/swarm-checkpoint',
+const ApiTasksAskAstraRoute = ApiTasksAskAstraRouteImport.update({
+  id: '/api/tasks-ask-astra',
+  path: '/api/tasks-ask-astra',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSwarmChatRoute = ApiSwarmChatRouteImport.update({
-  id: '/api/swarm-chat',
-  path: '/api/swarm-chat',
+const ApiTasksAstraReviewRoute = ApiTasksAstraReviewRouteImport.update({
+  id: '/api/tasks-astra-review',
+  path: '/api/tasks-astra-review',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiStartClaudeRoute = ApiStartClaudeRouteImport.update({
-  id: '/api/start-claude',
-  path: '/api/start-claude',
+const ApiTasksBatchExecuteRoute = ApiTasksBatchExecuteRouteImport.update({
+  id: '/api/tasks-batch-execute',
+  path: '/api/tasks-batch-execute',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiStartAgentRoute = ApiStartAgentRouteImport.update({
-  id: '/api/start-agent',
-  path: '/api/start-agent',
+const ApiTasksBlockersRoute = ApiTasksBlockersRouteImport.update({
+  id: '/api/tasks-blockers',
+  path: '/api/tasks-blockers',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSkillsRoute = ApiSkillsRouteImport.update({
-  id: '/api/skills',
-  path: '/api/skills',
+const ApiTasksClarifyNudgeRoute = ApiTasksClarifyNudgeRouteImport.update({
+  id: '/api/tasks-clarify-nudge',
+  path: '/api/tasks-clarify-nudge',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSistersImproveRoute = ApiSistersImproveRouteImport.update({
-  id: '/api/sisters-improve',
-  path: '/api/sisters-improve',
+const ApiTasksCompletionCheckRoute = ApiTasksCompletionCheckRouteImport.update({
+  id: '/api/tasks-completion-check',
+  path: '/api/tasks-completion-check',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSistersGrowthRoute = ApiSistersGrowthRouteImport.update({
-  id: '/api/sisters-growth',
-  path: '/api/sisters-growth',
+const ApiTasksCompletionTrendRoute = ApiTasksCompletionTrendRouteImport.update({
+  id: '/api/tasks-completion-trend',
+  path: '/api/tasks-completion-trend',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSistersBootstrapRoute = ApiSistersBootstrapRouteImport.update({
-  id: '/api/sisters-bootstrap',
-  path: '/api/sisters-bootstrap',
+const ApiTasksCreateFromTgRoute = ApiTasksCreateFromTgRouteImport.update({
+  id: '/api/tasks-create-from-tg',
+  path: '/api/tasks-create-from-tg',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSistersRoute = ApiSistersRouteImport.update({
-  id: '/api/sisters',
-  path: '/api/sisters',
+const ApiTasksDeployAgentsRoute = ApiTasksDeployAgentsRouteImport.update({
+  id: '/api/tasks-deploy-agents',
+  path: '/api/tasks-deploy-agents',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSessionsRoute = ApiSessionsRouteImport.update({
-  id: '/api/sessions',
-  path: '/api/sessions',
+const ApiTasksDrainNowRoute = ApiTasksDrainNowRouteImport.update({
+  id: '/api/tasks-drain-now',
+  path: '/api/tasks-drain-now',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSessionStatusRoute = ApiSessionStatusRouteImport.update({
-  id: '/api/session-status',
-  path: '/api/session-status',
+const ApiTasksExecLogRoute = ApiTasksExecLogRouteImport.update({
+  id: '/api/tasks-exec-log',
+  path: '/api/tasks-exec-log',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSessionSendRoute = ApiSessionSendRouteImport.update({
-  id: '/api/session-send',
-  path: '/api/session-send',
+const ApiTasksFromTextRoute = ApiTasksFromTextRouteImport.update({
+  id: '/api/tasks-from-text',
+  path: '/api/tasks-from-text',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSessionHistoryRoute = ApiSessionHistoryRouteImport.update({
-  id: '/api/session-history',
-  path: '/api/session-history',
+const ApiTasksGenerateIdeasRoute = ApiTasksGenerateIdeasRouteImport.update({
+  id: '/api/tasks-generate-ideas',
+  path: '/api/tasks-generate-ideas',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSendStreamRoute = ApiSendStreamRouteImport.update({
-  id: '/api/send-stream',
-  path: '/api/send-stream',
+const ApiTasksInjectIdeasRoute = ApiTasksInjectIdeasRouteImport.update({
+  id: '/api/tasks-inject-ideas',
+  path: '/api/tasks-inject-ideas',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSendRoute = ApiSendRouteImport.update({
-  id: '/api/send',
-  path: '/api/send',
+const ApiTasksProgressPingRoute = ApiTasksProgressPingRouteImport.update({
+  id: '/api/tasks-progress-ping',
+  path: '/api/tasks-progress-ping',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiRouteSisterRoute = ApiRouteSisterRouteImport.update({
-  id: '/api/route-sister',
-  path: '/api/route-sister',
+const ApiTasksPruneRoute = ApiTasksPruneRouteImport.update({
+  id: '/api/tasks-prune',
+  path: '/api/tasks-prune',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiRiskCheckRoute = ApiRiskCheckRouteImport.update({
-  id: '/api/risk-check',
-  path: '/api/risk-check',
+const ApiTasksReplanStubsRoute = ApiTasksReplanStubsRouteImport.update({
+  id: '/api/tasks-replan-stubs',
+  path: '/api/tasks-replan-stubs',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiProviderUsageRoute = ApiProviderUsageRouteImport.update({
-  id: '/api/provider-usage',
-  path: '/api/provider-usage',
+const ApiTasksRescueTimedoutRoute = ApiTasksRescueTimedoutRouteImport.update({
+  id: '/api/tasks-rescue-timedout',
+  path: '/api/tasks-rescue-timedout',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPreviewFileRoute = ApiPreviewFileRouteImport.update({
-  id: '/api/preview-file',
-  path: '/api/preview-file',
+const ApiTasksStaleRoute = ApiTasksStaleRouteImport.update({
+  id: '/api/tasks-stale',
+  path: '/api/tasks-stale',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPluginsRoute = ApiPluginsRouteImport.update({
-  id: '/api/plugins',
-  path: '/api/plugins',
+const ApiTasksSweepStatsRoute = ApiTasksSweepStatsRouteImport.update({
+  id: '/api/tasks-sweep-stats',
+  path: '/api/tasks-sweep-stats',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPingRoute = ApiPingRouteImport.update({
-  id: '/api/ping',
-  path: '/api/ping',
+const ApiTasksUnlockPrereqRoute = ApiTasksUnlockPrereqRouteImport.update({
+  id: '/api/tasks-unlock-prereq',
+  path: '/api/tasks-unlock-prereq',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPersonalitySwarmRoute = ApiPersonalitySwarmRouteImport.update({
-  id: '/api/personality-swarm',
-  path: '/api/personality-swarm',
+const ApiTelegramBoardRoute = ApiTelegramBoardRouteImport.update({
+  id: '/api/telegram-board',
+  path: '/api/telegram-board',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPathsRoute = ApiPathsRouteImport.update({
-  id: '/api/paths',
-  path: '/api/paths',
+const ApiTelegramBoardSummaryRoute = ApiTelegramBoardSummaryRouteImport.update({
+  id: '/api/telegram-board-summary',
+  path: '/api/telegram-board-summary',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiOrchestrateRoute = ApiOrchestrateRouteImport.update({
-  id: '/api/orchestrate',
-  path: '/api/orchestrate',
+const ApiTelegramFindRoute = ApiTelegramFindRouteImport.update({
+  id: '/api/telegram-find',
+  path: '/api/telegram-find',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiOpsObservabilityRoute = ApiOpsObservabilityRouteImport.update({
-  id: '/api/ops-observability',
-  path: '/api/ops-observability',
+const ApiTelegramTaskClarifyRoute = ApiTelegramTaskClarifyRouteImport.update({
+  id: '/api/telegram-task-clarify',
+  path: '/api/telegram-task-clarify',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiOpenrouterCreditsRoute = ApiOpenrouterCreditsRouteImport.update({
-  id: '/api/openrouter-credits',
-  path: '/api/openrouter-credits',
+const ApiTerminalCloseRoute = ApiTerminalCloseRouteImport.update({
+  id: '/api/terminal-close',
+  path: '/api/terminal-close',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiOdysseusBootstrapRoute = ApiOdysseusBootstrapRouteImport.update({
-  id: '/api/odysseus-bootstrap',
-  path: '/api/odysseus-bootstrap',
+const ApiTerminalInputRoute = ApiTerminalInputRouteImport.update({
+  id: '/api/terminal-input',
+  path: '/api/terminal-input',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiModelsRoute = ApiModelsRouteImport.update({
-  id: '/api/models',
-  path: '/api/models',
+const ApiTerminalResizeRoute = ApiTerminalResizeRouteImport.update({
+  id: '/api/terminal-resize',
+  path: '/api/terminal-resize',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiModelSwitchRoute = ApiModelSwitchRouteImport.update({
-  id: '/api/model-switch',
-  path: '/api/model-switch',
+const ApiTerminalStreamRoute = ApiTerminalStreamRouteImport.update({
+  id: '/api/terminal-stream',
+  path: '/api/terminal-stream',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiMemoryRoute = ApiMemoryRouteImport.update({
-  id: '/api/memory',
-  path: '/api/memory',
+const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
+  id: '/api/transcribe',
+  path: '/api/transcribe',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiMediaRoute = ApiMediaRouteImport.update({
-  id: '/api/media',
-  path: '/api/media',
+const ApiUserProfileRoute = ApiUserProfileRouteImport.update({
+  id: '/api/user-profile',
+  path: '/api/user-profile',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiMcpRoute = ApiMcpRouteImport.update({
-  id: '/api/mcp',
-  path: '/api/mcp',
+const ApiUserSettingsRoute = ApiUserSettingsRouteImport.update({
+  id: '/api/user-settings',
+  path: '/api/user-settings',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiLocalProvidersRoute = ApiLocalProvidersRouteImport.update({
-  id: '/api/local-providers',
-  path: '/api/local-providers',
+const ApiValidateProviderRoute = ApiValidateProviderRouteImport.update({
+  id: '/api/validate-provider',
+  path: '/api/validate-provider',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiIntegrationsRoute = ApiIntegrationsRouteImport.update({
-  id: '/api/integrations',
-  path: '/api/integrations',
+const ApiWorkflowTemplatesRoute = ApiWorkflowTemplatesRouteImport.update({
+  id: '/api/workflow-templates',
+  path: '/api/workflow-templates',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiHistoryRoute = ApiHistoryRouteImport.update({
-  id: '/api/history',
-  path: '/api/history',
+const ApiWorkspaceRoute = ApiWorkspaceRouteImport.update({
+  id: '/api/workspace',
+  path: '/api/workspace',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiHermesTasksAssigneesRoute = ApiHermesTasksAssigneesRouteImport.update({
-  id: '/api/hermes-tasks-assignees',
-  path: '/api/hermes-tasks-assignees',
+const ApiWorkspaceSessionHealthRoute =
+  ApiWorkspaceSessionHealthRouteImport.update({
+    id: '/api/workspace-session-health',
+    path: '/api/workspace-session-health',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiWorkspaceVersionRoute = ApiWorkspaceVersionRouteImport.update({
+  id: '/api/workspace-version',
+  path: '/api/workspace-version',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiHermesTasksRoute = ApiHermesTasksRouteImport.update({
-  id: '/api/hermes-tasks',
-  path: '/api/hermes-tasks',
+const ChatIndexRoute = ChatIndexRouteImport.update({
+  id: '/chat/',
+  path: '/chat/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiHermesConfigRoute = ApiHermesConfigRouteImport.update({
-  id: '/api/hermes-config',
-  path: '/api/hermes-config',
+const ChatSessionKeyRoute = ChatSessionKeyRouteImport.update({
+  id: '/chat/$sessionKey',
+  path: '/chat/$sessionKey',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiHealthRoute = ApiHealthRouteImport.update({
-  id: '/api/health',
-  path: '/api/health',
-  getParentRoute: () => rootRouteImport,
+const SettingsIndexRoute = SettingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SettingsRoute,
 } as any)
-const ApiHarpSelectorPreviewRoute = ApiHarpSelectorPreviewRouteImport.update({
-  id: '/api/harp-selector-preview',
-  path: '/api/harp-selector-preview',
-  getParentRoute: () => rootRouteImport,
+const SettingsProvidersRoute = SettingsProvidersRouteImport.update({
+  id: '/providers',
+  path: '/providers',
+  getParentRoute: () => SettingsRoute,
 } as any)
-const ApiHarpObservabilityRoute = ApiHarpObservabilityRouteImport.update({
-  id: '/api/harp-observability',
-  path: '/api/harp-observability',
-  getParentRoute: () => rootRouteImport,
+const ApiArtifactsArtifactIdRoute = ApiArtifactsArtifactIdRouteImport.update({
+  id: '/$artifactId',
+  path: '/$artifactId',
+  getParentRoute: () => ApiArtifactsRoute,
 } as any)
-const ApiHarpConfigRoute = ApiHarpConfigRouteImport.update({
-  id: '/api/harp-config',
-  path: '/api/harp-config',
-  getParentRoute: () => rootRouteImport,
+const ApiAuthGmailConnectRoute = ApiAuthGmailConnectRouteImport.update({
+  id: '/gmail-connect',
+  path: '/gmail-connect',
+  getParentRoute: () => ApiAuthRoute,
 } as any)
-const ApiGatewayStatusRoute = ApiGatewayStatusRouteImport.update({
-  id: '/api/gateway-status',
-  path: '/api/gateway-status',
-  getParentRoute: () => rootRouteImport,
+const ApiAuthGoogleRoute = ApiAuthGoogleRouteImport.update({
+  id: '/google',
+  path: '/google',
+  getParentRoute: () => ApiAuthRoute,
 } as any)
-const ApiGatewayReprobeRoute = ApiGatewayReprobeRouteImport.update({
-  id: '/api/gateway-reprobe',
-  path: '/api/gateway-reprobe',
-  getParentRoute: () => rootRouteImport,
+const ApiClaudeJobsJobIdRoute = ApiClaudeJobsJobIdRouteImport.update({
+  id: '/$jobId',
+  path: '/$jobId',
+  getParentRoute: () => ApiClaudeJobsRoute,
 } as any)
-const ApiFinanceUploadRoute = ApiFinanceUploadRouteImport.update({
-  id: '/api/finance-upload',
-  path: '/api/finance-upload',
+const ApiClaudeProxySplatRoute = ApiClaudeProxySplatRouteImport.update({
+  id: '/api/claude-proxy/$',
+  path: '/api/claude-proxy/$',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiFinanceExportRoute = ApiFinanceExportRouteImport.update({
-  id: '/api/finance-export',
-  path: '/api/finance-export',
-  getParentRoute: () => rootRouteImport,
+const ApiClaudeTasksTaskIdRoute = ApiClaudeTasksTaskIdRouteImport.update({
+  id: '/$taskId',
+  path: '/$taskId',
+  getParentRoute: () => ApiClaudeTasksRoute,
 } as any)
-const ApiFinanceDocumentRoute = ApiFinanceDocumentRouteImport.update({
-  id: '/api/finance-document',
-  path: '/api/finance-document',
+const ApiDashboardOverviewRoute = ApiDashboardOverviewRouteImport.update({
+  id: '/api/dashboard/overview',
+  path: '/api/dashboard/overview',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiFinanceBackupRoute = ApiFinanceBackupRouteImport.update({
-  id: '/api/finance-backup',
-  path: '/api/finance-backup',
+const ApiExternalMemoryCandidatesRoute =
+  ApiExternalMemoryCandidatesRouteImport.update({
+    id: '/api/external-memory/candidates',
+    path: '/api/external-memory/candidates',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiExternalMemoryProvidersRoute =
+  ApiExternalMemoryProvidersRouteImport.update({
+    id: '/api/external-memory/providers',
+    path: '/api/external-memory/providers',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiExternalMemorySearchRoute = ApiExternalMemorySearchRouteImport.update({
+  id: '/api/external-memory/search',
+  path: '/api/external-memory/search',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiFinanceRoute = ApiFinanceRouteImport.update({
-  id: '/api/finance',
-  path: '/api/finance',
-  getParentRoute: () => rootRouteImport,
+const ApiFinanceSummaryRoute = ApiFinanceSummaryRouteImport.update({
+  id: '/summary',
+  path: '/summary',
+  getParentRoute: () => ApiFinanceRoute,
 } as any)
-const ApiFilesRoute = ApiFilesRouteImport.update({
-  id: '/api/files',
-  path: '/api/files',
+const ApiGatewayAgentsRoute = ApiGatewayAgentsRouteImport.update({
+  id: '/api/gateway/agents',
+  path: '/api/gateway/agents',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiEventsRoute = ApiEventsRouteImport.update({
-  id: '/api/events',
-  path: '/api/events',
+const ApiGatewaySessionsRoute = ApiGatewaySessionsRouteImport.update({
+  id: '/api/gateway/sessions',
+  path: '/api/gateway/sessions',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiEnvResetRoute = ApiEnvResetRouteImport.update({
-  id: '/api/env-reset',
-  path: '/api/env-reset',
-  getParentRoute: () => rootRouteImport,
+const ApiHermesTasksTaskIdRoute = ApiHermesTasksTaskIdRouteImport.update({
+  id: '/$taskId',
+  path: '/$taskId',
+  getParentRoute: () => ApiHermesTasksRoute,
 } as any)
-const ApiDownloadApkRoute = ApiDownloadApkRouteImport.update({
-  id: '/api/download-apk',
-  path: '/api/download-apk',
+const ApiHindsightDeleteRoute = ApiHindsightDeleteRouteImport.update({
+  id: '/api/hindsight/delete',
+  path: '/api/hindsight/delete',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiDifyStatusRoute = ApiDifyStatusRouteImport.update({
-  id: '/api/dify-status',
-  path: '/api/dify-status',
+const ApiHindsightMemoriesRoute = ApiHindsightMemoriesRouteImport.update({
+  id: '/api/hindsight/memories',
+  path: '/api/hindsight/memories',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiDemoTradingRebalanceRoute = ApiDemoTradingRebalanceRouteImport.update({
-  id: '/api/demo-trading-rebalance',
-  path: '/api/demo-trading-rebalance',
+const ApiHindsightOperationsRoute = ApiHindsightOperationsRouteImport.update({
+  id: '/api/hindsight/operations',
+  path: '/api/hindsight/operations',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiDemoTradingLlmRoute = ApiDemoTradingLlmRouteImport.update({
-  id: '/api/demo-trading-llm',
-  path: '/api/demo-trading-llm',
+const ApiHindsightRecallRoute = ApiHindsightRecallRouteImport.update({
+  id: '/api/hindsight/recall',
+  path: '/api/hindsight/recall',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiDemoTradingGridRoute = ApiDemoTradingGridRouteImport.update({
-  id: '/api/demo-trading-grid',
-  path: '/api/demo-trading-grid',
+const ApiHindsightRetainRoute = ApiHindsightRetainRouteImport.update({
+  id: '/api/hindsight/retain',
+  path: '/api/hindsight/retain',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiDemoTradingRoute = ApiDemoTradingRouteImport.update({
-  id: '/api/demo-trading',
-  path: '/api/demo-trading',
+const ApiHindsightStatusRoute = ApiHindsightStatusRouteImport.update({
+  id: '/api/hindsight/status',
+  path: '/api/hindsight/status',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiDebugAnalyzeRoute = ApiDebugAnalyzeRouteImport.update({
-  id: '/api/debug-analyze',
-  path: '/api/debug-analyze',
+const ApiKnowledgeConfigRoute = ApiKnowledgeConfigRouteImport.update({
+  id: '/api/knowledge/config',
+  path: '/api/knowledge/config',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiCrewStatusRoute = ApiCrewStatusRouteImport.update({
-  id: '/api/crew-status',
-  path: '/api/crew-status',
+const ApiKnowledgeGraphRoute = ApiKnowledgeGraphRouteImport.update({
+  id: '/api/knowledge/graph',
+  path: '/api/knowledge/graph',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiContextUsageRoute = ApiContextUsageRouteImport.update({
-  id: '/api/context-usage',
-  path: '/api/context-usage',
+const ApiKnowledgeListRoute = ApiKnowledgeListRouteImport.update({
+  id: '/api/knowledge/list',
+  path: '/api/knowledge/list',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiConnectionStatusRoute = ApiConnectionStatusRouteImport.update({
-  id: '/api/connection-status',
-  path: '/api/connection-status',
+const ApiKnowledgeReadRoute = ApiKnowledgeReadRouteImport.update({
+  id: '/api/knowledge/read',
+  path: '/api/knowledge/read',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiConnectionSettingsRoute = ApiConnectionSettingsRouteImport.update({
-  id: '/api/connection-settings',
-  path: '/api/connection-settings',
+const ApiKnowledgeSearchRoute = ApiKnowledgeSearchRouteImport.update({
+  id: '/api/knowledge/search',
+  path: '/api/knowledge/search',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiConfigPatchRoute = ApiConfigPatchRouteImport.update({
-  id: '/api/config-patch',
-  path: '/api/config-patch',
+const ApiKnowledgeSyncRoute = ApiKnowledgeSyncRouteImport.update({
+  id: '/api/knowledge/sync',
+  path: '/api/knowledge/sync',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiConfigGetRoute = ApiConfigGetRouteImport.update({
-  id: '/api/config-get',
-  path: '/api/config-get',
-  getParentRoute: () => rootRouteImport,
+const ApiMcpNameRoute = ApiMcpNameRouteImport.update({
+  id: '/$name',
+  path: '/$name',
+  getParentRoute: () => ApiMcpRoute,
 } as any)
-const ApiConductorStopRoute = ApiConductorStopRouteImport.update({
-  id: '/api/conductor-stop',
-  path: '/api/conductor-stop',
-  getParentRoute: () => rootRouteImport,
+const ApiMcpConfigureRoute = ApiMcpConfigureRouteImport.update({
+  id: '/configure',
+  path: '/configure',
+  getParentRoute: () => ApiMcpRoute,
 } as any)
-const ApiConductorSpawnRoute = ApiConductorSpawnRouteImport.update({
-  id: '/api/conductor-spawn',
-  path: '/api/conductor-spawn',
-  getParentRoute: () => rootRouteImport,
+const ApiMcpDiscoverRoute = ApiMcpDiscoverRouteImport.update({
+  id: '/discover',
+  path: '/discover',
+  getParentRoute: () => ApiMcpRoute,
 } as any)
-const ApiCommandsRoute = ApiCommandsRouteImport.update({
-  id: '/api/commands',
-  path: '/api/commands',
-  getParentRoute: () => rootRouteImport,
+const ApiMcpHubSearchRoute = ApiMcpHubSearchRouteImport.update({
+  id: '/hub-search',
+  path: '/hub-search',
+  getParentRoute: () => ApiMcpRoute,
 } as any)
-const ApiCliAgentsRoute = ApiCliAgentsRouteImport.update({
-  id: '/api/cli-agents',
-  path: '/api/cli-agents',
-  getParentRoute: () => rootRouteImport,
+const ApiMcpHubSourcesRoute = ApiMcpHubSourcesRouteImport.update({
+  id: '/hub-sources',
+  path: '/hub-sources',
+  getParentRoute: () => ApiMcpRoute,
+} as any)
+const ApiMcpPresetsRoute = ApiMcpPresetsRouteImport.update({
+  id: '/presets',
+  path: '/presets',
+  getParentRoute: () => ApiMcpRoute,
+} as any)
+const ApiMcpTestRoute = ApiMcpTestRouteImport.update({
+  id: '/test',
+  path: '/test',
+  getParentRoute: () => ApiMcpRoute,
+} as any)
+const ApiMemoryListRoute = ApiMemoryListRouteImport.update({
+  id: '/list',
+  path: '/list',
+  getParentRoute: () => ApiMemoryRoute,
+} as any)
+const ApiMemoryReadRoute = ApiMemoryReadRouteImport.update({
+  id: '/read',
+  path: '/read',
+  getParentRoute: () => ApiMemoryRoute,
 } as any)
-const ApiClaudeUpdateRoute = ApiClaudeUpdateRouteImport.update({
-  id: '/api/claude-update',
-  path: '/api/claude-update',
+const ApiMemorySearchRoute = ApiMemorySearchRouteImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => ApiMemoryRoute,
+} as any)
+const ApiMemoryWriteRoute = ApiMemoryWriteRouteImport.update({
+  id: '/write',
+  path: '/write',
+  getParentRoute: () => ApiMemoryRoute,
+} as any)
+const ApiModelInfoRoute = ApiModelInfoRouteImport.update({
+  id: '/api/model/info',
+  path: '/api/model/info',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiClaudeTasksAssigneesRoute = ApiClaudeTasksAssigneesRouteImport.update({
-  id: '/api/claude-tasks-assignees',
-  path: '/api/claude-tasks-assignees',
+const ApiOauthDeviceCodeRoute = ApiOauthDeviceCodeRouteImport.update({
+  id: '/api/oauth/device-code',
+  path: '/api/oauth/device-code',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiClaudeTasksRoute = ApiClaudeTasksRouteImport.update({
-  id: '/api/claude-tasks',
-  path: '/api/claude-tasks',
+const ApiOauthPollTokenRoute = ApiOauthPollTokenRouteImport.update({
+  id: '/api/oauth/poll-token',
+  path: '/api/oauth/poll-token',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiClaudeJobsRoute = ApiClaudeJobsRouteImport.update({
-  id: '/api/claude-jobs',
-  path: '/api/claude-jobs',
+const ApiOdysseusSplatRoute = ApiOdysseusSplatRouteImport.update({
+  id: '/api/odysseus/$',
+  path: '/api/odysseus/$',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiClaudeConfigRoute = ApiClaudeConfigRouteImport.update({
-  id: '/api/claude-config',
-  path: '/api/claude-config',
+const ApiProfilesActivateRoute = ApiProfilesActivateRouteImport.update({
+  id: '/api/profiles/activate',
+  path: '/api/profiles/activate',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiChatEventsRoute = ApiChatEventsRouteImport.update({
-  id: '/api/chat-events',
-  path: '/api/chat-events',
+const ApiProfilesCreateRoute = ApiProfilesCreateRouteImport.update({
+  id: '/api/profiles/create',
+  path: '/api/profiles/create',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiAutoRefinementRoute = ApiAutoRefinementRouteImport.update({
-  id: '/api/auto-refinement',
-  path: '/api/auto-refinement',
+const ApiProfilesDeleteRoute = ApiProfilesDeleteRouteImport.update({
+  id: '/api/profiles/delete',
+  path: '/api/profiles/delete',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiAuthCheckRoute = ApiAuthCheckRouteImport.update({
-  id: '/api/auth-check',
-  path: '/api/auth-check',
+const ApiProfilesListRoute = ApiProfilesListRouteImport.update({
+  id: '/api/profiles/list',
+  path: '/api/profiles/list',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiAuthRoute = ApiAuthRouteImport.update({
-  id: '/api/auth',
-  path: '/api/auth',
+const ApiProfilesReadRoute = ApiProfilesReadRouteImport.update({
+  id: '/api/profiles/read',
+  path: '/api/profiles/read',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiArtifactsRoute = ApiArtifactsRouteImport.update({
-  id: '/api/artifacts',
-  path: '/api/artifacts',
+const ApiProfilesRenameRoute = ApiProfilesRenameRouteImport.update({
+  id: '/api/profiles/rename',
+  path: '/api/profiles/rename',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiAppVersionRoute = ApiAppVersionRouteImport.update({
-  id: '/api/app-version',
-  path: '/api/app-version',
+const ApiProfilesSkillsRoute = ApiProfilesSkillsRouteImport.update({
+  id: '/api/profiles/skills',
+  path: '/api/profiles/skills',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiAgentPauseRoute = ApiAgentPauseRouteImport.update({
-  id: '/api/agent-pause',
-  path: '/api/agent-pause',
+const ApiProfilesToggleSkillRoute = ApiProfilesToggleSkillRouteImport.update({
+  id: '/api/profiles/toggle-skill',
+  path: '/api/profiles/toggle-skill',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiAgentDispatchRoute = ApiAgentDispatchRouteImport.update({
-  id: '/api/agent-dispatch',
-  path: '/api/agent-dispatch',
+const ApiProfilesUpdateRoute = ApiProfilesUpdateRouteImport.update({
+  id: '/api/profiles/update',
+  path: '/api/profiles/update',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiAgentBusRoute = ApiAgentBusRouteImport.update({
-  id: '/api/agent-bus',
-  path: '/api/agent-bus',
+const ApiRunsActiveRoute = ApiRunsActiveRouteImport.update({
+  id: '/api/runs/active',
+  path: '/api/runs/active',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiWorkspaceStatsRoute = ApiWorkspaceStatsRouteImport.update({
-  id: '/stats',
-  path: '/stats',
-  getParentRoute: () => ApiWorkspaceRoute,
+const ApiSessionsGenerateTitleRoute =
+  ApiSessionsGenerateTitleRouteImport.update({
+    id: '/generate-title',
+    path: '/generate-title',
+    getParentRoute: () => ApiSessionsRoute,
+  } as any)
+const ApiSessionsSearchRoute = ApiSessionsSearchRouteImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => ApiSessionsRoute,
 } as any)
-const ApiWorkspaceSkillsRoute = ApiWorkspaceSkillsRouteImport.update({
-  id: '/skills',
-  path: '/skills',
-  getParentRoute: () => ApiWorkspaceRoute,
+const ApiSessionsSendRoute = ApiSessionsSendRouteImport.update({
+  id: '/send',
+  path: '/send',
+  getParentRoute: () => ApiSessionsRoute,
 } as any)
-const ApiWorkspaceMemoryFilesRoute = ApiWorkspaceMemoryFilesRouteImport.update({
-  id: '/memory-files',
-  path: '/memory-files',
-  getParentRoute: () => ApiWorkspaceRoute,
+const ApiSkillsHubSearchRoute = ApiSkillsHubSearchRouteImport.update({
+  id: '/hub-search',
+  path: '/hub-search',
+  getParentRoute: () => ApiSkillsRoute,
 } as any)
-const ApiUpdateWorkspaceRoute = ApiUpdateWorkspaceRouteImport.update({
-  id: '/api/update/workspace',
-  path: '/api/update/workspace',
-  getParentRoute: () => rootRouteImport,
+const ApiSkillsInstallRoute = ApiSkillsInstallRouteImport.update({
+  id: '/install',
+  path: '/install',
+  getParentRoute: () => ApiSkillsRoute,
+} as any)
+const ApiSkillsToggleRoute = ApiSkillsToggleRouteImport.update({
+  id: '/toggle',
+  path: '/toggle',
+  getParentRoute: () => ApiSkillsRoute,
+} as any)
+const ApiSkillsUninstallRoute = ApiSkillsUninstallRouteImport.update({
+  id: '/uninstall',
+  path: '/uninstall',
+  getParentRoute: () => ApiSkillsRoute,
+} as any)
+const ApiSwarmMemorySearchRoute = ApiSwarmMemorySearchRouteImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => ApiSwarmMemoryRoute,
+} as any)
+const ApiSwarmRuntimeResetRoute = ApiSwarmRuntimeResetRouteImport.update({
+  id: '/reset',
+  path: '/reset',
+  getParentRoute: () => ApiSwarmRuntimeRoute,
 } as any)
-const ApiUpdateStatusRoute = ApiUpdateStatusRouteImport.update({
-  id: '/api/update/status',
-  path: '/api/update/status',
+const ApiTradingLedgerRoute = ApiTradingLedgerRouteImport.update({
+  id: '/api/trading/ledger',
+  path: '/api/trading/ledger',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiUpdateNaveenStatusRoute = ApiUpdateNaveenStatusRouteImport.update({
-  id: '/api/update/naveen-status',
-  path: '/api/update/naveen-status',
+const ApiTradingSummaryRoute = ApiTradingSummaryRouteImport.update({
+  id: '/api/trading/summary',
+  path: '/api/trading/summary',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiUpdateNaveenApplyRoute = ApiUpdateNaveenApplyRouteImport.update({
-  id: '/api/update/naveen-apply',
-  path: '/api/update/naveen-apply',
+const ApiUpdateAgentRoute = ApiUpdateAgentRouteImport.update({
+  id: '/api/update/agent',
+  path: '/api/update/agent',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiUpdateNaveenAiAnalysisRoute =
@@ -1153,372 +1436,89 @@ const ApiUpdateNaveenAiAnalysisRoute =
     path: '/api/update/naveen-ai-analysis',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiUpdateAgentRoute = ApiUpdateAgentRouteImport.update({
-  id: '/api/update/agent',
-  path: '/api/update/agent',
+const ApiUpdateNaveenApplyRoute = ApiUpdateNaveenApplyRouteImport.update({
+  id: '/api/update/naveen-apply',
+  path: '/api/update/naveen-apply',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTradingSummaryRoute = ApiTradingSummaryRouteImport.update({
-  id: '/api/trading/summary',
-  path: '/api/trading/summary',
+const ApiUpdateNaveenStatusRoute = ApiUpdateNaveenStatusRouteImport.update({
+  id: '/api/update/naveen-status',
+  path: '/api/update/naveen-status',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTradingLedgerRoute = ApiTradingLedgerRouteImport.update({
-  id: '/api/trading/ledger',
-  path: '/api/trading/ledger',
+const ApiUpdateStatusRoute = ApiUpdateStatusRouteImport.update({
+  id: '/api/update/status',
+  path: '/api/update/status',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSwarmRuntimeResetRoute = ApiSwarmRuntimeResetRouteImport.update({
-  id: '/reset',
-  path: '/reset',
-  getParentRoute: () => ApiSwarmRuntimeRoute,
-} as any)
-const ApiSwarmMemorySearchRoute = ApiSwarmMemorySearchRouteImport.update({
-  id: '/search',
-  path: '/search',
-  getParentRoute: () => ApiSwarmMemoryRoute,
-} as any)
-const ApiSkillsUninstallRoute = ApiSkillsUninstallRouteImport.update({
-  id: '/uninstall',
-  path: '/uninstall',
-  getParentRoute: () => ApiSkillsRoute,
-} as any)
-const ApiSkillsToggleRoute = ApiSkillsToggleRouteImport.update({
-  id: '/toggle',
-  path: '/toggle',
-  getParentRoute: () => ApiSkillsRoute,
-} as any)
-const ApiSkillsInstallRoute = ApiSkillsInstallRouteImport.update({
-  id: '/install',
-  path: '/install',
-  getParentRoute: () => ApiSkillsRoute,
-} as any)
-const ApiSkillsHubSearchRoute = ApiSkillsHubSearchRouteImport.update({
-  id: '/hub-search',
-  path: '/hub-search',
-  getParentRoute: () => ApiSkillsRoute,
-} as any)
-const ApiSessionsSendRoute = ApiSessionsSendRouteImport.update({
-  id: '/send',
-  path: '/send',
-  getParentRoute: () => ApiSessionsRoute,
-} as any)
-const ApiSessionsSearchRoute = ApiSessionsSearchRouteImport.update({
-  id: '/search',
-  path: '/search',
-  getParentRoute: () => ApiSessionsRoute,
-} as any)
-const ApiSessionsGenerateTitleRoute =
-  ApiSessionsGenerateTitleRouteImport.update({
-    id: '/generate-title',
-    path: '/generate-title',
-    getParentRoute: () => ApiSessionsRoute,
-  } as any)
-const ApiRunsActiveRoute = ApiRunsActiveRouteImport.update({
-  id: '/api/runs/active',
-  path: '/api/runs/active',
+const ApiUpdateWorkspaceRoute = ApiUpdateWorkspaceRouteImport.update({
+  id: '/api/update/workspace',
+  path: '/api/update/workspace',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiProfilesUpdateRoute = ApiProfilesUpdateRouteImport.update({
-  id: '/api/profiles/update',
-  path: '/api/profiles/update',
-  getParentRoute: () => rootRouteImport,
+const ApiWorkspaceMemoryFilesRoute = ApiWorkspaceMemoryFilesRouteImport.update({
+  id: '/memory-files',
+  path: '/memory-files',
+  getParentRoute: () => ApiWorkspaceRoute,
 } as any)
-const ApiProfilesToggleSkillRoute = ApiProfilesToggleSkillRouteImport.update({
-  id: '/api/profiles/toggle-skill',
-  path: '/api/profiles/toggle-skill',
-  getParentRoute: () => rootRouteImport,
+const ApiWorkspaceSkillsRoute = ApiWorkspaceSkillsRouteImport.update({
+  id: '/skills',
+  path: '/skills',
+  getParentRoute: () => ApiWorkspaceRoute,
 } as any)
-const ApiProfilesSkillsRoute = ApiProfilesSkillsRouteImport.update({
-  id: '/api/profiles/skills',
-  path: '/api/profiles/skills',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiProfilesRenameRoute = ApiProfilesRenameRouteImport.update({
-  id: '/api/profiles/rename',
-  path: '/api/profiles/rename',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiProfilesReadRoute = ApiProfilesReadRouteImport.update({
-  id: '/api/profiles/read',
-  path: '/api/profiles/read',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiProfilesListRoute = ApiProfilesListRouteImport.update({
-  id: '/api/profiles/list',
-  path: '/api/profiles/list',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiProfilesDeleteRoute = ApiProfilesDeleteRouteImport.update({
-  id: '/api/profiles/delete',
-  path: '/api/profiles/delete',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiProfilesCreateRoute = ApiProfilesCreateRouteImport.update({
-  id: '/api/profiles/create',
-  path: '/api/profiles/create',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiProfilesActivateRoute = ApiProfilesActivateRouteImport.update({
-  id: '/api/profiles/activate',
-  path: '/api/profiles/activate',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiOdysseusSplatRoute = ApiOdysseusSplatRouteImport.update({
-  id: '/api/odysseus/$',
-  path: '/api/odysseus/$',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiOauthPollTokenRoute = ApiOauthPollTokenRouteImport.update({
-  id: '/api/oauth/poll-token',
-  path: '/api/oauth/poll-token',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiOauthDeviceCodeRoute = ApiOauthDeviceCodeRouteImport.update({
-  id: '/api/oauth/device-code',
-  path: '/api/oauth/device-code',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiModelInfoRoute = ApiModelInfoRouteImport.update({
-  id: '/api/model/info',
-  path: '/api/model/info',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiMemoryWriteRoute = ApiMemoryWriteRouteImport.update({
-  id: '/write',
-  path: '/write',
-  getParentRoute: () => ApiMemoryRoute,
-} as any)
-const ApiMemorySearchRoute = ApiMemorySearchRouteImport.update({
-  id: '/search',
-  path: '/search',
-  getParentRoute: () => ApiMemoryRoute,
-} as any)
-const ApiMemoryReadRoute = ApiMemoryReadRouteImport.update({
-  id: '/read',
-  path: '/read',
-  getParentRoute: () => ApiMemoryRoute,
-} as any)
-const ApiMemoryListRoute = ApiMemoryListRouteImport.update({
-  id: '/list',
-  path: '/list',
-  getParentRoute: () => ApiMemoryRoute,
-} as any)
-const ApiMcpTestRoute = ApiMcpTestRouteImport.update({
-  id: '/test',
-  path: '/test',
-  getParentRoute: () => ApiMcpRoute,
-} as any)
-const ApiMcpPresetsRoute = ApiMcpPresetsRouteImport.update({
-  id: '/presets',
-  path: '/presets',
-  getParentRoute: () => ApiMcpRoute,
-} as any)
-const ApiMcpHubSourcesRoute = ApiMcpHubSourcesRouteImport.update({
-  id: '/hub-sources',
-  path: '/hub-sources',
-  getParentRoute: () => ApiMcpRoute,
-} as any)
-const ApiMcpHubSearchRoute = ApiMcpHubSearchRouteImport.update({
-  id: '/hub-search',
-  path: '/hub-search',
-  getParentRoute: () => ApiMcpRoute,
-} as any)
-const ApiMcpDiscoverRoute = ApiMcpDiscoverRouteImport.update({
-  id: '/discover',
-  path: '/discover',
-  getParentRoute: () => ApiMcpRoute,
-} as any)
-const ApiMcpConfigureRoute = ApiMcpConfigureRouteImport.update({
-  id: '/configure',
-  path: '/configure',
-  getParentRoute: () => ApiMcpRoute,
-} as any)
-const ApiMcpNameRoute = ApiMcpNameRouteImport.update({
-  id: '/$name',
-  path: '/$name',
-  getParentRoute: () => ApiMcpRoute,
-} as any)
-const ApiKnowledgeSyncRoute = ApiKnowledgeSyncRouteImport.update({
-  id: '/api/knowledge/sync',
-  path: '/api/knowledge/sync',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiKnowledgeSearchRoute = ApiKnowledgeSearchRouteImport.update({
-  id: '/api/knowledge/search',
-  path: '/api/knowledge/search',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiKnowledgeReadRoute = ApiKnowledgeReadRouteImport.update({
-  id: '/api/knowledge/read',
-  path: '/api/knowledge/read',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiKnowledgeListRoute = ApiKnowledgeListRouteImport.update({
-  id: '/api/knowledge/list',
-  path: '/api/knowledge/list',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiKnowledgeGraphRoute = ApiKnowledgeGraphRouteImport.update({
-  id: '/api/knowledge/graph',
-  path: '/api/knowledge/graph',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiKnowledgeConfigRoute = ApiKnowledgeConfigRouteImport.update({
-  id: '/api/knowledge/config',
-  path: '/api/knowledge/config',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiHindsightStatusRoute = ApiHindsightStatusRouteImport.update({
-  id: '/api/hindsight/status',
-  path: '/api/hindsight/status',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiHindsightRetainRoute = ApiHindsightRetainRouteImport.update({
-  id: '/api/hindsight/retain',
-  path: '/api/hindsight/retain',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiHindsightRecallRoute = ApiHindsightRecallRouteImport.update({
-  id: '/api/hindsight/recall',
-  path: '/api/hindsight/recall',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiHindsightOperationsRoute = ApiHindsightOperationsRouteImport.update({
-  id: '/api/hindsight/operations',
-  path: '/api/hindsight/operations',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiHindsightMemoriesRoute = ApiHindsightMemoriesRouteImport.update({
-  id: '/api/hindsight/memories',
-  path: '/api/hindsight/memories',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiHindsightDeleteRoute = ApiHindsightDeleteRouteImport.update({
-  id: '/api/hindsight/delete',
-  path: '/api/hindsight/delete',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiHermesTasksTaskIdRoute = ApiHermesTasksTaskIdRouteImport.update({
-  id: '/$taskId',
-  path: '/$taskId',
-  getParentRoute: () => ApiHermesTasksRoute,
-} as any)
-const ApiGatewaySessionsRoute = ApiGatewaySessionsRouteImport.update({
-  id: '/api/gateway/sessions',
-  path: '/api/gateway/sessions',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiGatewayAgentsRoute = ApiGatewayAgentsRouteImport.update({
-  id: '/api/gateway/agents',
-  path: '/api/gateway/agents',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiFinanceSummaryRoute = ApiFinanceSummaryRouteImport.update({
-  id: '/summary',
-  path: '/summary',
-  getParentRoute: () => ApiFinanceRoute,
-} as any)
-const ApiExternalMemorySearchRoute = ApiExternalMemorySearchRouteImport.update({
-  id: '/api/external-memory/search',
-  path: '/api/external-memory/search',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiExternalMemoryProvidersRoute =
-  ApiExternalMemoryProvidersRouteImport.update({
-    id: '/api/external-memory/providers',
-    path: '/api/external-memory/providers',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiExternalMemoryCandidatesRoute =
-  ApiExternalMemoryCandidatesRouteImport.update({
-    id: '/api/external-memory/candidates',
-    path: '/api/external-memory/candidates',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiDashboardOverviewRoute = ApiDashboardOverviewRouteImport.update({
-  id: '/api/dashboard/overview',
-  path: '/api/dashboard/overview',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiClaudeTasksTaskIdRoute = ApiClaudeTasksTaskIdRouteImport.update({
-  id: '/$taskId',
-  path: '/$taskId',
-  getParentRoute: () => ApiClaudeTasksRoute,
-} as any)
-const ApiClaudeProxySplatRoute = ApiClaudeProxySplatRouteImport.update({
-  id: '/api/claude-proxy/$',
-  path: '/api/claude-proxy/$',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiClaudeJobsJobIdRoute = ApiClaudeJobsJobIdRouteImport.update({
-  id: '/$jobId',
-  path: '/$jobId',
-  getParentRoute: () => ApiClaudeJobsRoute,
-} as any)
-const ApiAuthGoogleRoute = ApiAuthGoogleRouteImport.update({
-  id: '/google',
-  path: '/google',
-  getParentRoute: () => ApiAuthRoute,
-} as any)
-const ApiAuthGmailConnectRoute = ApiAuthGmailConnectRouteImport.update({
-  id: '/gmail-connect',
-  path: '/gmail-connect',
-  getParentRoute: () => ApiAuthRoute,
-} as any)
-const ApiArtifactsArtifactIdRoute = ApiArtifactsArtifactIdRouteImport.update({
-  id: '/$artifactId',
-  path: '/$artifactId',
-  getParentRoute: () => ApiArtifactsRoute,
-} as any)
-const ApiSessionsSessionKeyStatusRoute =
-  ApiSessionsSessionKeyStatusRouteImport.update({
-    id: '/$sessionKey/status',
-    path: '/$sessionKey/status',
-    getParentRoute: () => ApiSessionsRoute,
-  } as any)
-const ApiSessionsSessionKeyActiveRunRoute =
-  ApiSessionsSessionKeyActiveRunRouteImport.update({
-    id: '/$sessionKey/active-run',
-    path: '/$sessionKey/active-run',
-    getParentRoute: () => ApiSessionsRoute,
-  } as any)
-const ApiMcpHubSourcesIdRoute = ApiMcpHubSourcesIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => ApiMcpHubSourcesRoute,
-} as any)
-const ApiMcpNameLogsRoute = ApiMcpNameLogsRouteImport.update({
-  id: '/logs',
-  path: '/logs',
-  getParentRoute: () => ApiMcpNameRoute,
-} as any)
-const ApiFinanceReportIncomeRoute = ApiFinanceReportIncomeRouteImport.update({
-  id: '/report/income',
-  path: '/report/income',
-  getParentRoute: () => ApiFinanceRoute,
-} as any)
-const ApiFinanceReportExpenseRoute = ApiFinanceReportExpenseRouteImport.update({
-  id: '/report/expense',
-  path: '/report/expense',
-  getParentRoute: () => ApiFinanceRoute,
+const ApiWorkspaceStatsRoute = ApiWorkspaceStatsRouteImport.update({
+  id: '/stats',
+  path: '/stats',
+  getParentRoute: () => ApiWorkspaceRoute,
 } as any)
 const ApiAuthGoogleCallbackRoute = ApiAuthGoogleCallbackRouteImport.update({
   id: '/callback',
   path: '/callback',
   getParentRoute: () => ApiAuthGoogleRoute,
 } as any)
-const ApiWorkspaceSkillsSkillIdContentRoute =
-  ApiWorkspaceSkillsSkillIdContentRouteImport.update({
-    id: '/$skillId/content',
-    path: '/$skillId/content',
-    getParentRoute: () => ApiWorkspaceSkillsRoute,
+const ApiFinanceReportExpenseRoute = ApiFinanceReportExpenseRouteImport.update({
+  id: '/report/expense',
+  path: '/report/expense',
+  getParentRoute: () => ApiFinanceRoute,
+} as any)
+const ApiFinanceReportIncomeRoute = ApiFinanceReportIncomeRouteImport.update({
+  id: '/report/income',
+  path: '/report/income',
+  getParentRoute: () => ApiFinanceRoute,
+} as any)
+const ApiMcpNameLogsRoute = ApiMcpNameLogsRouteImport.update({
+  id: '/logs',
+  path: '/logs',
+  getParentRoute: () => ApiMcpNameRoute,
+} as any)
+const ApiMcpHubSourcesIdRoute = ApiMcpHubSourcesIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ApiMcpHubSourcesRoute,
+} as any)
+const ApiSessionsSessionKeyActiveRunRoute =
+  ApiSessionsSessionKeyActiveRunRouteImport.update({
+    id: '/$sessionKey/active-run',
+    path: '/$sessionKey/active-run',
+    getParentRoute: () => ApiSessionsRoute,
+  } as any)
+const ApiSessionsSessionKeyStatusRoute =
+  ApiSessionsSessionKeyStatusRouteImport.update({
+    id: '/$sessionKey/status',
+    path: '/$sessionKey/status',
+    getParentRoute: () => ApiSessionsRoute,
   } as any)
 const ApiRunsSessionKeyRunIdAbandonRoute =
   ApiRunsSessionKeyRunIdAbandonRouteImport.update({
     id: '/api/runs/$sessionKey/$runId/abandon',
     path: '/api/runs/$sessionKey/$runId/abandon',
     getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiWorkspaceSkillsSkillIdContentRoute =
+  ApiWorkspaceSkillsSkillIdContentRouteImport.update({
+    id: '/$skillId/content',
+    path: '/$skillId/content',
+    getParentRoute: () => ApiWorkspaceSkillsRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -3250,179 +3250,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/trading': {
-      id: '/trading'
-      path: '/trading'
-      fullPath: '/trading'
-      preLoaderRoute: typeof TradingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/terminal': {
-      id: '/terminal'
-      path: '/terminal'
-      fullPath: '/terminal'
-      preLoaderRoute: typeof TerminalRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/tasks': {
-      id: '/tasks'
-      path: '/tasks'
-      fullPath: '/tasks'
-      preLoaderRoute: typeof TasksRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/swarm2': {
-      id: '/swarm2'
-      path: '/swarm2'
-      fullPath: '/swarm2'
-      preLoaderRoute: typeof Swarm2RouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/swarm': {
-      id: '/swarm'
-      path: '/swarm'
-      fullPath: '/swarm'
-      preLoaderRoute: typeof SwarmRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/skills': {
-      id: '/skills'
-      path: '/skills'
-      fullPath: '/skills'
-      preLoaderRoute: typeof SkillsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/research': {
-      id: '/research'
-      path: '/research'
-      fullPath: '/research'
-      preLoaderRoute: typeof ResearchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/profiles': {
-      id: '/profiles'
-      path: '/profiles'
-      fullPath: '/profiles'
-      preLoaderRoute: typeof ProfilesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/personal-finance': {
-      id: '/personal-finance'
-      path: '/personal-finance'
-      fullPath: '/personal-finance'
-      preLoaderRoute: typeof PersonalFinanceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/ops-cost': {
-      id: '/ops-cost'
-      path: '/ops-cost'
-      fullPath: '/ops-cost'
-      preLoaderRoute: typeof OpsCostRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/operations': {
-      id: '/operations'
-      path: '/operations'
-      fullPath: '/operations'
-      preLoaderRoute: typeof OperationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/memory': {
-      id: '/memory'
-      path: '/memory'
-      fullPath: '/memory'
-      preLoaderRoute: typeof MemoryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/mcp': {
-      id: '/mcp'
-      path: '/mcp'
-      fullPath: '/mcp'
-      preLoaderRoute: typeof McpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/jobs': {
-      id: '/jobs'
-      path: '/jobs'
-      fullPath: '/jobs'
-      preLoaderRoute: typeof JobsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/finance': {
-      id: '/finance'
-      path: '/finance'
-      fullPath: '/finance'
-      preLoaderRoute: typeof FinanceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/files': {
-      id: '/files'
-      path: '/files'
-      fullPath: '/files'
-      preLoaderRoute: typeof FilesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/echo-studio': {
-      id: '/echo-studio'
-      path: '/echo-studio'
-      fullPath: '/echo-studio'
-      preLoaderRoute: typeof EchoStudioRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/download-apk': {
-      id: '/download-apk'
-      path: '/download-apk'
-      fullPath: '/download-apk'
-      preLoaderRoute: typeof DownloadApkRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dify': {
-      id: '/dify'
-      path: '/dify'
-      fullPath: '/dify'
-      preLoaderRoute: typeof DifyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/conductor': {
-      id: '/conductor'
-      path: '/conductor'
-      fullPath: '/conductor'
-      preLoaderRoute: typeof ConductorRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/command': {
-      id: '/command'
-      path: '/command'
-      fullPath: '/command'
-      preLoaderRoute: typeof CommandRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/agora': {
-      id: '/agora'
-      path: '/agora'
-      fullPath: '/agora'
-      preLoaderRoute: typeof AgoraRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/agents': {
-      id: '/agents'
-      path: '/agents'
-      fullPath: '/agents'
-      preLoaderRoute: typeof AgentsRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$': {
@@ -3432,1005 +3264,179 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SplatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/agents': {
+      id: '/agents'
+      path: '/agents'
+      fullPath: '/agents'
+      preLoaderRoute: typeof AgentsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings/': {
-      id: '/settings/'
-      path: '/'
-      fullPath: '/settings/'
-      preLoaderRoute: typeof SettingsIndexRouteImport
-      parentRoute: typeof SettingsRoute
-    }
-    '/chat/': {
-      id: '/chat/'
-      path: '/chat'
-      fullPath: '/chat/'
-      preLoaderRoute: typeof ChatIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings/providers': {
-      id: '/settings/providers'
-      path: '/providers'
-      fullPath: '/settings/providers'
-      preLoaderRoute: typeof SettingsProvidersRouteImport
-      parentRoute: typeof SettingsRoute
-    }
-    '/chat/$sessionKey': {
-      id: '/chat/$sessionKey'
-      path: '/chat/$sessionKey'
-      fullPath: '/chat/$sessionKey'
-      preLoaderRoute: typeof ChatSessionKeyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/workspace-version': {
-      id: '/api/workspace-version'
-      path: '/api/workspace-version'
-      fullPath: '/api/workspace-version'
-      preLoaderRoute: typeof ApiWorkspaceVersionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/workspace-session-health': {
-      id: '/api/workspace-session-health'
-      path: '/api/workspace-session-health'
-      fullPath: '/api/workspace-session-health'
-      preLoaderRoute: typeof ApiWorkspaceSessionHealthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/workspace': {
-      id: '/api/workspace'
-      path: '/api/workspace'
-      fullPath: '/api/workspace'
-      preLoaderRoute: typeof ApiWorkspaceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/workflow-templates': {
-      id: '/api/workflow-templates'
-      path: '/api/workflow-templates'
-      fullPath: '/api/workflow-templates'
-      preLoaderRoute: typeof ApiWorkflowTemplatesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/validate-provider': {
-      id: '/api/validate-provider'
-      path: '/api/validate-provider'
-      fullPath: '/api/validate-provider'
-      preLoaderRoute: typeof ApiValidateProviderRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/user-settings': {
-      id: '/api/user-settings'
-      path: '/api/user-settings'
-      fullPath: '/api/user-settings'
-      preLoaderRoute: typeof ApiUserSettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/user-profile': {
-      id: '/api/user-profile'
-      path: '/api/user-profile'
-      fullPath: '/api/user-profile'
-      preLoaderRoute: typeof ApiUserProfileRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/transcribe': {
-      id: '/api/transcribe'
-      path: '/api/transcribe'
-      fullPath: '/api/transcribe'
-      preLoaderRoute: typeof ApiTranscribeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/terminal-stream': {
-      id: '/api/terminal-stream'
-      path: '/api/terminal-stream'
-      fullPath: '/api/terminal-stream'
-      preLoaderRoute: typeof ApiTerminalStreamRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/terminal-resize': {
-      id: '/api/terminal-resize'
-      path: '/api/terminal-resize'
-      fullPath: '/api/terminal-resize'
-      preLoaderRoute: typeof ApiTerminalResizeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/terminal-input': {
-      id: '/api/terminal-input'
-      path: '/api/terminal-input'
-      fullPath: '/api/terminal-input'
-      preLoaderRoute: typeof ApiTerminalInputRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/terminal-close': {
-      id: '/api/terminal-close'
-      path: '/api/terminal-close'
-      fullPath: '/api/terminal-close'
-      preLoaderRoute: typeof ApiTerminalCloseRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/telegram-task-clarify': {
-      id: '/api/telegram-task-clarify'
-      path: '/api/telegram-task-clarify'
-      fullPath: '/api/telegram-task-clarify'
-      preLoaderRoute: typeof ApiTelegramTaskClarifyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/telegram-find': {
-      id: '/api/telegram-find'
-      path: '/api/telegram-find'
-      fullPath: '/api/telegram-find'
-      preLoaderRoute: typeof ApiTelegramFindRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/telegram-board-summary': {
-      id: '/api/telegram-board-summary'
-      path: '/api/telegram-board-summary'
-      fullPath: '/api/telegram-board-summary'
-      preLoaderRoute: typeof ApiTelegramBoardSummaryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/telegram-board': {
-      id: '/api/telegram-board'
-      path: '/api/telegram-board'
-      fullPath: '/api/telegram-board'
-      preLoaderRoute: typeof ApiTelegramBoardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tasks-unlock-prereq': {
-      id: '/api/tasks-unlock-prereq'
-      path: '/api/tasks-unlock-prereq'
-      fullPath: '/api/tasks-unlock-prereq'
-      preLoaderRoute: typeof ApiTasksUnlockPrereqRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tasks-sweep-stats': {
-      id: '/api/tasks-sweep-stats'
-      path: '/api/tasks-sweep-stats'
-      fullPath: '/api/tasks-sweep-stats'
-      preLoaderRoute: typeof ApiTasksSweepStatsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tasks-stale': {
-      id: '/api/tasks-stale'
-      path: '/api/tasks-stale'
-      fullPath: '/api/tasks-stale'
-      preLoaderRoute: typeof ApiTasksStaleRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tasks-rescue-timedout': {
-      id: '/api/tasks-rescue-timedout'
-      path: '/api/tasks-rescue-timedout'
-      fullPath: '/api/tasks-rescue-timedout'
-      preLoaderRoute: typeof ApiTasksRescueTimedoutRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tasks-replan-stubs': {
-      id: '/api/tasks-replan-stubs'
-      path: '/api/tasks-replan-stubs'
-      fullPath: '/api/tasks-replan-stubs'
-      preLoaderRoute: typeof ApiTasksReplanStubsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tasks-prune': {
-      id: '/api/tasks-prune'
-      path: '/api/tasks-prune'
-      fullPath: '/api/tasks-prune'
-      preLoaderRoute: typeof ApiTasksPruneRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tasks-progress-ping': {
-      id: '/api/tasks-progress-ping'
-      path: '/api/tasks-progress-ping'
-      fullPath: '/api/tasks-progress-ping'
-      preLoaderRoute: typeof ApiTasksProgressPingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tasks-inject-ideas': {
-      id: '/api/tasks-inject-ideas'
-      path: '/api/tasks-inject-ideas'
-      fullPath: '/api/tasks-inject-ideas'
-      preLoaderRoute: typeof ApiTasksInjectIdeasRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tasks-generate-ideas': {
-      id: '/api/tasks-generate-ideas'
-      path: '/api/tasks-generate-ideas'
-      fullPath: '/api/tasks-generate-ideas'
-      preLoaderRoute: typeof ApiTasksGenerateIdeasRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tasks-from-text': {
-      id: '/api/tasks-from-text'
-      path: '/api/tasks-from-text'
-      fullPath: '/api/tasks-from-text'
-      preLoaderRoute: typeof ApiTasksFromTextRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tasks-exec-log': {
-      id: '/api/tasks-exec-log'
-      path: '/api/tasks-exec-log'
-      fullPath: '/api/tasks-exec-log'
-      preLoaderRoute: typeof ApiTasksExecLogRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tasks-drain-now': {
-      id: '/api/tasks-drain-now'
-      path: '/api/tasks-drain-now'
-      fullPath: '/api/tasks-drain-now'
-      preLoaderRoute: typeof ApiTasksDrainNowRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tasks-deploy-agents': {
-      id: '/api/tasks-deploy-agents'
-      path: '/api/tasks-deploy-agents'
-      fullPath: '/api/tasks-deploy-agents'
-      preLoaderRoute: typeof ApiTasksDeployAgentsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tasks-create-from-tg': {
-      id: '/api/tasks-create-from-tg'
-      path: '/api/tasks-create-from-tg'
-      fullPath: '/api/tasks-create-from-tg'
-      preLoaderRoute: typeof ApiTasksCreateFromTgRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tasks-completion-trend': {
-      id: '/api/tasks-completion-trend'
-      path: '/api/tasks-completion-trend'
-      fullPath: '/api/tasks-completion-trend'
-      preLoaderRoute: typeof ApiTasksCompletionTrendRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tasks-completion-check': {
-      id: '/api/tasks-completion-check'
-      path: '/api/tasks-completion-check'
-      fullPath: '/api/tasks-completion-check'
-      preLoaderRoute: typeof ApiTasksCompletionCheckRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tasks-clarify-nudge': {
-      id: '/api/tasks-clarify-nudge'
-      path: '/api/tasks-clarify-nudge'
-      fullPath: '/api/tasks-clarify-nudge'
-      preLoaderRoute: typeof ApiTasksClarifyNudgeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tasks-blockers': {
-      id: '/api/tasks-blockers'
-      path: '/api/tasks-blockers'
-      fullPath: '/api/tasks-blockers'
-      preLoaderRoute: typeof ApiTasksBlockersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tasks-batch-execute': {
-      id: '/api/tasks-batch-execute'
-      path: '/api/tasks-batch-execute'
-      fullPath: '/api/tasks-batch-execute'
-      preLoaderRoute: typeof ApiTasksBatchExecuteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tasks-astra-review': {
-      id: '/api/tasks-astra-review'
-      path: '/api/tasks-astra-review'
-      fullPath: '/api/tasks-astra-review'
-      preLoaderRoute: typeof ApiTasksAstraReviewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tasks-ask-astra': {
-      id: '/api/tasks-ask-astra'
-      path: '/api/tasks-ask-astra'
-      fullPath: '/api/tasks-ask-astra'
-      preLoaderRoute: typeof ApiTasksAskAstraRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tasks': {
-      id: '/api/tasks'
-      path: '/api/tasks'
-      fullPath: '/api/tasks'
-      preLoaderRoute: typeof ApiTasksRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/system-metrics': {
-      id: '/api/system-metrics'
-      path: '/api/system-metrics'
-      fullPath: '/api/system-metrics'
-      preLoaderRoute: typeof ApiSystemMetricsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/swarm-tmux-stop': {
-      id: '/api/swarm-tmux-stop'
-      path: '/api/swarm-tmux-stop'
-      fullPath: '/api/swarm-tmux-stop'
-      preLoaderRoute: typeof ApiSwarmTmuxStopRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/swarm-tmux-start': {
-      id: '/api/swarm-tmux-start'
-      path: '/api/swarm-tmux-start'
-      fullPath: '/api/swarm-tmux-start'
-      preLoaderRoute: typeof ApiSwarmTmuxStartRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/swarm-tmux-scroll': {
-      id: '/api/swarm-tmux-scroll'
-      path: '/api/swarm-tmux-scroll'
-      fullPath: '/api/swarm-tmux-scroll'
-      preLoaderRoute: typeof ApiSwarmTmuxScrollRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/swarm-runtime': {
-      id: '/api/swarm-runtime'
-      path: '/api/swarm-runtime'
-      fullPath: '/api/swarm-runtime'
-      preLoaderRoute: typeof ApiSwarmRuntimeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/swarm-roster': {
-      id: '/api/swarm-roster'
-      path: '/api/swarm-roster'
-      fullPath: '/api/swarm-roster'
-      preLoaderRoute: typeof ApiSwarmRosterRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/swarm-reports': {
-      id: '/api/swarm-reports'
-      path: '/api/swarm-reports'
-      fullPath: '/api/swarm-reports'
-      preLoaderRoute: typeof ApiSwarmReportsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/swarm-project': {
-      id: '/api/swarm-project'
-      path: '/api/swarm-project'
-      fullPath: '/api/swarm-project'
-      preLoaderRoute: typeof ApiSwarmProjectRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/swarm-orchestrator-loop': {
-      id: '/api/swarm-orchestrator-loop'
-      path: '/api/swarm-orchestrator-loop'
-      fullPath: '/api/swarm-orchestrator-loop'
-      preLoaderRoute: typeof ApiSwarmOrchestratorLoopRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/swarm-missions': {
-      id: '/api/swarm-missions'
-      path: '/api/swarm-missions'
-      fullPath: '/api/swarm-missions'
-      preLoaderRoute: typeof ApiSwarmMissionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/swarm-memory': {
-      id: '/api/swarm-memory'
-      path: '/api/swarm-memory'
-      fullPath: '/api/swarm-memory'
-      preLoaderRoute: typeof ApiSwarmMemoryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/swarm-lifecycle': {
-      id: '/api/swarm-lifecycle'
-      path: '/api/swarm-lifecycle'
-      fullPath: '/api/swarm-lifecycle'
-      preLoaderRoute: typeof ApiSwarmLifecycleRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/swarm-kanban': {
-      id: '/api/swarm-kanban'
-      path: '/api/swarm-kanban'
-      fullPath: '/api/swarm-kanban'
-      preLoaderRoute: typeof ApiSwarmKanbanRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/swarm-health': {
-      id: '/api/swarm-health'
-      path: '/api/swarm-health'
-      fullPath: '/api/swarm-health'
-      preLoaderRoute: typeof ApiSwarmHealthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/swarm-environment': {
-      id: '/api/swarm-environment'
-      path: '/api/swarm-environment'
-      fullPath: '/api/swarm-environment'
-      preLoaderRoute: typeof ApiSwarmEnvironmentRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/swarm-dispatch': {
-      id: '/api/swarm-dispatch'
-      path: '/api/swarm-dispatch'
-      fullPath: '/api/swarm-dispatch'
-      preLoaderRoute: typeof ApiSwarmDispatchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/swarm-direct-chat': {
-      id: '/api/swarm-direct-chat'
-      path: '/api/swarm-direct-chat'
-      fullPath: '/api/swarm-direct-chat'
-      preLoaderRoute: typeof ApiSwarmDirectChatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/swarm-decompose': {
-      id: '/api/swarm-decompose'
-      path: '/api/swarm-decompose'
-      fullPath: '/api/swarm-decompose'
-      preLoaderRoute: typeof ApiSwarmDecomposeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/swarm-checkpoint': {
-      id: '/api/swarm-checkpoint'
-      path: '/api/swarm-checkpoint'
-      fullPath: '/api/swarm-checkpoint'
-      preLoaderRoute: typeof ApiSwarmCheckpointRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/swarm-chat': {
-      id: '/api/swarm-chat'
-      path: '/api/swarm-chat'
-      fullPath: '/api/swarm-chat'
-      preLoaderRoute: typeof ApiSwarmChatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/start-claude': {
-      id: '/api/start-claude'
-      path: '/api/start-claude'
-      fullPath: '/api/start-claude'
-      preLoaderRoute: typeof ApiStartClaudeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/start-agent': {
-      id: '/api/start-agent'
-      path: '/api/start-agent'
-      fullPath: '/api/start-agent'
-      preLoaderRoute: typeof ApiStartAgentRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/skills': {
-      id: '/api/skills'
-      path: '/api/skills'
-      fullPath: '/api/skills'
-      preLoaderRoute: typeof ApiSkillsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/sisters-improve': {
-      id: '/api/sisters-improve'
-      path: '/api/sisters-improve'
-      fullPath: '/api/sisters-improve'
-      preLoaderRoute: typeof ApiSistersImproveRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/sisters-growth': {
-      id: '/api/sisters-growth'
-      path: '/api/sisters-growth'
-      fullPath: '/api/sisters-growth'
-      preLoaderRoute: typeof ApiSistersGrowthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/sisters-bootstrap': {
-      id: '/api/sisters-bootstrap'
-      path: '/api/sisters-bootstrap'
-      fullPath: '/api/sisters-bootstrap'
-      preLoaderRoute: typeof ApiSistersBootstrapRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/sisters': {
-      id: '/api/sisters'
-      path: '/api/sisters'
-      fullPath: '/api/sisters'
-      preLoaderRoute: typeof ApiSistersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/sessions': {
-      id: '/api/sessions'
-      path: '/api/sessions'
-      fullPath: '/api/sessions'
-      preLoaderRoute: typeof ApiSessionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/session-status': {
-      id: '/api/session-status'
-      path: '/api/session-status'
-      fullPath: '/api/session-status'
-      preLoaderRoute: typeof ApiSessionStatusRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/session-send': {
-      id: '/api/session-send'
-      path: '/api/session-send'
-      fullPath: '/api/session-send'
-      preLoaderRoute: typeof ApiSessionSendRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/session-history': {
-      id: '/api/session-history'
-      path: '/api/session-history'
-      fullPath: '/api/session-history'
-      preLoaderRoute: typeof ApiSessionHistoryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/send-stream': {
-      id: '/api/send-stream'
-      path: '/api/send-stream'
-      fullPath: '/api/send-stream'
-      preLoaderRoute: typeof ApiSendStreamRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/send': {
-      id: '/api/send'
-      path: '/api/send'
-      fullPath: '/api/send'
-      preLoaderRoute: typeof ApiSendRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/route-sister': {
-      id: '/api/route-sister'
-      path: '/api/route-sister'
-      fullPath: '/api/route-sister'
-      preLoaderRoute: typeof ApiRouteSisterRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/risk-check': {
-      id: '/api/risk-check'
-      path: '/api/risk-check'
-      fullPath: '/api/risk-check'
-      preLoaderRoute: typeof ApiRiskCheckRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/provider-usage': {
-      id: '/api/provider-usage'
-      path: '/api/provider-usage'
-      fullPath: '/api/provider-usage'
-      preLoaderRoute: typeof ApiProviderUsageRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/preview-file': {
-      id: '/api/preview-file'
-      path: '/api/preview-file'
-      fullPath: '/api/preview-file'
-      preLoaderRoute: typeof ApiPreviewFileRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/plugins': {
-      id: '/api/plugins'
-      path: '/api/plugins'
-      fullPath: '/api/plugins'
-      preLoaderRoute: typeof ApiPluginsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/ping': {
-      id: '/api/ping'
-      path: '/api/ping'
-      fullPath: '/api/ping'
-      preLoaderRoute: typeof ApiPingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/personality-swarm': {
-      id: '/api/personality-swarm'
-      path: '/api/personality-swarm'
-      fullPath: '/api/personality-swarm'
-      preLoaderRoute: typeof ApiPersonalitySwarmRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/paths': {
-      id: '/api/paths'
-      path: '/api/paths'
-      fullPath: '/api/paths'
-      preLoaderRoute: typeof ApiPathsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/orchestrate': {
-      id: '/api/orchestrate'
-      path: '/api/orchestrate'
-      fullPath: '/api/orchestrate'
-      preLoaderRoute: typeof ApiOrchestrateRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/ops-observability': {
-      id: '/api/ops-observability'
-      path: '/api/ops-observability'
-      fullPath: '/api/ops-observability'
-      preLoaderRoute: typeof ApiOpsObservabilityRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/openrouter-credits': {
-      id: '/api/openrouter-credits'
-      path: '/api/openrouter-credits'
-      fullPath: '/api/openrouter-credits'
-      preLoaderRoute: typeof ApiOpenrouterCreditsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/odysseus-bootstrap': {
-      id: '/api/odysseus-bootstrap'
-      path: '/api/odysseus-bootstrap'
-      fullPath: '/api/odysseus-bootstrap'
-      preLoaderRoute: typeof ApiOdysseusBootstrapRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/models': {
-      id: '/api/models'
-      path: '/api/models'
-      fullPath: '/api/models'
-      preLoaderRoute: typeof ApiModelsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/model-switch': {
-      id: '/api/model-switch'
-      path: '/api/model-switch'
-      fullPath: '/api/model-switch'
-      preLoaderRoute: typeof ApiModelSwitchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/memory': {
-      id: '/api/memory'
-      path: '/api/memory'
-      fullPath: '/api/memory'
-      preLoaderRoute: typeof ApiMemoryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/media': {
-      id: '/api/media'
-      path: '/api/media'
-      fullPath: '/api/media'
-      preLoaderRoute: typeof ApiMediaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/mcp': {
-      id: '/api/mcp'
-      path: '/api/mcp'
-      fullPath: '/api/mcp'
-      preLoaderRoute: typeof ApiMcpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/local-providers': {
-      id: '/api/local-providers'
-      path: '/api/local-providers'
-      fullPath: '/api/local-providers'
-      preLoaderRoute: typeof ApiLocalProvidersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/integrations': {
-      id: '/api/integrations'
-      path: '/api/integrations'
-      fullPath: '/api/integrations'
-      preLoaderRoute: typeof ApiIntegrationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/history': {
-      id: '/api/history'
-      path: '/api/history'
-      fullPath: '/api/history'
-      preLoaderRoute: typeof ApiHistoryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/hermes-tasks-assignees': {
-      id: '/api/hermes-tasks-assignees'
-      path: '/api/hermes-tasks-assignees'
-      fullPath: '/api/hermes-tasks-assignees'
-      preLoaderRoute: typeof ApiHermesTasksAssigneesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/hermes-tasks': {
-      id: '/api/hermes-tasks'
-      path: '/api/hermes-tasks'
-      fullPath: '/api/hermes-tasks'
-      preLoaderRoute: typeof ApiHermesTasksRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/hermes-config': {
-      id: '/api/hermes-config'
-      path: '/api/hermes-config'
-      fullPath: '/api/hermes-config'
-      preLoaderRoute: typeof ApiHermesConfigRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/health': {
-      id: '/api/health'
-      path: '/api/health'
-      fullPath: '/api/health'
-      preLoaderRoute: typeof ApiHealthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/harp-selector-preview': {
-      id: '/api/harp-selector-preview'
-      path: '/api/harp-selector-preview'
-      fullPath: '/api/harp-selector-preview'
-      preLoaderRoute: typeof ApiHarpSelectorPreviewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/harp-observability': {
-      id: '/api/harp-observability'
-      path: '/api/harp-observability'
-      fullPath: '/api/harp-observability'
-      preLoaderRoute: typeof ApiHarpObservabilityRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/harp-config': {
-      id: '/api/harp-config'
-      path: '/api/harp-config'
-      fullPath: '/api/harp-config'
-      preLoaderRoute: typeof ApiHarpConfigRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/gateway-status': {
-      id: '/api/gateway-status'
-      path: '/api/gateway-status'
-      fullPath: '/api/gateway-status'
-      preLoaderRoute: typeof ApiGatewayStatusRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/gateway-reprobe': {
-      id: '/api/gateway-reprobe'
-      path: '/api/gateway-reprobe'
-      fullPath: '/api/gateway-reprobe'
-      preLoaderRoute: typeof ApiGatewayReprobeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/finance-upload': {
-      id: '/api/finance-upload'
-      path: '/api/finance-upload'
-      fullPath: '/api/finance-upload'
-      preLoaderRoute: typeof ApiFinanceUploadRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/finance-export': {
-      id: '/api/finance-export'
-      path: '/api/finance-export'
-      fullPath: '/api/finance-export'
-      preLoaderRoute: typeof ApiFinanceExportRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/finance-document': {
-      id: '/api/finance-document'
-      path: '/api/finance-document'
-      fullPath: '/api/finance-document'
-      preLoaderRoute: typeof ApiFinanceDocumentRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/finance-backup': {
-      id: '/api/finance-backup'
-      path: '/api/finance-backup'
-      fullPath: '/api/finance-backup'
-      preLoaderRoute: typeof ApiFinanceBackupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/finance': {
-      id: '/api/finance'
-      path: '/api/finance'
-      fullPath: '/api/finance'
-      preLoaderRoute: typeof ApiFinanceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/files': {
-      id: '/api/files'
-      path: '/api/files'
-      fullPath: '/api/files'
-      preLoaderRoute: typeof ApiFilesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/events': {
-      id: '/api/events'
-      path: '/api/events'
-      fullPath: '/api/events'
-      preLoaderRoute: typeof ApiEventsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/env-reset': {
-      id: '/api/env-reset'
-      path: '/api/env-reset'
-      fullPath: '/api/env-reset'
-      preLoaderRoute: typeof ApiEnvResetRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/download-apk': {
-      id: '/api/download-apk'
-      path: '/api/download-apk'
-      fullPath: '/api/download-apk'
-      preLoaderRoute: typeof ApiDownloadApkRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/dify-status': {
-      id: '/api/dify-status'
-      path: '/api/dify-status'
-      fullPath: '/api/dify-status'
-      preLoaderRoute: typeof ApiDifyStatusRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/demo-trading-rebalance': {
-      id: '/api/demo-trading-rebalance'
-      path: '/api/demo-trading-rebalance'
-      fullPath: '/api/demo-trading-rebalance'
-      preLoaderRoute: typeof ApiDemoTradingRebalanceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/demo-trading-llm': {
-      id: '/api/demo-trading-llm'
-      path: '/api/demo-trading-llm'
-      fullPath: '/api/demo-trading-llm'
-      preLoaderRoute: typeof ApiDemoTradingLlmRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/demo-trading-grid': {
-      id: '/api/demo-trading-grid'
-      path: '/api/demo-trading-grid'
-      fullPath: '/api/demo-trading-grid'
-      preLoaderRoute: typeof ApiDemoTradingGridRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/demo-trading': {
-      id: '/api/demo-trading'
-      path: '/api/demo-trading'
-      fullPath: '/api/demo-trading'
-      preLoaderRoute: typeof ApiDemoTradingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/debug-analyze': {
-      id: '/api/debug-analyze'
-      path: '/api/debug-analyze'
-      fullPath: '/api/debug-analyze'
-      preLoaderRoute: typeof ApiDebugAnalyzeRouteImport
+    '/agora': {
+      id: '/agora'
+      path: '/agora'
+      fullPath: '/agora'
+      preLoaderRoute: typeof AgoraRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/crew-status': {
-      id: '/api/crew-status'
-      path: '/api/crew-status'
-      fullPath: '/api/crew-status'
-      preLoaderRoute: typeof ApiCrewStatusRouteImport
+    '/command': {
+      id: '/command'
+      path: '/command'
+      fullPath: '/command'
+      preLoaderRoute: typeof CommandRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/context-usage': {
-      id: '/api/context-usage'
-      path: '/api/context-usage'
-      fullPath: '/api/context-usage'
-      preLoaderRoute: typeof ApiContextUsageRouteImport
+    '/conductor': {
+      id: '/conductor'
+      path: '/conductor'
+      fullPath: '/conductor'
+      preLoaderRoute: typeof ConductorRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/connection-status': {
-      id: '/api/connection-status'
-      path: '/api/connection-status'
-      fullPath: '/api/connection-status'
-      preLoaderRoute: typeof ApiConnectionStatusRouteImport
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/connection-settings': {
-      id: '/api/connection-settings'
-      path: '/api/connection-settings'
-      fullPath: '/api/connection-settings'
-      preLoaderRoute: typeof ApiConnectionSettingsRouteImport
+    '/dify': {
+      id: '/dify'
+      path: '/dify'
+      fullPath: '/dify'
+      preLoaderRoute: typeof DifyRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/config-patch': {
-      id: '/api/config-patch'
-      path: '/api/config-patch'
-      fullPath: '/api/config-patch'
-      preLoaderRoute: typeof ApiConfigPatchRouteImport
+    '/download-apk': {
+      id: '/download-apk'
+      path: '/download-apk'
+      fullPath: '/download-apk'
+      preLoaderRoute: typeof DownloadApkRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/config-get': {
-      id: '/api/config-get'
-      path: '/api/config-get'
-      fullPath: '/api/config-get'
-      preLoaderRoute: typeof ApiConfigGetRouteImport
+    '/echo-studio': {
+      id: '/echo-studio'
+      path: '/echo-studio'
+      fullPath: '/echo-studio'
+      preLoaderRoute: typeof EchoStudioRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/conductor-stop': {
-      id: '/api/conductor-stop'
-      path: '/api/conductor-stop'
-      fullPath: '/api/conductor-stop'
-      preLoaderRoute: typeof ApiConductorStopRouteImport
+    '/files': {
+      id: '/files'
+      path: '/files'
+      fullPath: '/files'
+      preLoaderRoute: typeof FilesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/conductor-spawn': {
-      id: '/api/conductor-spawn'
-      path: '/api/conductor-spawn'
-      fullPath: '/api/conductor-spawn'
-      preLoaderRoute: typeof ApiConductorSpawnRouteImport
+    '/finance': {
+      id: '/finance'
+      path: '/finance'
+      fullPath: '/finance'
+      preLoaderRoute: typeof FinanceRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/commands': {
-      id: '/api/commands'
-      path: '/api/commands'
-      fullPath: '/api/commands'
-      preLoaderRoute: typeof ApiCommandsRouteImport
+    '/jobs': {
+      id: '/jobs'
+      path: '/jobs'
+      fullPath: '/jobs'
+      preLoaderRoute: typeof JobsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/cli-agents': {
-      id: '/api/cli-agents'
-      path: '/api/cli-agents'
-      fullPath: '/api/cli-agents'
-      preLoaderRoute: typeof ApiCliAgentsRouteImport
+    '/mcp': {
+      id: '/mcp'
+      path: '/mcp'
+      fullPath: '/mcp'
+      preLoaderRoute: typeof McpRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/claude-update': {
-      id: '/api/claude-update'
-      path: '/api/claude-update'
-      fullPath: '/api/claude-update'
-      preLoaderRoute: typeof ApiClaudeUpdateRouteImport
+    '/memory': {
+      id: '/memory'
+      path: '/memory'
+      fullPath: '/memory'
+      preLoaderRoute: typeof MemoryRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/claude-tasks-assignees': {
-      id: '/api/claude-tasks-assignees'
-      path: '/api/claude-tasks-assignees'
-      fullPath: '/api/claude-tasks-assignees'
-      preLoaderRoute: typeof ApiClaudeTasksAssigneesRouteImport
+    '/operations': {
+      id: '/operations'
+      path: '/operations'
+      fullPath: '/operations'
+      preLoaderRoute: typeof OperationsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/claude-tasks': {
-      id: '/api/claude-tasks'
-      path: '/api/claude-tasks'
-      fullPath: '/api/claude-tasks'
-      preLoaderRoute: typeof ApiClaudeTasksRouteImport
+    '/ops-cost': {
+      id: '/ops-cost'
+      path: '/ops-cost'
+      fullPath: '/ops-cost'
+      preLoaderRoute: typeof OpsCostRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/claude-jobs': {
-      id: '/api/claude-jobs'
-      path: '/api/claude-jobs'
-      fullPath: '/api/claude-jobs'
-      preLoaderRoute: typeof ApiClaudeJobsRouteImport
+    '/personal-finance': {
+      id: '/personal-finance'
+      path: '/personal-finance'
+      fullPath: '/personal-finance'
+      preLoaderRoute: typeof PersonalFinanceRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/claude-config': {
-      id: '/api/claude-config'
-      path: '/api/claude-config'
-      fullPath: '/api/claude-config'
-      preLoaderRoute: typeof ApiClaudeConfigRouteImport
+    '/profiles': {
+      id: '/profiles'
+      path: '/profiles'
+      fullPath: '/profiles'
+      preLoaderRoute: typeof ProfilesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/chat-events': {
-      id: '/api/chat-events'
-      path: '/api/chat-events'
-      fullPath: '/api/chat-events'
-      preLoaderRoute: typeof ApiChatEventsRouteImport
+    '/research': {
+      id: '/research'
+      path: '/research'
+      fullPath: '/research'
+      preLoaderRoute: typeof ResearchRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/auto-refinement': {
-      id: '/api/auto-refinement'
-      path: '/api/auto-refinement'
-      fullPath: '/api/auto-refinement'
-      preLoaderRoute: typeof ApiAutoRefinementRouteImport
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/auth-check': {
-      id: '/api/auth-check'
-      path: '/api/auth-check'
-      fullPath: '/api/auth-check'
-      preLoaderRoute: typeof ApiAuthCheckRouteImport
+    '/skills': {
+      id: '/skills'
+      path: '/skills'
+      fullPath: '/skills'
+      preLoaderRoute: typeof SkillsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/auth': {
-      id: '/api/auth'
-      path: '/api/auth'
-      fullPath: '/api/auth'
-      preLoaderRoute: typeof ApiAuthRouteImport
+    '/swarm': {
+      id: '/swarm'
+      path: '/swarm'
+      fullPath: '/swarm'
+      preLoaderRoute: typeof SwarmRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/artifacts': {
-      id: '/api/artifacts'
-      path: '/api/artifacts'
-      fullPath: '/api/artifacts'
-      preLoaderRoute: typeof ApiArtifactsRouteImport
+    '/swarm2': {
+      id: '/swarm2'
+      path: '/swarm2'
+      fullPath: '/swarm2'
+      preLoaderRoute: typeof Swarm2RouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/app-version': {
-      id: '/api/app-version'
-      path: '/api/app-version'
-      fullPath: '/api/app-version'
-      preLoaderRoute: typeof ApiAppVersionRouteImport
+    '/tasks': {
+      id: '/tasks'
+      path: '/tasks'
+      fullPath: '/tasks'
+      preLoaderRoute: typeof TasksRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/agent-pause': {
-      id: '/api/agent-pause'
-      path: '/api/agent-pause'
-      fullPath: '/api/agent-pause'
-      preLoaderRoute: typeof ApiAgentPauseRouteImport
+    '/terminal': {
+      id: '/terminal'
+      path: '/terminal'
+      fullPath: '/terminal'
+      preLoaderRoute: typeof TerminalRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/agent-dispatch': {
-      id: '/api/agent-dispatch'
-      path: '/api/agent-dispatch'
-      fullPath: '/api/agent-dispatch'
-      preLoaderRoute: typeof ApiAgentDispatchRouteImport
+    '/trading': {
+      id: '/trading'
+      path: '/trading'
+      fullPath: '/trading'
+      preLoaderRoute: typeof TradingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/agent-bus': {
@@ -4440,459 +3446,1033 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAgentBusRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/workspace/stats': {
-      id: '/api/workspace/stats'
-      path: '/stats'
-      fullPath: '/api/workspace/stats'
-      preLoaderRoute: typeof ApiWorkspaceStatsRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/skills': {
-      id: '/api/workspace/skills'
-      path: '/skills'
-      fullPath: '/api/workspace/skills'
-      preLoaderRoute: typeof ApiWorkspaceSkillsRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/workspace/memory-files': {
-      id: '/api/workspace/memory-files'
-      path: '/memory-files'
-      fullPath: '/api/workspace/memory-files'
-      preLoaderRoute: typeof ApiWorkspaceMemoryFilesRouteImport
-      parentRoute: typeof ApiWorkspaceRoute
-    }
-    '/api/update/workspace': {
-      id: '/api/update/workspace'
-      path: '/api/update/workspace'
-      fullPath: '/api/update/workspace'
-      preLoaderRoute: typeof ApiUpdateWorkspaceRouteImport
+    '/api/agent-dispatch': {
+      id: '/api/agent-dispatch'
+      path: '/api/agent-dispatch'
+      fullPath: '/api/agent-dispatch'
+      preLoaderRoute: typeof ApiAgentDispatchRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/update/status': {
-      id: '/api/update/status'
-      path: '/api/update/status'
-      fullPath: '/api/update/status'
-      preLoaderRoute: typeof ApiUpdateStatusRouteImport
+    '/api/agent-pause': {
+      id: '/api/agent-pause'
+      path: '/api/agent-pause'
+      fullPath: '/api/agent-pause'
+      preLoaderRoute: typeof ApiAgentPauseRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/update/naveen-status': {
-      id: '/api/update/naveen-status'
-      path: '/api/update/naveen-status'
-      fullPath: '/api/update/naveen-status'
-      preLoaderRoute: typeof ApiUpdateNaveenStatusRouteImport
+    '/api/app-version': {
+      id: '/api/app-version'
+      path: '/api/app-version'
+      fullPath: '/api/app-version'
+      preLoaderRoute: typeof ApiAppVersionRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/update/naveen-apply': {
-      id: '/api/update/naveen-apply'
-      path: '/api/update/naveen-apply'
-      fullPath: '/api/update/naveen-apply'
-      preLoaderRoute: typeof ApiUpdateNaveenApplyRouteImport
+    '/api/artifacts': {
+      id: '/api/artifacts'
+      path: '/api/artifacts'
+      fullPath: '/api/artifacts'
+      preLoaderRoute: typeof ApiArtifactsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/update/naveen-ai-analysis': {
-      id: '/api/update/naveen-ai-analysis'
-      path: '/api/update/naveen-ai-analysis'
-      fullPath: '/api/update/naveen-ai-analysis'
-      preLoaderRoute: typeof ApiUpdateNaveenAiAnalysisRouteImport
+    '/api/auth': {
+      id: '/api/auth'
+      path: '/api/auth'
+      fullPath: '/api/auth'
+      preLoaderRoute: typeof ApiAuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/update/agent': {
-      id: '/api/update/agent'
-      path: '/api/update/agent'
-      fullPath: '/api/update/agent'
-      preLoaderRoute: typeof ApiUpdateAgentRouteImport
+    '/api/auth-check': {
+      id: '/api/auth-check'
+      path: '/api/auth-check'
+      fullPath: '/api/auth-check'
+      preLoaderRoute: typeof ApiAuthCheckRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/trading/summary': {
-      id: '/api/trading/summary'
-      path: '/api/trading/summary'
-      fullPath: '/api/trading/summary'
-      preLoaderRoute: typeof ApiTradingSummaryRouteImport
+    '/api/auto-refinement': {
+      id: '/api/auto-refinement'
+      path: '/api/auto-refinement'
+      fullPath: '/api/auto-refinement'
+      preLoaderRoute: typeof ApiAutoRefinementRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/trading/ledger': {
-      id: '/api/trading/ledger'
-      path: '/api/trading/ledger'
-      fullPath: '/api/trading/ledger'
-      preLoaderRoute: typeof ApiTradingLedgerRouteImport
+    '/api/chat-events': {
+      id: '/api/chat-events'
+      path: '/api/chat-events'
+      fullPath: '/api/chat-events'
+      preLoaderRoute: typeof ApiChatEventsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/swarm-runtime/reset': {
-      id: '/api/swarm-runtime/reset'
-      path: '/reset'
-      fullPath: '/api/swarm-runtime/reset'
-      preLoaderRoute: typeof ApiSwarmRuntimeResetRouteImport
-      parentRoute: typeof ApiSwarmRuntimeRoute
-    }
-    '/api/swarm-memory/search': {
-      id: '/api/swarm-memory/search'
-      path: '/search'
-      fullPath: '/api/swarm-memory/search'
-      preLoaderRoute: typeof ApiSwarmMemorySearchRouteImport
-      parentRoute: typeof ApiSwarmMemoryRoute
-    }
-    '/api/skills/uninstall': {
-      id: '/api/skills/uninstall'
-      path: '/uninstall'
-      fullPath: '/api/skills/uninstall'
-      preLoaderRoute: typeof ApiSkillsUninstallRouteImport
-      parentRoute: typeof ApiSkillsRoute
-    }
-    '/api/skills/toggle': {
-      id: '/api/skills/toggle'
-      path: '/toggle'
-      fullPath: '/api/skills/toggle'
-      preLoaderRoute: typeof ApiSkillsToggleRouteImport
-      parentRoute: typeof ApiSkillsRoute
-    }
-    '/api/skills/install': {
-      id: '/api/skills/install'
-      path: '/install'
-      fullPath: '/api/skills/install'
-      preLoaderRoute: typeof ApiSkillsInstallRouteImport
-      parentRoute: typeof ApiSkillsRoute
-    }
-    '/api/skills/hub-search': {
-      id: '/api/skills/hub-search'
-      path: '/hub-search'
-      fullPath: '/api/skills/hub-search'
-      preLoaderRoute: typeof ApiSkillsHubSearchRouteImport
-      parentRoute: typeof ApiSkillsRoute
-    }
-    '/api/sessions/send': {
-      id: '/api/sessions/send'
-      path: '/send'
-      fullPath: '/api/sessions/send'
-      preLoaderRoute: typeof ApiSessionsSendRouteImport
-      parentRoute: typeof ApiSessionsRoute
-    }
-    '/api/sessions/search': {
-      id: '/api/sessions/search'
-      path: '/search'
-      fullPath: '/api/sessions/search'
-      preLoaderRoute: typeof ApiSessionsSearchRouteImport
-      parentRoute: typeof ApiSessionsRoute
-    }
-    '/api/sessions/generate-title': {
-      id: '/api/sessions/generate-title'
-      path: '/generate-title'
-      fullPath: '/api/sessions/generate-title'
-      preLoaderRoute: typeof ApiSessionsGenerateTitleRouteImport
-      parentRoute: typeof ApiSessionsRoute
-    }
-    '/api/runs/active': {
-      id: '/api/runs/active'
-      path: '/api/runs/active'
-      fullPath: '/api/runs/active'
-      preLoaderRoute: typeof ApiRunsActiveRouteImport
+    '/api/claude-config': {
+      id: '/api/claude-config'
+      path: '/api/claude-config'
+      fullPath: '/api/claude-config'
+      preLoaderRoute: typeof ApiClaudeConfigRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/profiles/update': {
-      id: '/api/profiles/update'
-      path: '/api/profiles/update'
-      fullPath: '/api/profiles/update'
-      preLoaderRoute: typeof ApiProfilesUpdateRouteImport
+    '/api/claude-jobs': {
+      id: '/api/claude-jobs'
+      path: '/api/claude-jobs'
+      fullPath: '/api/claude-jobs'
+      preLoaderRoute: typeof ApiClaudeJobsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/profiles/toggle-skill': {
-      id: '/api/profiles/toggle-skill'
-      path: '/api/profiles/toggle-skill'
-      fullPath: '/api/profiles/toggle-skill'
-      preLoaderRoute: typeof ApiProfilesToggleSkillRouteImport
+    '/api/claude-tasks': {
+      id: '/api/claude-tasks'
+      path: '/api/claude-tasks'
+      fullPath: '/api/claude-tasks'
+      preLoaderRoute: typeof ApiClaudeTasksRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/profiles/skills': {
-      id: '/api/profiles/skills'
-      path: '/api/profiles/skills'
-      fullPath: '/api/profiles/skills'
-      preLoaderRoute: typeof ApiProfilesSkillsRouteImport
+    '/api/claude-tasks-assignees': {
+      id: '/api/claude-tasks-assignees'
+      path: '/api/claude-tasks-assignees'
+      fullPath: '/api/claude-tasks-assignees'
+      preLoaderRoute: typeof ApiClaudeTasksAssigneesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/profiles/rename': {
-      id: '/api/profiles/rename'
-      path: '/api/profiles/rename'
-      fullPath: '/api/profiles/rename'
-      preLoaderRoute: typeof ApiProfilesRenameRouteImport
+    '/api/claude-update': {
+      id: '/api/claude-update'
+      path: '/api/claude-update'
+      fullPath: '/api/claude-update'
+      preLoaderRoute: typeof ApiClaudeUpdateRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/profiles/read': {
-      id: '/api/profiles/read'
-      path: '/api/profiles/read'
-      fullPath: '/api/profiles/read'
-      preLoaderRoute: typeof ApiProfilesReadRouteImport
+    '/api/cli-agents': {
+      id: '/api/cli-agents'
+      path: '/api/cli-agents'
+      fullPath: '/api/cli-agents'
+      preLoaderRoute: typeof ApiCliAgentsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/profiles/list': {
-      id: '/api/profiles/list'
-      path: '/api/profiles/list'
-      fullPath: '/api/profiles/list'
-      preLoaderRoute: typeof ApiProfilesListRouteImport
+    '/api/commands': {
+      id: '/api/commands'
+      path: '/api/commands'
+      fullPath: '/api/commands'
+      preLoaderRoute: typeof ApiCommandsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/profiles/delete': {
-      id: '/api/profiles/delete'
-      path: '/api/profiles/delete'
-      fullPath: '/api/profiles/delete'
-      preLoaderRoute: typeof ApiProfilesDeleteRouteImport
+    '/api/conductor-spawn': {
+      id: '/api/conductor-spawn'
+      path: '/api/conductor-spawn'
+      fullPath: '/api/conductor-spawn'
+      preLoaderRoute: typeof ApiConductorSpawnRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/profiles/create': {
-      id: '/api/profiles/create'
-      path: '/api/profiles/create'
-      fullPath: '/api/profiles/create'
-      preLoaderRoute: typeof ApiProfilesCreateRouteImport
+    '/api/conductor-stop': {
+      id: '/api/conductor-stop'
+      path: '/api/conductor-stop'
+      fullPath: '/api/conductor-stop'
+      preLoaderRoute: typeof ApiConductorStopRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/profiles/activate': {
-      id: '/api/profiles/activate'
-      path: '/api/profiles/activate'
-      fullPath: '/api/profiles/activate'
-      preLoaderRoute: typeof ApiProfilesActivateRouteImport
+    '/api/config-get': {
+      id: '/api/config-get'
+      path: '/api/config-get'
+      fullPath: '/api/config-get'
+      preLoaderRoute: typeof ApiConfigGetRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/odysseus/$': {
-      id: '/api/odysseus/$'
-      path: '/api/odysseus/$'
-      fullPath: '/api/odysseus/$'
-      preLoaderRoute: typeof ApiOdysseusSplatRouteImport
+    '/api/config-patch': {
+      id: '/api/config-patch'
+      path: '/api/config-patch'
+      fullPath: '/api/config-patch'
+      preLoaderRoute: typeof ApiConfigPatchRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/oauth/poll-token': {
-      id: '/api/oauth/poll-token'
-      path: '/api/oauth/poll-token'
-      fullPath: '/api/oauth/poll-token'
-      preLoaderRoute: typeof ApiOauthPollTokenRouteImport
+    '/api/connection-settings': {
+      id: '/api/connection-settings'
+      path: '/api/connection-settings'
+      fullPath: '/api/connection-settings'
+      preLoaderRoute: typeof ApiConnectionSettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/oauth/device-code': {
-      id: '/api/oauth/device-code'
-      path: '/api/oauth/device-code'
-      fullPath: '/api/oauth/device-code'
-      preLoaderRoute: typeof ApiOauthDeviceCodeRouteImport
+    '/api/connection-status': {
+      id: '/api/connection-status'
+      path: '/api/connection-status'
+      fullPath: '/api/connection-status'
+      preLoaderRoute: typeof ApiConnectionStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/model/info': {
-      id: '/api/model/info'
-      path: '/api/model/info'
-      fullPath: '/api/model/info'
-      preLoaderRoute: typeof ApiModelInfoRouteImport
+    '/api/context-usage': {
+      id: '/api/context-usage'
+      path: '/api/context-usage'
+      fullPath: '/api/context-usage'
+      preLoaderRoute: typeof ApiContextUsageRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/memory/write': {
-      id: '/api/memory/write'
-      path: '/write'
-      fullPath: '/api/memory/write'
-      preLoaderRoute: typeof ApiMemoryWriteRouteImport
-      parentRoute: typeof ApiMemoryRoute
-    }
-    '/api/memory/search': {
-      id: '/api/memory/search'
-      path: '/search'
-      fullPath: '/api/memory/search'
-      preLoaderRoute: typeof ApiMemorySearchRouteImport
-      parentRoute: typeof ApiMemoryRoute
-    }
-    '/api/memory/read': {
-      id: '/api/memory/read'
-      path: '/read'
-      fullPath: '/api/memory/read'
-      preLoaderRoute: typeof ApiMemoryReadRouteImport
-      parentRoute: typeof ApiMemoryRoute
-    }
-    '/api/memory/list': {
-      id: '/api/memory/list'
-      path: '/list'
-      fullPath: '/api/memory/list'
-      preLoaderRoute: typeof ApiMemoryListRouteImport
-      parentRoute: typeof ApiMemoryRoute
-    }
-    '/api/mcp/test': {
-      id: '/api/mcp/test'
-      path: '/test'
-      fullPath: '/api/mcp/test'
-      preLoaderRoute: typeof ApiMcpTestRouteImport
-      parentRoute: typeof ApiMcpRoute
-    }
-    '/api/mcp/presets': {
-      id: '/api/mcp/presets'
-      path: '/presets'
-      fullPath: '/api/mcp/presets'
-      preLoaderRoute: typeof ApiMcpPresetsRouteImport
-      parentRoute: typeof ApiMcpRoute
-    }
-    '/api/mcp/hub-sources': {
-      id: '/api/mcp/hub-sources'
-      path: '/hub-sources'
-      fullPath: '/api/mcp/hub-sources'
-      preLoaderRoute: typeof ApiMcpHubSourcesRouteImport
-      parentRoute: typeof ApiMcpRoute
-    }
-    '/api/mcp/hub-search': {
-      id: '/api/mcp/hub-search'
-      path: '/hub-search'
-      fullPath: '/api/mcp/hub-search'
-      preLoaderRoute: typeof ApiMcpHubSearchRouteImport
-      parentRoute: typeof ApiMcpRoute
-    }
-    '/api/mcp/discover': {
-      id: '/api/mcp/discover'
-      path: '/discover'
-      fullPath: '/api/mcp/discover'
-      preLoaderRoute: typeof ApiMcpDiscoverRouteImport
-      parentRoute: typeof ApiMcpRoute
-    }
-    '/api/mcp/configure': {
-      id: '/api/mcp/configure'
-      path: '/configure'
-      fullPath: '/api/mcp/configure'
-      preLoaderRoute: typeof ApiMcpConfigureRouteImport
-      parentRoute: typeof ApiMcpRoute
-    }
-    '/api/mcp/$name': {
-      id: '/api/mcp/$name'
-      path: '/$name'
-      fullPath: '/api/mcp/$name'
-      preLoaderRoute: typeof ApiMcpNameRouteImport
-      parentRoute: typeof ApiMcpRoute
-    }
-    '/api/knowledge/sync': {
-      id: '/api/knowledge/sync'
-      path: '/api/knowledge/sync'
-      fullPath: '/api/knowledge/sync'
-      preLoaderRoute: typeof ApiKnowledgeSyncRouteImport
+    '/api/crew-status': {
+      id: '/api/crew-status'
+      path: '/api/crew-status'
+      fullPath: '/api/crew-status'
+      preLoaderRoute: typeof ApiCrewStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/knowledge/search': {
-      id: '/api/knowledge/search'
-      path: '/api/knowledge/search'
-      fullPath: '/api/knowledge/search'
-      preLoaderRoute: typeof ApiKnowledgeSearchRouteImport
+    '/api/debug-analyze': {
+      id: '/api/debug-analyze'
+      path: '/api/debug-analyze'
+      fullPath: '/api/debug-analyze'
+      preLoaderRoute: typeof ApiDebugAnalyzeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/knowledge/read': {
-      id: '/api/knowledge/read'
-      path: '/api/knowledge/read'
-      fullPath: '/api/knowledge/read'
-      preLoaderRoute: typeof ApiKnowledgeReadRouteImport
+    '/api/demo-trading': {
+      id: '/api/demo-trading'
+      path: '/api/demo-trading'
+      fullPath: '/api/demo-trading'
+      preLoaderRoute: typeof ApiDemoTradingRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/knowledge/list': {
-      id: '/api/knowledge/list'
-      path: '/api/knowledge/list'
-      fullPath: '/api/knowledge/list'
-      preLoaderRoute: typeof ApiKnowledgeListRouteImport
+    '/api/demo-trading-grid': {
+      id: '/api/demo-trading-grid'
+      path: '/api/demo-trading-grid'
+      fullPath: '/api/demo-trading-grid'
+      preLoaderRoute: typeof ApiDemoTradingGridRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/knowledge/graph': {
-      id: '/api/knowledge/graph'
-      path: '/api/knowledge/graph'
-      fullPath: '/api/knowledge/graph'
-      preLoaderRoute: typeof ApiKnowledgeGraphRouteImport
+    '/api/demo-trading-llm': {
+      id: '/api/demo-trading-llm'
+      path: '/api/demo-trading-llm'
+      fullPath: '/api/demo-trading-llm'
+      preLoaderRoute: typeof ApiDemoTradingLlmRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/knowledge/config': {
-      id: '/api/knowledge/config'
-      path: '/api/knowledge/config'
-      fullPath: '/api/knowledge/config'
-      preLoaderRoute: typeof ApiKnowledgeConfigRouteImport
+    '/api/demo-trading-rebalance': {
+      id: '/api/demo-trading-rebalance'
+      path: '/api/demo-trading-rebalance'
+      fullPath: '/api/demo-trading-rebalance'
+      preLoaderRoute: typeof ApiDemoTradingRebalanceRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/hindsight/status': {
-      id: '/api/hindsight/status'
-      path: '/api/hindsight/status'
-      fullPath: '/api/hindsight/status'
-      preLoaderRoute: typeof ApiHindsightStatusRouteImport
+    '/api/dify-status': {
+      id: '/api/dify-status'
+      path: '/api/dify-status'
+      fullPath: '/api/dify-status'
+      preLoaderRoute: typeof ApiDifyStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/hindsight/retain': {
-      id: '/api/hindsight/retain'
-      path: '/api/hindsight/retain'
-      fullPath: '/api/hindsight/retain'
-      preLoaderRoute: typeof ApiHindsightRetainRouteImport
+    '/api/download-apk': {
+      id: '/api/download-apk'
+      path: '/api/download-apk'
+      fullPath: '/api/download-apk'
+      preLoaderRoute: typeof ApiDownloadApkRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/hindsight/recall': {
-      id: '/api/hindsight/recall'
-      path: '/api/hindsight/recall'
-      fullPath: '/api/hindsight/recall'
-      preLoaderRoute: typeof ApiHindsightRecallRouteImport
+    '/api/env-reset': {
+      id: '/api/env-reset'
+      path: '/api/env-reset'
+      fullPath: '/api/env-reset'
+      preLoaderRoute: typeof ApiEnvResetRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/hindsight/operations': {
-      id: '/api/hindsight/operations'
-      path: '/api/hindsight/operations'
-      fullPath: '/api/hindsight/operations'
-      preLoaderRoute: typeof ApiHindsightOperationsRouteImport
+    '/api/events': {
+      id: '/api/events'
+      path: '/api/events'
+      fullPath: '/api/events'
+      preLoaderRoute: typeof ApiEventsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/hindsight/memories': {
-      id: '/api/hindsight/memories'
-      path: '/api/hindsight/memories'
-      fullPath: '/api/hindsight/memories'
-      preLoaderRoute: typeof ApiHindsightMemoriesRouteImport
+    '/api/files': {
+      id: '/api/files'
+      path: '/api/files'
+      fullPath: '/api/files'
+      preLoaderRoute: typeof ApiFilesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/hindsight/delete': {
-      id: '/api/hindsight/delete'
-      path: '/api/hindsight/delete'
-      fullPath: '/api/hindsight/delete'
-      preLoaderRoute: typeof ApiHindsightDeleteRouteImport
+    '/api/finance': {
+      id: '/api/finance'
+      path: '/api/finance'
+      fullPath: '/api/finance'
+      preLoaderRoute: typeof ApiFinanceRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/hermes-tasks/$taskId': {
-      id: '/api/hermes-tasks/$taskId'
-      path: '/$taskId'
-      fullPath: '/api/hermes-tasks/$taskId'
-      preLoaderRoute: typeof ApiHermesTasksTaskIdRouteImport
-      parentRoute: typeof ApiHermesTasksRoute
-    }
-    '/api/gateway/sessions': {
-      id: '/api/gateway/sessions'
-      path: '/api/gateway/sessions'
-      fullPath: '/api/gateway/sessions'
-      preLoaderRoute: typeof ApiGatewaySessionsRouteImport
+    '/api/finance-backup': {
+      id: '/api/finance-backup'
+      path: '/api/finance-backup'
+      fullPath: '/api/finance-backup'
+      preLoaderRoute: typeof ApiFinanceBackupRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/gateway/agents': {
-      id: '/api/gateway/agents'
-      path: '/api/gateway/agents'
-      fullPath: '/api/gateway/agents'
-      preLoaderRoute: typeof ApiGatewayAgentsRouteImport
+    '/api/finance-document': {
+      id: '/api/finance-document'
+      path: '/api/finance-document'
+      fullPath: '/api/finance-document'
+      preLoaderRoute: typeof ApiFinanceDocumentRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/finance/summary': {
-      id: '/api/finance/summary'
-      path: '/summary'
-      fullPath: '/api/finance/summary'
-      preLoaderRoute: typeof ApiFinanceSummaryRouteImport
-      parentRoute: typeof ApiFinanceRoute
-    }
-    '/api/external-memory/search': {
-      id: '/api/external-memory/search'
-      path: '/api/external-memory/search'
-      fullPath: '/api/external-memory/search'
-      preLoaderRoute: typeof ApiExternalMemorySearchRouteImport
+    '/api/finance-export': {
+      id: '/api/finance-export'
+      path: '/api/finance-export'
+      fullPath: '/api/finance-export'
+      preLoaderRoute: typeof ApiFinanceExportRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/external-memory/providers': {
-      id: '/api/external-memory/providers'
-      path: '/api/external-memory/providers'
-      fullPath: '/api/external-memory/providers'
-      preLoaderRoute: typeof ApiExternalMemoryProvidersRouteImport
+    '/api/finance-upload': {
+      id: '/api/finance-upload'
+      path: '/api/finance-upload'
+      fullPath: '/api/finance-upload'
+      preLoaderRoute: typeof ApiFinanceUploadRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/external-memory/candidates': {
-      id: '/api/external-memory/candidates'
-      path: '/api/external-memory/candidates'
-      fullPath: '/api/external-memory/candidates'
-      preLoaderRoute: typeof ApiExternalMemoryCandidatesRouteImport
+    '/api/gateway-reprobe': {
+      id: '/api/gateway-reprobe'
+      path: '/api/gateway-reprobe'
+      fullPath: '/api/gateway-reprobe'
+      preLoaderRoute: typeof ApiGatewayReprobeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/dashboard/overview': {
-      id: '/api/dashboard/overview'
-      path: '/api/dashboard/overview'
-      fullPath: '/api/dashboard/overview'
-      preLoaderRoute: typeof ApiDashboardOverviewRouteImport
+    '/api/gateway-status': {
+      id: '/api/gateway-status'
+      path: '/api/gateway-status'
+      fullPath: '/api/gateway-status'
+      preLoaderRoute: typeof ApiGatewayStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/harp-config': {
+      id: '/api/harp-config'
+      path: '/api/harp-config'
+      fullPath: '/api/harp-config'
+      preLoaderRoute: typeof ApiHarpConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/harp-observability': {
+      id: '/api/harp-observability'
+      path: '/api/harp-observability'
+      fullPath: '/api/harp-observability'
+      preLoaderRoute: typeof ApiHarpObservabilityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/harp-selector-preview': {
+      id: '/api/harp-selector-preview'
+      path: '/api/harp-selector-preview'
+      fullPath: '/api/harp-selector-preview'
+      preLoaderRoute: typeof ApiHarpSelectorPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/hermes-config': {
+      id: '/api/hermes-config'
+      path: '/api/hermes-config'
+      fullPath: '/api/hermes-config'
+      preLoaderRoute: typeof ApiHermesConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/hermes-tasks': {
+      id: '/api/hermes-tasks'
+      path: '/api/hermes-tasks'
+      fullPath: '/api/hermes-tasks'
+      preLoaderRoute: typeof ApiHermesTasksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/hermes-tasks-assignees': {
+      id: '/api/hermes-tasks-assignees'
+      path: '/api/hermes-tasks-assignees'
+      fullPath: '/api/hermes-tasks-assignees'
+      preLoaderRoute: typeof ApiHermesTasksAssigneesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/history': {
+      id: '/api/history'
+      path: '/api/history'
+      fullPath: '/api/history'
+      preLoaderRoute: typeof ApiHistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/integrations': {
+      id: '/api/integrations'
+      path: '/api/integrations'
+      fullPath: '/api/integrations'
+      preLoaderRoute: typeof ApiIntegrationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/local-providers': {
+      id: '/api/local-providers'
+      path: '/api/local-providers'
+      fullPath: '/api/local-providers'
+      preLoaderRoute: typeof ApiLocalProvidersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/mcp': {
+      id: '/api/mcp'
+      path: '/api/mcp'
+      fullPath: '/api/mcp'
+      preLoaderRoute: typeof ApiMcpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/media': {
+      id: '/api/media'
+      path: '/api/media'
+      fullPath: '/api/media'
+      preLoaderRoute: typeof ApiMediaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/memory': {
+      id: '/api/memory'
+      path: '/api/memory'
+      fullPath: '/api/memory'
+      preLoaderRoute: typeof ApiMemoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/model-switch': {
+      id: '/api/model-switch'
+      path: '/api/model-switch'
+      fullPath: '/api/model-switch'
+      preLoaderRoute: typeof ApiModelSwitchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/models': {
+      id: '/api/models'
+      path: '/api/models'
+      fullPath: '/api/models'
+      preLoaderRoute: typeof ApiModelsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/odysseus-bootstrap': {
+      id: '/api/odysseus-bootstrap'
+      path: '/api/odysseus-bootstrap'
+      fullPath: '/api/odysseus-bootstrap'
+      preLoaderRoute: typeof ApiOdysseusBootstrapRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/openrouter-credits': {
+      id: '/api/openrouter-credits'
+      path: '/api/openrouter-credits'
+      fullPath: '/api/openrouter-credits'
+      preLoaderRoute: typeof ApiOpenrouterCreditsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ops-observability': {
+      id: '/api/ops-observability'
+      path: '/api/ops-observability'
+      fullPath: '/api/ops-observability'
+      preLoaderRoute: typeof ApiOpsObservabilityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/orchestrate': {
+      id: '/api/orchestrate'
+      path: '/api/orchestrate'
+      fullPath: '/api/orchestrate'
+      preLoaderRoute: typeof ApiOrchestrateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/paths': {
+      id: '/api/paths'
+      path: '/api/paths'
+      fullPath: '/api/paths'
+      preLoaderRoute: typeof ApiPathsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/personality-swarm': {
+      id: '/api/personality-swarm'
+      path: '/api/personality-swarm'
+      fullPath: '/api/personality-swarm'
+      preLoaderRoute: typeof ApiPersonalitySwarmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ping': {
+      id: '/api/ping'
+      path: '/api/ping'
+      fullPath: '/api/ping'
+      preLoaderRoute: typeof ApiPingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/plugins': {
+      id: '/api/plugins'
+      path: '/api/plugins'
+      fullPath: '/api/plugins'
+      preLoaderRoute: typeof ApiPluginsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/preview-file': {
+      id: '/api/preview-file'
+      path: '/api/preview-file'
+      fullPath: '/api/preview-file'
+      preLoaderRoute: typeof ApiPreviewFileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/provider-usage': {
+      id: '/api/provider-usage'
+      path: '/api/provider-usage'
+      fullPath: '/api/provider-usage'
+      preLoaderRoute: typeof ApiProviderUsageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/risk-check': {
+      id: '/api/risk-check'
+      path: '/api/risk-check'
+      fullPath: '/api/risk-check'
+      preLoaderRoute: typeof ApiRiskCheckRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/route-sister': {
+      id: '/api/route-sister'
+      path: '/api/route-sister'
+      fullPath: '/api/route-sister'
+      preLoaderRoute: typeof ApiRouteSisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/send': {
+      id: '/api/send'
+      path: '/api/send'
+      fullPath: '/api/send'
+      preLoaderRoute: typeof ApiSendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/send-stream': {
+      id: '/api/send-stream'
+      path: '/api/send-stream'
+      fullPath: '/api/send-stream'
+      preLoaderRoute: typeof ApiSendStreamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/session-history': {
+      id: '/api/session-history'
+      path: '/api/session-history'
+      fullPath: '/api/session-history'
+      preLoaderRoute: typeof ApiSessionHistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/session-send': {
+      id: '/api/session-send'
+      path: '/api/session-send'
+      fullPath: '/api/session-send'
+      preLoaderRoute: typeof ApiSessionSendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/session-status': {
+      id: '/api/session-status'
+      path: '/api/session-status'
+      fullPath: '/api/session-status'
+      preLoaderRoute: typeof ApiSessionStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/sessions': {
+      id: '/api/sessions'
+      path: '/api/sessions'
+      fullPath: '/api/sessions'
+      preLoaderRoute: typeof ApiSessionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/sisters': {
+      id: '/api/sisters'
+      path: '/api/sisters'
+      fullPath: '/api/sisters'
+      preLoaderRoute: typeof ApiSistersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/sisters-bootstrap': {
+      id: '/api/sisters-bootstrap'
+      path: '/api/sisters-bootstrap'
+      fullPath: '/api/sisters-bootstrap'
+      preLoaderRoute: typeof ApiSistersBootstrapRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/sisters-growth': {
+      id: '/api/sisters-growth'
+      path: '/api/sisters-growth'
+      fullPath: '/api/sisters-growth'
+      preLoaderRoute: typeof ApiSistersGrowthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/sisters-improve': {
+      id: '/api/sisters-improve'
+      path: '/api/sisters-improve'
+      fullPath: '/api/sisters-improve'
+      preLoaderRoute: typeof ApiSistersImproveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/skills': {
+      id: '/api/skills'
+      path: '/api/skills'
+      fullPath: '/api/skills'
+      preLoaderRoute: typeof ApiSkillsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/start-agent': {
+      id: '/api/start-agent'
+      path: '/api/start-agent'
+      fullPath: '/api/start-agent'
+      preLoaderRoute: typeof ApiStartAgentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/start-claude': {
+      id: '/api/start-claude'
+      path: '/api/start-claude'
+      fullPath: '/api/start-claude'
+      preLoaderRoute: typeof ApiStartClaudeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-chat': {
+      id: '/api/swarm-chat'
+      path: '/api/swarm-chat'
+      fullPath: '/api/swarm-chat'
+      preLoaderRoute: typeof ApiSwarmChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-checkpoint': {
+      id: '/api/swarm-checkpoint'
+      path: '/api/swarm-checkpoint'
+      fullPath: '/api/swarm-checkpoint'
+      preLoaderRoute: typeof ApiSwarmCheckpointRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-decompose': {
+      id: '/api/swarm-decompose'
+      path: '/api/swarm-decompose'
+      fullPath: '/api/swarm-decompose'
+      preLoaderRoute: typeof ApiSwarmDecomposeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-direct-chat': {
+      id: '/api/swarm-direct-chat'
+      path: '/api/swarm-direct-chat'
+      fullPath: '/api/swarm-direct-chat'
+      preLoaderRoute: typeof ApiSwarmDirectChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-dispatch': {
+      id: '/api/swarm-dispatch'
+      path: '/api/swarm-dispatch'
+      fullPath: '/api/swarm-dispatch'
+      preLoaderRoute: typeof ApiSwarmDispatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-environment': {
+      id: '/api/swarm-environment'
+      path: '/api/swarm-environment'
+      fullPath: '/api/swarm-environment'
+      preLoaderRoute: typeof ApiSwarmEnvironmentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-health': {
+      id: '/api/swarm-health'
+      path: '/api/swarm-health'
+      fullPath: '/api/swarm-health'
+      preLoaderRoute: typeof ApiSwarmHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-kanban': {
+      id: '/api/swarm-kanban'
+      path: '/api/swarm-kanban'
+      fullPath: '/api/swarm-kanban'
+      preLoaderRoute: typeof ApiSwarmKanbanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-lifecycle': {
+      id: '/api/swarm-lifecycle'
+      path: '/api/swarm-lifecycle'
+      fullPath: '/api/swarm-lifecycle'
+      preLoaderRoute: typeof ApiSwarmLifecycleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-memory': {
+      id: '/api/swarm-memory'
+      path: '/api/swarm-memory'
+      fullPath: '/api/swarm-memory'
+      preLoaderRoute: typeof ApiSwarmMemoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-missions': {
+      id: '/api/swarm-missions'
+      path: '/api/swarm-missions'
+      fullPath: '/api/swarm-missions'
+      preLoaderRoute: typeof ApiSwarmMissionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-orchestrator-loop': {
+      id: '/api/swarm-orchestrator-loop'
+      path: '/api/swarm-orchestrator-loop'
+      fullPath: '/api/swarm-orchestrator-loop'
+      preLoaderRoute: typeof ApiSwarmOrchestratorLoopRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-project': {
+      id: '/api/swarm-project'
+      path: '/api/swarm-project'
+      fullPath: '/api/swarm-project'
+      preLoaderRoute: typeof ApiSwarmProjectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-reports': {
+      id: '/api/swarm-reports'
+      path: '/api/swarm-reports'
+      fullPath: '/api/swarm-reports'
+      preLoaderRoute: typeof ApiSwarmReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-roster': {
+      id: '/api/swarm-roster'
+      path: '/api/swarm-roster'
+      fullPath: '/api/swarm-roster'
+      preLoaderRoute: typeof ApiSwarmRosterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-runtime': {
+      id: '/api/swarm-runtime'
+      path: '/api/swarm-runtime'
+      fullPath: '/api/swarm-runtime'
+      preLoaderRoute: typeof ApiSwarmRuntimeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-tmux-scroll': {
+      id: '/api/swarm-tmux-scroll'
+      path: '/api/swarm-tmux-scroll'
+      fullPath: '/api/swarm-tmux-scroll'
+      preLoaderRoute: typeof ApiSwarmTmuxScrollRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-tmux-start': {
+      id: '/api/swarm-tmux-start'
+      path: '/api/swarm-tmux-start'
+      fullPath: '/api/swarm-tmux-start'
+      preLoaderRoute: typeof ApiSwarmTmuxStartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/swarm-tmux-stop': {
+      id: '/api/swarm-tmux-stop'
+      path: '/api/swarm-tmux-stop'
+      fullPath: '/api/swarm-tmux-stop'
+      preLoaderRoute: typeof ApiSwarmTmuxStopRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/system-metrics': {
+      id: '/api/system-metrics'
+      path: '/api/system-metrics'
+      fullPath: '/api/system-metrics'
+      preLoaderRoute: typeof ApiSystemMetricsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks': {
+      id: '/api/tasks'
+      path: '/api/tasks'
+      fullPath: '/api/tasks'
+      preLoaderRoute: typeof ApiTasksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-ask-astra': {
+      id: '/api/tasks-ask-astra'
+      path: '/api/tasks-ask-astra'
+      fullPath: '/api/tasks-ask-astra'
+      preLoaderRoute: typeof ApiTasksAskAstraRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-astra-review': {
+      id: '/api/tasks-astra-review'
+      path: '/api/tasks-astra-review'
+      fullPath: '/api/tasks-astra-review'
+      preLoaderRoute: typeof ApiTasksAstraReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-batch-execute': {
+      id: '/api/tasks-batch-execute'
+      path: '/api/tasks-batch-execute'
+      fullPath: '/api/tasks-batch-execute'
+      preLoaderRoute: typeof ApiTasksBatchExecuteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-blockers': {
+      id: '/api/tasks-blockers'
+      path: '/api/tasks-blockers'
+      fullPath: '/api/tasks-blockers'
+      preLoaderRoute: typeof ApiTasksBlockersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-clarify-nudge': {
+      id: '/api/tasks-clarify-nudge'
+      path: '/api/tasks-clarify-nudge'
+      fullPath: '/api/tasks-clarify-nudge'
+      preLoaderRoute: typeof ApiTasksClarifyNudgeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-completion-check': {
+      id: '/api/tasks-completion-check'
+      path: '/api/tasks-completion-check'
+      fullPath: '/api/tasks-completion-check'
+      preLoaderRoute: typeof ApiTasksCompletionCheckRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-completion-trend': {
+      id: '/api/tasks-completion-trend'
+      path: '/api/tasks-completion-trend'
+      fullPath: '/api/tasks-completion-trend'
+      preLoaderRoute: typeof ApiTasksCompletionTrendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-create-from-tg': {
+      id: '/api/tasks-create-from-tg'
+      path: '/api/tasks-create-from-tg'
+      fullPath: '/api/tasks-create-from-tg'
+      preLoaderRoute: typeof ApiTasksCreateFromTgRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-deploy-agents': {
+      id: '/api/tasks-deploy-agents'
+      path: '/api/tasks-deploy-agents'
+      fullPath: '/api/tasks-deploy-agents'
+      preLoaderRoute: typeof ApiTasksDeployAgentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-drain-now': {
+      id: '/api/tasks-drain-now'
+      path: '/api/tasks-drain-now'
+      fullPath: '/api/tasks-drain-now'
+      preLoaderRoute: typeof ApiTasksDrainNowRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-exec-log': {
+      id: '/api/tasks-exec-log'
+      path: '/api/tasks-exec-log'
+      fullPath: '/api/tasks-exec-log'
+      preLoaderRoute: typeof ApiTasksExecLogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-from-text': {
+      id: '/api/tasks-from-text'
+      path: '/api/tasks-from-text'
+      fullPath: '/api/tasks-from-text'
+      preLoaderRoute: typeof ApiTasksFromTextRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-generate-ideas': {
+      id: '/api/tasks-generate-ideas'
+      path: '/api/tasks-generate-ideas'
+      fullPath: '/api/tasks-generate-ideas'
+      preLoaderRoute: typeof ApiTasksGenerateIdeasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-inject-ideas': {
+      id: '/api/tasks-inject-ideas'
+      path: '/api/tasks-inject-ideas'
+      fullPath: '/api/tasks-inject-ideas'
+      preLoaderRoute: typeof ApiTasksInjectIdeasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-progress-ping': {
+      id: '/api/tasks-progress-ping'
+      path: '/api/tasks-progress-ping'
+      fullPath: '/api/tasks-progress-ping'
+      preLoaderRoute: typeof ApiTasksProgressPingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-prune': {
+      id: '/api/tasks-prune'
+      path: '/api/tasks-prune'
+      fullPath: '/api/tasks-prune'
+      preLoaderRoute: typeof ApiTasksPruneRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-replan-stubs': {
+      id: '/api/tasks-replan-stubs'
+      path: '/api/tasks-replan-stubs'
+      fullPath: '/api/tasks-replan-stubs'
+      preLoaderRoute: typeof ApiTasksReplanStubsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-rescue-timedout': {
+      id: '/api/tasks-rescue-timedout'
+      path: '/api/tasks-rescue-timedout'
+      fullPath: '/api/tasks-rescue-timedout'
+      preLoaderRoute: typeof ApiTasksRescueTimedoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-stale': {
+      id: '/api/tasks-stale'
+      path: '/api/tasks-stale'
+      fullPath: '/api/tasks-stale'
+      preLoaderRoute: typeof ApiTasksStaleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-sweep-stats': {
+      id: '/api/tasks-sweep-stats'
+      path: '/api/tasks-sweep-stats'
+      fullPath: '/api/tasks-sweep-stats'
+      preLoaderRoute: typeof ApiTasksSweepStatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tasks-unlock-prereq': {
+      id: '/api/tasks-unlock-prereq'
+      path: '/api/tasks-unlock-prereq'
+      fullPath: '/api/tasks-unlock-prereq'
+      preLoaderRoute: typeof ApiTasksUnlockPrereqRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/telegram-board': {
+      id: '/api/telegram-board'
+      path: '/api/telegram-board'
+      fullPath: '/api/telegram-board'
+      preLoaderRoute: typeof ApiTelegramBoardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/telegram-board-summary': {
+      id: '/api/telegram-board-summary'
+      path: '/api/telegram-board-summary'
+      fullPath: '/api/telegram-board-summary'
+      preLoaderRoute: typeof ApiTelegramBoardSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/telegram-find': {
+      id: '/api/telegram-find'
+      path: '/api/telegram-find'
+      fullPath: '/api/telegram-find'
+      preLoaderRoute: typeof ApiTelegramFindRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/telegram-task-clarify': {
+      id: '/api/telegram-task-clarify'
+      path: '/api/telegram-task-clarify'
+      fullPath: '/api/telegram-task-clarify'
+      preLoaderRoute: typeof ApiTelegramTaskClarifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/terminal-close': {
+      id: '/api/terminal-close'
+      path: '/api/terminal-close'
+      fullPath: '/api/terminal-close'
+      preLoaderRoute: typeof ApiTerminalCloseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/terminal-input': {
+      id: '/api/terminal-input'
+      path: '/api/terminal-input'
+      fullPath: '/api/terminal-input'
+      preLoaderRoute: typeof ApiTerminalInputRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/terminal-resize': {
+      id: '/api/terminal-resize'
+      path: '/api/terminal-resize'
+      fullPath: '/api/terminal-resize'
+      preLoaderRoute: typeof ApiTerminalResizeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/terminal-stream': {
+      id: '/api/terminal-stream'
+      path: '/api/terminal-stream'
+      fullPath: '/api/terminal-stream'
+      preLoaderRoute: typeof ApiTerminalStreamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/transcribe': {
+      id: '/api/transcribe'
+      path: '/api/transcribe'
+      fullPath: '/api/transcribe'
+      preLoaderRoute: typeof ApiTranscribeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/user-profile': {
+      id: '/api/user-profile'
+      path: '/api/user-profile'
+      fullPath: '/api/user-profile'
+      preLoaderRoute: typeof ApiUserProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/user-settings': {
+      id: '/api/user-settings'
+      path: '/api/user-settings'
+      fullPath: '/api/user-settings'
+      preLoaderRoute: typeof ApiUserSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/validate-provider': {
+      id: '/api/validate-provider'
+      path: '/api/validate-provider'
+      fullPath: '/api/validate-provider'
+      preLoaderRoute: typeof ApiValidateProviderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/workflow-templates': {
+      id: '/api/workflow-templates'
+      path: '/api/workflow-templates'
+      fullPath: '/api/workflow-templates'
+      preLoaderRoute: typeof ApiWorkflowTemplatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/workspace': {
+      id: '/api/workspace'
+      path: '/api/workspace'
+      fullPath: '/api/workspace'
+      preLoaderRoute: typeof ApiWorkspaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/workspace-session-health': {
+      id: '/api/workspace-session-health'
+      path: '/api/workspace-session-health'
+      fullPath: '/api/workspace-session-health'
+      preLoaderRoute: typeof ApiWorkspaceSessionHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/workspace-version': {
+      id: '/api/workspace-version'
+      path: '/api/workspace-version'
+      fullPath: '/api/workspace-version'
+      preLoaderRoute: typeof ApiWorkspaceVersionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chat/': {
+      id: '/chat/'
+      path: '/chat'
+      fullPath: '/chat/'
+      preLoaderRoute: typeof ChatIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chat/$sessionKey': {
+      id: '/chat/$sessionKey'
+      path: '/chat/$sessionKey'
+      fullPath: '/chat/$sessionKey'
+      preLoaderRoute: typeof ChatSessionKeyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/': {
+      id: '/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof SettingsIndexRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/providers': {
+      id: '/settings/providers'
+      path: '/providers'
+      fullPath: '/settings/providers'
+      preLoaderRoute: typeof SettingsProvidersRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/api/artifacts/$artifactId': {
+      id: '/api/artifacts/$artifactId'
+      path: '/$artifactId'
+      fullPath: '/api/artifacts/$artifactId'
+      preLoaderRoute: typeof ApiArtifactsArtifactIdRouteImport
+      parentRoute: typeof ApiArtifactsRoute
+    }
+    '/api/auth/gmail-connect': {
+      id: '/api/auth/gmail-connect'
+      path: '/gmail-connect'
+      fullPath: '/api/auth/gmail-connect'
+      preLoaderRoute: typeof ApiAuthGmailConnectRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/auth/google': {
+      id: '/api/auth/google'
+      path: '/google'
+      fullPath: '/api/auth/google'
+      preLoaderRoute: typeof ApiAuthGoogleRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/claude-jobs/$jobId': {
+      id: '/api/claude-jobs/$jobId'
+      path: '/$jobId'
+      fullPath: '/api/claude-jobs/$jobId'
+      preLoaderRoute: typeof ApiClaudeJobsJobIdRouteImport
+      parentRoute: typeof ApiClaudeJobsRoute
+    }
+    '/api/claude-proxy/$': {
+      id: '/api/claude-proxy/$'
+      path: '/api/claude-proxy/$'
+      fullPath: '/api/claude-proxy/$'
+      preLoaderRoute: typeof ApiClaudeProxySplatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/claude-tasks/$taskId': {
@@ -4902,82 +4482,460 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiClaudeTasksTaskIdRouteImport
       parentRoute: typeof ApiClaudeTasksRoute
     }
-    '/api/claude-proxy/$': {
-      id: '/api/claude-proxy/$'
-      path: '/api/claude-proxy/$'
-      fullPath: '/api/claude-proxy/$'
-      preLoaderRoute: typeof ApiClaudeProxySplatRouteImport
+    '/api/dashboard/overview': {
+      id: '/api/dashboard/overview'
+      path: '/api/dashboard/overview'
+      fullPath: '/api/dashboard/overview'
+      preLoaderRoute: typeof ApiDashboardOverviewRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/claude-jobs/$jobId': {
-      id: '/api/claude-jobs/$jobId'
-      path: '/$jobId'
-      fullPath: '/api/claude-jobs/$jobId'
-      preLoaderRoute: typeof ApiClaudeJobsJobIdRouteImport
-      parentRoute: typeof ApiClaudeJobsRoute
+    '/api/external-memory/candidates': {
+      id: '/api/external-memory/candidates'
+      path: '/api/external-memory/candidates'
+      fullPath: '/api/external-memory/candidates'
+      preLoaderRoute: typeof ApiExternalMemoryCandidatesRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/api/auth/google': {
-      id: '/api/auth/google'
-      path: '/google'
-      fullPath: '/api/auth/google'
-      preLoaderRoute: typeof ApiAuthGoogleRouteImport
-      parentRoute: typeof ApiAuthRoute
+    '/api/external-memory/providers': {
+      id: '/api/external-memory/providers'
+      path: '/api/external-memory/providers'
+      fullPath: '/api/external-memory/providers'
+      preLoaderRoute: typeof ApiExternalMemoryProvidersRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/api/auth/gmail-connect': {
-      id: '/api/auth/gmail-connect'
-      path: '/gmail-connect'
-      fullPath: '/api/auth/gmail-connect'
-      preLoaderRoute: typeof ApiAuthGmailConnectRouteImport
-      parentRoute: typeof ApiAuthRoute
+    '/api/external-memory/search': {
+      id: '/api/external-memory/search'
+      path: '/api/external-memory/search'
+      fullPath: '/api/external-memory/search'
+      preLoaderRoute: typeof ApiExternalMemorySearchRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/api/artifacts/$artifactId': {
-      id: '/api/artifacts/$artifactId'
-      path: '/$artifactId'
-      fullPath: '/api/artifacts/$artifactId'
-      preLoaderRoute: typeof ApiArtifactsArtifactIdRouteImport
-      parentRoute: typeof ApiArtifactsRoute
-    }
-    '/api/sessions/$sessionKey/status': {
-      id: '/api/sessions/$sessionKey/status'
-      path: '/$sessionKey/status'
-      fullPath: '/api/sessions/$sessionKey/status'
-      preLoaderRoute: typeof ApiSessionsSessionKeyStatusRouteImport
-      parentRoute: typeof ApiSessionsRoute
-    }
-    '/api/sessions/$sessionKey/active-run': {
-      id: '/api/sessions/$sessionKey/active-run'
-      path: '/$sessionKey/active-run'
-      fullPath: '/api/sessions/$sessionKey/active-run'
-      preLoaderRoute: typeof ApiSessionsSessionKeyActiveRunRouteImport
-      parentRoute: typeof ApiSessionsRoute
-    }
-    '/api/mcp/hub-sources/$id': {
-      id: '/api/mcp/hub-sources/$id'
-      path: '/$id'
-      fullPath: '/api/mcp/hub-sources/$id'
-      preLoaderRoute: typeof ApiMcpHubSourcesIdRouteImport
-      parentRoute: typeof ApiMcpHubSourcesRoute
-    }
-    '/api/mcp/$name/logs': {
-      id: '/api/mcp/$name/logs'
-      path: '/logs'
-      fullPath: '/api/mcp/$name/logs'
-      preLoaderRoute: typeof ApiMcpNameLogsRouteImport
-      parentRoute: typeof ApiMcpNameRoute
-    }
-    '/api/finance/report/income': {
-      id: '/api/finance/report/income'
-      path: '/report/income'
-      fullPath: '/api/finance/report/income'
-      preLoaderRoute: typeof ApiFinanceReportIncomeRouteImport
+    '/api/finance/summary': {
+      id: '/api/finance/summary'
+      path: '/summary'
+      fullPath: '/api/finance/summary'
+      preLoaderRoute: typeof ApiFinanceSummaryRouteImport
       parentRoute: typeof ApiFinanceRoute
     }
-    '/api/finance/report/expense': {
-      id: '/api/finance/report/expense'
-      path: '/report/expense'
-      fullPath: '/api/finance/report/expense'
-      preLoaderRoute: typeof ApiFinanceReportExpenseRouteImport
-      parentRoute: typeof ApiFinanceRoute
+    '/api/gateway/agents': {
+      id: '/api/gateway/agents'
+      path: '/api/gateway/agents'
+      fullPath: '/api/gateway/agents'
+      preLoaderRoute: typeof ApiGatewayAgentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/gateway/sessions': {
+      id: '/api/gateway/sessions'
+      path: '/api/gateway/sessions'
+      fullPath: '/api/gateway/sessions'
+      preLoaderRoute: typeof ApiGatewaySessionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/hermes-tasks/$taskId': {
+      id: '/api/hermes-tasks/$taskId'
+      path: '/$taskId'
+      fullPath: '/api/hermes-tasks/$taskId'
+      preLoaderRoute: typeof ApiHermesTasksTaskIdRouteImport
+      parentRoute: typeof ApiHermesTasksRoute
+    }
+    '/api/hindsight/delete': {
+      id: '/api/hindsight/delete'
+      path: '/api/hindsight/delete'
+      fullPath: '/api/hindsight/delete'
+      preLoaderRoute: typeof ApiHindsightDeleteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/hindsight/memories': {
+      id: '/api/hindsight/memories'
+      path: '/api/hindsight/memories'
+      fullPath: '/api/hindsight/memories'
+      preLoaderRoute: typeof ApiHindsightMemoriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/hindsight/operations': {
+      id: '/api/hindsight/operations'
+      path: '/api/hindsight/operations'
+      fullPath: '/api/hindsight/operations'
+      preLoaderRoute: typeof ApiHindsightOperationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/hindsight/recall': {
+      id: '/api/hindsight/recall'
+      path: '/api/hindsight/recall'
+      fullPath: '/api/hindsight/recall'
+      preLoaderRoute: typeof ApiHindsightRecallRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/hindsight/retain': {
+      id: '/api/hindsight/retain'
+      path: '/api/hindsight/retain'
+      fullPath: '/api/hindsight/retain'
+      preLoaderRoute: typeof ApiHindsightRetainRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/hindsight/status': {
+      id: '/api/hindsight/status'
+      path: '/api/hindsight/status'
+      fullPath: '/api/hindsight/status'
+      preLoaderRoute: typeof ApiHindsightStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/knowledge/config': {
+      id: '/api/knowledge/config'
+      path: '/api/knowledge/config'
+      fullPath: '/api/knowledge/config'
+      preLoaderRoute: typeof ApiKnowledgeConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/knowledge/graph': {
+      id: '/api/knowledge/graph'
+      path: '/api/knowledge/graph'
+      fullPath: '/api/knowledge/graph'
+      preLoaderRoute: typeof ApiKnowledgeGraphRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/knowledge/list': {
+      id: '/api/knowledge/list'
+      path: '/api/knowledge/list'
+      fullPath: '/api/knowledge/list'
+      preLoaderRoute: typeof ApiKnowledgeListRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/knowledge/read': {
+      id: '/api/knowledge/read'
+      path: '/api/knowledge/read'
+      fullPath: '/api/knowledge/read'
+      preLoaderRoute: typeof ApiKnowledgeReadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/knowledge/search': {
+      id: '/api/knowledge/search'
+      path: '/api/knowledge/search'
+      fullPath: '/api/knowledge/search'
+      preLoaderRoute: typeof ApiKnowledgeSearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/knowledge/sync': {
+      id: '/api/knowledge/sync'
+      path: '/api/knowledge/sync'
+      fullPath: '/api/knowledge/sync'
+      preLoaderRoute: typeof ApiKnowledgeSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/mcp/$name': {
+      id: '/api/mcp/$name'
+      path: '/$name'
+      fullPath: '/api/mcp/$name'
+      preLoaderRoute: typeof ApiMcpNameRouteImport
+      parentRoute: typeof ApiMcpRoute
+    }
+    '/api/mcp/configure': {
+      id: '/api/mcp/configure'
+      path: '/configure'
+      fullPath: '/api/mcp/configure'
+      preLoaderRoute: typeof ApiMcpConfigureRouteImport
+      parentRoute: typeof ApiMcpRoute
+    }
+    '/api/mcp/discover': {
+      id: '/api/mcp/discover'
+      path: '/discover'
+      fullPath: '/api/mcp/discover'
+      preLoaderRoute: typeof ApiMcpDiscoverRouteImport
+      parentRoute: typeof ApiMcpRoute
+    }
+    '/api/mcp/hub-search': {
+      id: '/api/mcp/hub-search'
+      path: '/hub-search'
+      fullPath: '/api/mcp/hub-search'
+      preLoaderRoute: typeof ApiMcpHubSearchRouteImport
+      parentRoute: typeof ApiMcpRoute
+    }
+    '/api/mcp/hub-sources': {
+      id: '/api/mcp/hub-sources'
+      path: '/hub-sources'
+      fullPath: '/api/mcp/hub-sources'
+      preLoaderRoute: typeof ApiMcpHubSourcesRouteImport
+      parentRoute: typeof ApiMcpRoute
+    }
+    '/api/mcp/presets': {
+      id: '/api/mcp/presets'
+      path: '/presets'
+      fullPath: '/api/mcp/presets'
+      preLoaderRoute: typeof ApiMcpPresetsRouteImport
+      parentRoute: typeof ApiMcpRoute
+    }
+    '/api/mcp/test': {
+      id: '/api/mcp/test'
+      path: '/test'
+      fullPath: '/api/mcp/test'
+      preLoaderRoute: typeof ApiMcpTestRouteImport
+      parentRoute: typeof ApiMcpRoute
+    }
+    '/api/memory/list': {
+      id: '/api/memory/list'
+      path: '/list'
+      fullPath: '/api/memory/list'
+      preLoaderRoute: typeof ApiMemoryListRouteImport
+      parentRoute: typeof ApiMemoryRoute
+    }
+    '/api/memory/read': {
+      id: '/api/memory/read'
+      path: '/read'
+      fullPath: '/api/memory/read'
+      preLoaderRoute: typeof ApiMemoryReadRouteImport
+      parentRoute: typeof ApiMemoryRoute
+    }
+    '/api/memory/search': {
+      id: '/api/memory/search'
+      path: '/search'
+      fullPath: '/api/memory/search'
+      preLoaderRoute: typeof ApiMemorySearchRouteImport
+      parentRoute: typeof ApiMemoryRoute
+    }
+    '/api/memory/write': {
+      id: '/api/memory/write'
+      path: '/write'
+      fullPath: '/api/memory/write'
+      preLoaderRoute: typeof ApiMemoryWriteRouteImport
+      parentRoute: typeof ApiMemoryRoute
+    }
+    '/api/model/info': {
+      id: '/api/model/info'
+      path: '/api/model/info'
+      fullPath: '/api/model/info'
+      preLoaderRoute: typeof ApiModelInfoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/oauth/device-code': {
+      id: '/api/oauth/device-code'
+      path: '/api/oauth/device-code'
+      fullPath: '/api/oauth/device-code'
+      preLoaderRoute: typeof ApiOauthDeviceCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/oauth/poll-token': {
+      id: '/api/oauth/poll-token'
+      path: '/api/oauth/poll-token'
+      fullPath: '/api/oauth/poll-token'
+      preLoaderRoute: typeof ApiOauthPollTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/odysseus/$': {
+      id: '/api/odysseus/$'
+      path: '/api/odysseus/$'
+      fullPath: '/api/odysseus/$'
+      preLoaderRoute: typeof ApiOdysseusSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/profiles/activate': {
+      id: '/api/profiles/activate'
+      path: '/api/profiles/activate'
+      fullPath: '/api/profiles/activate'
+      preLoaderRoute: typeof ApiProfilesActivateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/profiles/create': {
+      id: '/api/profiles/create'
+      path: '/api/profiles/create'
+      fullPath: '/api/profiles/create'
+      preLoaderRoute: typeof ApiProfilesCreateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/profiles/delete': {
+      id: '/api/profiles/delete'
+      path: '/api/profiles/delete'
+      fullPath: '/api/profiles/delete'
+      preLoaderRoute: typeof ApiProfilesDeleteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/profiles/list': {
+      id: '/api/profiles/list'
+      path: '/api/profiles/list'
+      fullPath: '/api/profiles/list'
+      preLoaderRoute: typeof ApiProfilesListRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/profiles/read': {
+      id: '/api/profiles/read'
+      path: '/api/profiles/read'
+      fullPath: '/api/profiles/read'
+      preLoaderRoute: typeof ApiProfilesReadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/profiles/rename': {
+      id: '/api/profiles/rename'
+      path: '/api/profiles/rename'
+      fullPath: '/api/profiles/rename'
+      preLoaderRoute: typeof ApiProfilesRenameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/profiles/skills': {
+      id: '/api/profiles/skills'
+      path: '/api/profiles/skills'
+      fullPath: '/api/profiles/skills'
+      preLoaderRoute: typeof ApiProfilesSkillsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/profiles/toggle-skill': {
+      id: '/api/profiles/toggle-skill'
+      path: '/api/profiles/toggle-skill'
+      fullPath: '/api/profiles/toggle-skill'
+      preLoaderRoute: typeof ApiProfilesToggleSkillRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/profiles/update': {
+      id: '/api/profiles/update'
+      path: '/api/profiles/update'
+      fullPath: '/api/profiles/update'
+      preLoaderRoute: typeof ApiProfilesUpdateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/runs/active': {
+      id: '/api/runs/active'
+      path: '/api/runs/active'
+      fullPath: '/api/runs/active'
+      preLoaderRoute: typeof ApiRunsActiveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/sessions/generate-title': {
+      id: '/api/sessions/generate-title'
+      path: '/generate-title'
+      fullPath: '/api/sessions/generate-title'
+      preLoaderRoute: typeof ApiSessionsGenerateTitleRouteImport
+      parentRoute: typeof ApiSessionsRoute
+    }
+    '/api/sessions/search': {
+      id: '/api/sessions/search'
+      path: '/search'
+      fullPath: '/api/sessions/search'
+      preLoaderRoute: typeof ApiSessionsSearchRouteImport
+      parentRoute: typeof ApiSessionsRoute
+    }
+    '/api/sessions/send': {
+      id: '/api/sessions/send'
+      path: '/send'
+      fullPath: '/api/sessions/send'
+      preLoaderRoute: typeof ApiSessionsSendRouteImport
+      parentRoute: typeof ApiSessionsRoute
+    }
+    '/api/skills/hub-search': {
+      id: '/api/skills/hub-search'
+      path: '/hub-search'
+      fullPath: '/api/skills/hub-search'
+      preLoaderRoute: typeof ApiSkillsHubSearchRouteImport
+      parentRoute: typeof ApiSkillsRoute
+    }
+    '/api/skills/install': {
+      id: '/api/skills/install'
+      path: '/install'
+      fullPath: '/api/skills/install'
+      preLoaderRoute: typeof ApiSkillsInstallRouteImport
+      parentRoute: typeof ApiSkillsRoute
+    }
+    '/api/skills/toggle': {
+      id: '/api/skills/toggle'
+      path: '/toggle'
+      fullPath: '/api/skills/toggle'
+      preLoaderRoute: typeof ApiSkillsToggleRouteImport
+      parentRoute: typeof ApiSkillsRoute
+    }
+    '/api/skills/uninstall': {
+      id: '/api/skills/uninstall'
+      path: '/uninstall'
+      fullPath: '/api/skills/uninstall'
+      preLoaderRoute: typeof ApiSkillsUninstallRouteImport
+      parentRoute: typeof ApiSkillsRoute
+    }
+    '/api/swarm-memory/search': {
+      id: '/api/swarm-memory/search'
+      path: '/search'
+      fullPath: '/api/swarm-memory/search'
+      preLoaderRoute: typeof ApiSwarmMemorySearchRouteImport
+      parentRoute: typeof ApiSwarmMemoryRoute
+    }
+    '/api/swarm-runtime/reset': {
+      id: '/api/swarm-runtime/reset'
+      path: '/reset'
+      fullPath: '/api/swarm-runtime/reset'
+      preLoaderRoute: typeof ApiSwarmRuntimeResetRouteImport
+      parentRoute: typeof ApiSwarmRuntimeRoute
+    }
+    '/api/trading/ledger': {
+      id: '/api/trading/ledger'
+      path: '/api/trading/ledger'
+      fullPath: '/api/trading/ledger'
+      preLoaderRoute: typeof ApiTradingLedgerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/trading/summary': {
+      id: '/api/trading/summary'
+      path: '/api/trading/summary'
+      fullPath: '/api/trading/summary'
+      preLoaderRoute: typeof ApiTradingSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/update/agent': {
+      id: '/api/update/agent'
+      path: '/api/update/agent'
+      fullPath: '/api/update/agent'
+      preLoaderRoute: typeof ApiUpdateAgentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/update/naveen-ai-analysis': {
+      id: '/api/update/naveen-ai-analysis'
+      path: '/api/update/naveen-ai-analysis'
+      fullPath: '/api/update/naveen-ai-analysis'
+      preLoaderRoute: typeof ApiUpdateNaveenAiAnalysisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/update/naveen-apply': {
+      id: '/api/update/naveen-apply'
+      path: '/api/update/naveen-apply'
+      fullPath: '/api/update/naveen-apply'
+      preLoaderRoute: typeof ApiUpdateNaveenApplyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/update/naveen-status': {
+      id: '/api/update/naveen-status'
+      path: '/api/update/naveen-status'
+      fullPath: '/api/update/naveen-status'
+      preLoaderRoute: typeof ApiUpdateNaveenStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/update/status': {
+      id: '/api/update/status'
+      path: '/api/update/status'
+      fullPath: '/api/update/status'
+      preLoaderRoute: typeof ApiUpdateStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/update/workspace': {
+      id: '/api/update/workspace'
+      path: '/api/update/workspace'
+      fullPath: '/api/update/workspace'
+      preLoaderRoute: typeof ApiUpdateWorkspaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/workspace/memory-files': {
+      id: '/api/workspace/memory-files'
+      path: '/memory-files'
+      fullPath: '/api/workspace/memory-files'
+      preLoaderRoute: typeof ApiWorkspaceMemoryFilesRouteImport
+      parentRoute: typeof ApiWorkspaceRoute
+    }
+    '/api/workspace/skills': {
+      id: '/api/workspace/skills'
+      path: '/skills'
+      fullPath: '/api/workspace/skills'
+      preLoaderRoute: typeof ApiWorkspaceSkillsRouteImport
+      parentRoute: typeof ApiWorkspaceRoute
+    }
+    '/api/workspace/stats': {
+      id: '/api/workspace/stats'
+      path: '/stats'
+      fullPath: '/api/workspace/stats'
+      preLoaderRoute: typeof ApiWorkspaceStatsRouteImport
+      parentRoute: typeof ApiWorkspaceRoute
     }
     '/api/auth/google/callback': {
       id: '/api/auth/google/callback'
@@ -4986,12 +4944,47 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthGoogleCallbackRouteImport
       parentRoute: typeof ApiAuthGoogleRoute
     }
-    '/api/workspace/skills/$skillId/content': {
-      id: '/api/workspace/skills/$skillId/content'
-      path: '/$skillId/content'
-      fullPath: '/api/workspace/skills/$skillId/content'
-      preLoaderRoute: typeof ApiWorkspaceSkillsSkillIdContentRouteImport
-      parentRoute: typeof ApiWorkspaceSkillsRoute
+    '/api/finance/report/expense': {
+      id: '/api/finance/report/expense'
+      path: '/report/expense'
+      fullPath: '/api/finance/report/expense'
+      preLoaderRoute: typeof ApiFinanceReportExpenseRouteImport
+      parentRoute: typeof ApiFinanceRoute
+    }
+    '/api/finance/report/income': {
+      id: '/api/finance/report/income'
+      path: '/report/income'
+      fullPath: '/api/finance/report/income'
+      preLoaderRoute: typeof ApiFinanceReportIncomeRouteImport
+      parentRoute: typeof ApiFinanceRoute
+    }
+    '/api/mcp/$name/logs': {
+      id: '/api/mcp/$name/logs'
+      path: '/logs'
+      fullPath: '/api/mcp/$name/logs'
+      preLoaderRoute: typeof ApiMcpNameLogsRouteImport
+      parentRoute: typeof ApiMcpNameRoute
+    }
+    '/api/mcp/hub-sources/$id': {
+      id: '/api/mcp/hub-sources/$id'
+      path: '/$id'
+      fullPath: '/api/mcp/hub-sources/$id'
+      preLoaderRoute: typeof ApiMcpHubSourcesIdRouteImport
+      parentRoute: typeof ApiMcpHubSourcesRoute
+    }
+    '/api/sessions/$sessionKey/active-run': {
+      id: '/api/sessions/$sessionKey/active-run'
+      path: '/$sessionKey/active-run'
+      fullPath: '/api/sessions/$sessionKey/active-run'
+      preLoaderRoute: typeof ApiSessionsSessionKeyActiveRunRouteImport
+      parentRoute: typeof ApiSessionsRoute
+    }
+    '/api/sessions/$sessionKey/status': {
+      id: '/api/sessions/$sessionKey/status'
+      path: '/$sessionKey/status'
+      fullPath: '/api/sessions/$sessionKey/status'
+      preLoaderRoute: typeof ApiSessionsSessionKeyStatusRouteImport
+      parentRoute: typeof ApiSessionsRoute
     }
     '/api/runs/$sessionKey/$runId/abandon': {
       id: '/api/runs/$sessionKey/$runId/abandon'
@@ -4999,6 +4992,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/runs/$sessionKey/$runId/abandon'
       preLoaderRoute: typeof ApiRunsSessionKeyRunIdAbandonRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/api/workspace/skills/$skillId/content': {
+      id: '/api/workspace/skills/$skillId/content'
+      path: '/$skillId/content'
+      fullPath: '/api/workspace/skills/$skillId/content'
+      preLoaderRoute: typeof ApiWorkspaceSkillsSkillIdContentRouteImport
+      parentRoute: typeof ApiWorkspaceSkillsRoute
     }
   }
 }
