@@ -2,8 +2,9 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { getProviderUsage } from '../../server/provider-usage'
 import { isAuthenticated } from '../../server/auth-middleware'
-
 import { safeErrorMessage } from '../../server/rate-limit'
+import { recordAndReadProviderUsageHistory } from '../../server/provider-usage-history'
+import type { ProviderUsageHistoryPoint } from '../../server/provider-usage-history'
 
 const REQUEST_TIMEOUT_MS = 5000 // 5 second timeout
 
@@ -45,7 +46,13 @@ export const Route = createFileRoute('/api/provider-usage')({
             REQUEST_TIMEOUT_MS,
             'Provider usage request timed out',
           )
-          return json(payload)
+          let history: Array<ProviderUsageHistoryPoint> = []
+          try {
+            history = recordAndReadProviderUsageHistory(payload.providers)
+          } catch {
+            // Usage remains available if optional local history storage is unavailable.
+          }
+          return json({ ...payload, history })
         } catch (err) {
           return json(
             {

@@ -1,10 +1,14 @@
+import { execFileSync } from 'node:child_process'
 import { mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  getCopilotDailyUsage,
+  getCopilotUsageSummary,
   getFinanceStorageMonitorSummary,
   getFinanceStorageSmokeCronSummary,
+  getHermesDailyUsage,
 } from './ops-observability'
 
 const tempDirs: Array<string> = []
@@ -30,6 +34,61 @@ function makeTempDir(): string {
   mkdirSync(dir, { recursive: true })
   return dir
 }
+
+describe('ops-observability Copilot usage', () => {
+  it('aggregates local usage counters without reading conversation content', async () => {
+    const dir = makeTempDir()
+    const dbPath = join(dir, 'copilot.db')
+    execFileSync('/usr/bin/sqlite3', [dbPath], {
+      input: [
+        'CREATE TABLE assistant_usage_events (session_id TEXT, input_tokens INTEGER, output_tokens INTEGER, total_nano_aiu INTEGER, created_at TEXT);',
+        "INSERT INTO assistant_usage_events VALUES ('session-a', 100, 25, 1000000000, datetime('now','-2 hours'));",
+        "INSERT INTO assistant_usage_events VALUES ('session-b', 200, 50, 2000000000, datetime('now','-2 days'));",
+        "INSERT INTO assistant_usage_events VALUES ('old-session', 1000, 1000, 9000000000, datetime('now','-9 days'));",
+      ].join('\n'),
+    })
+
+    await expect(getCopilotUsageSummary(dbPath)).resolves.toMatchObject({
+      requests24h: 1,
+      requests7d: 2,
+      sessions7d: 2,
+      inputTokens7d: 300,
+      outputTokens7d: 75,
+      aiu7d: 3,
+    })
+    const daily = await getCopilotDailyUsage(dbPath)
+    expect(daily).toHaveLength(2)
+    expect(daily?.map((row) => row.requests)).toEqual([1, 1])
+    expect(daily?.reduce((sum, row) => sum + row.inputTokens, 0)).toBe(300)
+  })
+
+  it('returns null when the local Copilot telemetry database is absent', async () => {
+    await expect(
+      getCopilotUsageSummary(join(tmpdir(), 'missing-copilot-usage.db')),
+    ).resolves.toBeNull()
+  })
+})
+
+describe('ops-observability Hermes daily usage', () => {
+  it('aggregates local gateway sessions by UTC day with billed and estimated spend separated', async () => {
+    const dir = makeTempDir()
+    const dbPath = join(dir, 'state.db')
+    execFileSync('/usr/bin/sqlite3', [dbPath], {
+      input: [
+        'CREATE TABLE sessions (started_at INTEGER, billing_provider TEXT, model TEXT, input_tokens INTEGER, output_tokens INTEGER, actual_cost_usd REAL, estimated_cost_usd REAL);',
+        "INSERT INTO sessions VALUES (strftime('%s','now','-2 hours'), 'openrouter', 'paid-model', 100, 50, 0.12, 0.12);",
+        "INSERT INTO sessions VALUES (strftime('%s','now','-2 days'), 'openai-codex', 'gpt-codex', 200, 25, NULL, 0.05);",
+        "INSERT INTO sessions VALUES (strftime('%s','now','-9 days'), 'openrouter', 'old-model', 500, 500, 1.0, 1.0);",
+      ].join('\n'),
+    })
+
+    const daily = await getHermesDailyUsage(dbPath)
+    expect(daily).toHaveLength(2)
+    expect(daily?.map((row) => row.sessions)).toEqual([1, 1])
+    expect(daily?.map((row) => row.billedCostUsd)).toEqual([0, 0.12])
+    expect(daily?.map((row) => row.estimatedCostUsd)).toEqual([0.05, 0.12])
+  })
+})
 
 describe('ops-observability finance storage monitor', () => {
   it('summarises monitor state and flags stale heartbeats', () => {

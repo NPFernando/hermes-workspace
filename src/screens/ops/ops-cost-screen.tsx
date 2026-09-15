@@ -8,6 +8,8 @@
  *  - Ops cron job health                                      (cron/jobs.json)
  */
 import { useQuery } from '@tanstack/react-query'
+import { AiUsagePanel } from './components/ai-usage-panel'
+import { AgentControlPlane } from './components/agent-control-plane'
 
 interface CostSummary {
   burn24h: number | null
@@ -108,6 +110,30 @@ interface OpsPayload {
   cost: CostSummary | null
   liveness: ModelLiveness | null
   modelUsage7d: Array<ModelUsageRow> | null
+  copilotUsage7d: {
+    requests24h: number
+    requests7d: number
+    sessions7d: number
+    inputTokens7d: number
+    outputTokens7d: number
+    aiu7d: number
+    lastEventAt: string | null
+  } | null
+  copilotDailyUsage7d: Array<{
+    day: string
+    requests: number
+    sessions: number
+    inputTokens: number
+    outputTokens: number
+    aiu: number
+  }> | null
+  hermesDailyUsage7d: Array<{
+    day: string
+    sessions: number
+    tokens: number
+    billedCostUsd: number
+    estimatedCostUsd: number
+  }> | null
   escalation: EscalationStats | null
   cronJobs: Array<OpsCronJob> | null
   financeStorageMonitor: FinanceStorageMonitorSummary | null
@@ -219,6 +245,9 @@ export function OpsCostScreen() {
     cost,
     liveness,
     modelUsage7d,
+    copilotUsage7d,
+    copilotDailyUsage7d,
+    hermesDailyUsage7d,
     escalation,
     cronJobs,
     financeStorageMonitor,
@@ -291,12 +320,32 @@ export function OpsCostScreen() {
         />
       </div>
 
+      <AiUsagePanel
+        copilotUsage={copilotUsage7d}
+        copilotDailyUsage={copilotDailyUsage7d}
+        hermesDailyUsage={hermesDailyUsage7d}
+        hermesUsage={
+          modelUsage7d
+            ? modelUsage7d.reduce(
+                (total, row) => ({
+                  sessions: total.sessions + row.sessions,
+                  tokens: total.tokens + row.tokens,
+                }),
+                { sessions: 0, tokens: 0 },
+              )
+            : null
+        }
+      />
+
+      <AgentControlPlane />
+
       {/* Headroom context-compression proxy (delegated-subagent OpenRouter traffic) */}
       <Panel title="Context compression — Headroom proxy">
         {headroom == null ? (
           <p className="text-sm text-[var(--theme-muted)]">
             Headroom proxy not running (or unreachable at{' '}
-            <code>127.0.0.1:8787</code>). Delegated subagent traffic goes direct.
+            <code>127.0.0.1:8787</code>). Delegated subagent traffic goes
+            direct.
           </p>
         ) : (
           <div className="space-y-3">
@@ -336,7 +385,9 @@ export function OpsCostScreen() {
                     <th className="pb-2 font-normal">Client</th>
                     <th className="pb-2 font-normal text-right">Requests</th>
                     <th className="pb-2 font-normal text-right">Saved %</th>
-                    <th className="pb-2 font-normal text-right">Tokens saved</th>
+                    <th className="pb-2 font-normal text-right">
+                      Tokens saved
+                    </th>
                   </tr>
                 </thead>
                 <tbody>

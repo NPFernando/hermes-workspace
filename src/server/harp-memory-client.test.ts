@@ -5,6 +5,7 @@ import {
   approveMemory,
   flagFinanceMemory,
   getCachedCategoryPreferences,
+  getHarpReadiness,
   getUserFinanceMemoriesForPrompt,
   isHarpMemoryEnabled,
   listActiveFinanceMemories,
@@ -20,6 +21,7 @@ afterEach(() => {
   globalThis.fetch = realFetch
   delete process.env.HARP_MEMORY_API_TOKEN
   delete process.env.HARP_MEMORY_API_URL
+  delete process.env.HARP_READINESS_REPOSITORY_PATH
   __resetHarpMemoryClient()
 })
 
@@ -62,16 +64,23 @@ describe('harp-memory-client — enabled', () => {
   })
 
   it('proposeCategoryPreference POSTs a confidential user-scoped candidate', async () => {
-    const spy = vi.fn(async () => new Response('{"accepted":true}', { status: 200 }))
+    const spy = vi.fn(
+      async () => new Response('{"accepted":true}', { status: 200 }),
+    )
     globalThis.fetch = spy
 
-    await proposeCategoryPreference({ vendor: '  Keells  ', category: ' Groceries ' })
+    await proposeCategoryPreference({
+      vendor: '  Keells  ',
+      category: ' Groceries ',
+    })
 
     expect(spy).toHaveBeenCalledTimes(1)
     const [url, init] = spy.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe('http://harp.test/api/propose')
     expect(init.method).toBe('POST')
-    expect((init.headers as Record<string, string>).authorization).toBe('Bearer test-token')
+    expect((init.headers as Record<string, string>).authorization).toBe(
+      'Bearer test-token',
+    )
     const body = JSON.parse(init.body as string)
     expect(body).toMatchObject({
       scope: 'user',
@@ -82,13 +91,61 @@ describe('harp-memory-client — enabled', () => {
     expect(body.content).toContain('"Keells"')
   })
 
+  it('getHarpReadiness calls only the authenticated read-only readiness endpoint', async () => {
+    const readiness = {
+      status: 'ready_for_review',
+      blockers: [],
+      execution_enabled: false,
+      side_effects: false,
+      operator_approval_required: true,
+    }
+    const spy = vi.fn(
+      async () => new Response(JSON.stringify(readiness), { status: 200 }),
+    )
+    globalThis.fetch = spy
+
+    const result = await getHarpReadiness('/tmp/harp checkout')
+
+    expect(result.available).toBe(true)
+    expect(result.repositoryPath).toBe('/tmp/harp checkout')
+    expect(result.report).toEqual(readiness)
+    const [url, init] = spy.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe(
+      'http://harp.test/api/readiness?repository_path=%2Ftmp%2Fharp+checkout',
+    )
+    expect(init.method).toBe('GET')
+    expect(init.headers).toEqual({ authorization: 'Bearer test-token' })
+  })
+
+  it('marks HARP readiness unavailable rather than fabricating a report', async () => {
+    globalThis.fetch = async () => new Response('unavailable', { status: 503 })
+
+    const result = await getHarpReadiness('/tmp/harp')
+
+    expect(result.available).toBe(false)
+    expect(result.report).toBeNull()
+  })
+
   it('getCachedCategoryPreferences returns {} on the first (async) call, then the mapped rules', async () => {
     const payload = {
       results: [
-        { id: '1', source_ref: 'hermes-finance', metadata: { vendor: 'keells', category: 'Groceries' } },
-        { id: '2', source_ref: 'hermes-finance', content: 'Categorize finance transactions from "uber" as "Transport".' },
+        {
+          id: '1',
+          source_ref: 'hermes-finance',
+          metadata: { vendor: 'keells', category: 'Groceries' },
+        },
+        {
+          id: '2',
+          source_ref: 'hermes-finance',
+          content:
+            'Categorize finance transactions from "uber" as "Transport".',
+        },
         // a confidential user memory from another tool — must be ignored
-        { id: '3', source_ref: 'some-other-tool', content: 'Categorize finance transactions from "spy" as "Espionage".' },
+        {
+          id: '3',
+          source_ref: 'some-other-tool',
+          content: 'Categorize finance transactions from "spy" as "Espionage".',
+        },
       ],
     }
     let calledUrl = ''
@@ -110,8 +167,7 @@ describe('harp-memory-client — enabled', () => {
   })
 
   it('a failing search leaves the cache empty (never throws)', async () => {
-    globalThis.fetch = async () =>
-      new Response('nope', { status: 503 })
+    globalThis.fetch = async () => new Response('nope', { status: 503 })
     getCachedCategoryPreferences()
     await new Promise((r) => setTimeout(r, 10))
     expect(getCachedCategoryPreferences()).toEqual({})
@@ -120,17 +176,31 @@ describe('harp-memory-client — enabled', () => {
   it('getUserFinanceMemoriesForPrompt filters category rules and truncates', async () => {
     const payload = {
       results: [
-        { id: '1', source_ref: 'hermes-finance', content: 'I consider dining out discretionary spending.' },
+        {
+          id: '1',
+          source_ref: 'hermes-finance',
+          content: 'I consider dining out discretionary spending.',
+        },
         {
           id: '2',
           source_ref: 'hermes-finance',
           memory_type: 'category_rule',
-          content: 'Categorize finance transactions from "keells" as "Groceries".',
+          content:
+            'Categorize finance transactions from "keells" as "Groceries".',
         },
-        { id: '3', source_ref: 'hermes-finance', content: 'Categorize finance transactions from "uber" as "Transport".' },
+        {
+          id: '3',
+          source_ref: 'hermes-finance',
+          content:
+            'Categorize finance transactions from "uber" as "Transport".',
+        },
         { id: '4', source_ref: 'hermes-finance', content: 'x'.repeat(500) },
         // not ours — excluded even though it's confidential + user-scoped
-        { id: '5', source_ref: 'notes-app', content: 'Unrelated confidential note.' },
+        {
+          id: '5',
+          source_ref: 'notes-app',
+          content: 'Unrelated confidential note.',
+        },
       ],
     }
     let calledUrl = ''
@@ -159,19 +229,48 @@ describe('harp-memory-client — enabled', () => {
   it('listActiveFinanceMemories classifies each entry', async () => {
     const payload = {
       results: [
-        { id: 'a', source_ref: 'hermes-finance', memory_type: 'category_rule', content: 'Categorize finance transactions from "keells" as "Groceries".' },
-        { id: 'b', source_ref: 'hermes-finance', memory_type: 'financial_rule', content: 'Keep 6 months of expenses in cash.' },
-        { id: 'c', source_ref: 'hermes-finance', content: 'I prefer conservative estimates.' },
+        {
+          id: 'a',
+          source_ref: 'hermes-finance',
+          memory_type: 'category_rule',
+          content:
+            'Categorize finance transactions from "keells" as "Groceries".',
+        },
+        {
+          id: 'b',
+          source_ref: 'hermes-finance',
+          memory_type: 'financial_rule',
+          content: 'Keep 6 months of expenses in cash.',
+        },
+        {
+          id: 'c',
+          source_ref: 'hermes-finance',
+          content: 'I prefer conservative estimates.',
+        },
         { id: '', source_ref: 'hermes-finance', content: 'dropped — no id' },
-        { id: 'd', source_ref: 'other-tool', memory_type: 'financial_rule', content: 'Not a finance-dashboard memory.' },
+        {
+          id: 'd',
+          source_ref: 'other-tool',
+          memory_type: 'financial_rule',
+          content: 'Not a finance-dashboard memory.',
+        },
       ],
     }
     globalThis.fetch = async () =>
       new Response(JSON.stringify(payload), { status: 200 })
 
     expect(await listActiveFinanceMemories()).toEqual([
-      { id: 'a', content: 'Categorize finance transactions from "keells" as "Groceries".', kind: 'category_rule' },
-      { id: 'b', content: 'Keep 6 months of expenses in cash.', kind: 'financial_rule' },
+      {
+        id: 'a',
+        content:
+          'Categorize finance transactions from "keells" as "Groceries".',
+        kind: 'category_rule',
+      },
+      {
+        id: 'b',
+        content: 'Keep 6 months of expenses in cash.',
+        kind: 'financial_rule',
+      },
       { id: 'c', content: 'I prefer conservative estimates.', kind: 'other' },
     ])
   })
@@ -186,14 +285,24 @@ describe('harp-memory-client — enabled', () => {
     })
     globalThis.fetch = spy as unknown as typeof fetch
 
-    expect(await proposeFinancialRule('  Keep 6 months in cash  ')).toEqual({ submitted: true })
+    expect(await proposeFinancialRule('  Keep 6 months in cash  ')).toEqual({
+      submitted: true,
+    })
     await flagFinanceMemory('m-9')
 
     const bodies = spy.mock.calls.map(
-      (c) => JSON.parse((c[1]).body as string) as Record<string, unknown>,
+      (c) => JSON.parse(c[1].body as string) as Record<string, unknown>,
     )
-    expect(bodies[0]).toMatchObject({ memory_type: 'financial_rule', scope: 'user', data_class: 'confidential' })
-    expect(bodies[1]).toMatchObject({ memory_id: 'm-9', useful: false, user_corrected: true })
+    expect(bodies[0]).toMatchObject({
+      memory_type: 'financial_rule',
+      scope: 'user',
+      data_class: 'confidential',
+    })
+    expect(bodies[1]).toMatchObject({
+      memory_id: 'm-9',
+      useful: false,
+      user_corrected: true,
+    })
   })
 
   it('proposeFinancialRule ignores an empty rule', async () => {
@@ -206,9 +315,23 @@ describe('harp-memory-client — enabled', () => {
   it('listPendingFinanceCandidates keeps only rule candidates', async () => {
     const payload = {
       candidates: [
-        { memory_id: 'p1', memory_type: 'financial_rule', content: 'Keep 6 months in cash.', created_at: '2026-09-08T00:00:00Z' },
-        { memory_id: 'p2', memory_type: 'category_rule', content: 'Categorize finance transactions from "keells" as "Groceries".' },
-        { memory_id: 'p3', memory_type: 'temporary_context', content: 'unrelated repo candidate' },
+        {
+          memory_id: 'p1',
+          memory_type: 'financial_rule',
+          content: 'Keep 6 months in cash.',
+          created_at: '2026-09-08T00:00:00Z',
+        },
+        {
+          memory_id: 'p2',
+          memory_type: 'category_rule',
+          content:
+            'Categorize finance transactions from "keells" as "Groceries".',
+        },
+        {
+          memory_id: 'p3',
+          memory_type: 'temporary_context',
+          content: 'unrelated repo candidate',
+        },
         { memory_id: '', content: 'no id' },
       ],
     }
@@ -216,24 +339,36 @@ describe('harp-memory-client — enabled', () => {
       new Response(JSON.stringify(payload), { status: 200 })
 
     expect(await listPendingFinanceCandidates()).toEqual([
-      { id: 'p1', content: 'Keep 6 months in cash.', kind: 'financial_rule', createdAt: '2026-09-08T00:00:00Z' },
-      { id: 'p2', content: 'Categorize finance transactions from "keells" as "Groceries".', kind: 'category_rule', createdAt: null },
+      {
+        id: 'p1',
+        content: 'Keep 6 months in cash.',
+        kind: 'financial_rule',
+        createdAt: '2026-09-08T00:00:00Z',
+      },
+      {
+        id: 'p2',
+        content:
+          'Categorize finance transactions from "keells" as "Groceries".',
+        kind: 'category_rule',
+        createdAt: null,
+      },
     ])
   })
 
   it('approveMemory / rejectMemory POST reviewer=naveen; ok on any 2xx, not on failure', async () => {
-    const spy = vi.fn(async (url: string, _init: RequestInit) =>
-      // service returns { id, status, reviewed_by } — we only care that it 2xx'd
-      new Response(JSON.stringify({ id: 'x', status: 'active' }), {
-        status: url.endsWith('reject') ? 503 : 200,
-      }),
+    const spy = vi.fn(
+      async (url: string, _init: RequestInit) =>
+        // service returns { id, status, reviewed_by } — we only care that it 2xx'd
+        new Response(JSON.stringify({ id: 'x', status: 'active' }), {
+          status: url.endsWith('reject') ? 503 : 200,
+        }),
     )
     globalThis.fetch = spy as unknown as typeof fetch
 
     expect(await approveMemory('p1')).toEqual({ ok: true })
     expect(await rejectMemory('p2')).toEqual({ ok: false }) // 503 → call() returns null
     const bodies = spy.mock.calls.map(
-      (c) => JSON.parse((c[1]).body as string) as Record<string, unknown>,
+      (c) => JSON.parse(c[1].body as string) as Record<string, unknown>,
     )
     expect(bodies[0]).toEqual({ memory_id: 'p1', reviewer: 'naveen' })
     expect(bodies[1]).toEqual({ memory_id: 'p2', reviewer: 'naveen' })

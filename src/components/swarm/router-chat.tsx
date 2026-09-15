@@ -13,6 +13,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import type { CrewMember } from '@/hooks/use-crew-status'
 import { cn } from '@/lib/utils'
+import { buildPacingPreview } from '@/lib/swarm-dispatch-pacing'
 
 type Mode = 'auto' | 'manual' | 'broadcast'
 
@@ -47,7 +48,48 @@ type DispatchResult = {
 export type DispatchResponse = {
   dispatchedAt: number
   completedAt: number
+  dispatchMode?: 'serial' | 'parallel'
+  queueId?: string | null
+  queuePosition?: number | null
   results: Array<DispatchResult>
+}
+
+type QueueStatus = {
+  mode: 'postgres'
+  active: null | {
+    id: string
+    assignmentCount: number
+    queuedAt: number
+    startedAt: number | null
+    status: string
+    cancelRequestedAt: number | null
+    leaseExpiresAt: number | null
+    deadLetterAt: number | null
+    retryOfJobId: string | null
+  }
+  waiting: Array<{
+    id: string
+    position: number
+    assignmentCount: number
+    queuedAt: number
+    startedAt: number | null
+    status: string
+    cancelRequestedAt: number | null
+    leaseExpiresAt: number | null
+    deadLetterAt: number | null
+    retryOfJobId: string | null
+  }>
+  recent: Array<{
+    id: string
+    assignmentCount: number
+    queuedAt: number
+    startedAt: number | null
+    status: string
+    cancelRequestedAt: number | null
+    leaseExpiresAt: number | null
+    deadLetterAt: number | null
+    retryOfJobId: string | null
+  }>
 }
 
 type FollowUpResponse = {
@@ -112,9 +154,49 @@ export function RouterChat({
   const [assignments, setAssignments] = useState<Array<Assignment>>([])
   const [unassigned, setUnassigned] = useState<Array<string>>([])
   const [dispatching, setDispatching] = useState(false)
+  const [serialDispatch, setSerialDispatch] = useState(false)
+  const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null)
   const [dispatchError, setDispatchError] = useState<string | null>(null)
+  const [cancellingQueueId, setCancellingQueueId] = useState<string | null>(
+    null,
+  )
+  const [retryingQueueId, setRetryingQueueId] = useState<string | null>(null)
   const [results, setResults] = useState<DispatchResponse | null>(null)
   const [followUp, setFollowUp] = useState<FollowUpResponse | null>(null)
+  const pacingTasks =
+    mode === 'auto'
+      ? assignments
+      : mode === 'manual'
+        ? selectedId && prompt.trim()
+          ? [{ workerId: selectedId, task: prompt }]
+          : []
+        : (roomIds.length > 0
+            ? roomIds
+            : members.map((member) => member.id)
+          ).map((workerId) => ({ workerId, task: prompt }))
+  const pacingPreview = buildPacingPreview(pacingTasks)
+
+  useEffect(() => {
+    let disposed = false
+    const refresh = async () => {
+      try {
+        const response = await fetch('/api/swarm-dispatch', {
+          cache: 'no-store',
+        })
+        if (!response.ok) return
+        const data = (await response.json()) as QueueStatus
+        if (!disposed) setQueueStatus(data)
+      } catch {
+        // Queue status is best-effort; it must not interrupt dispatch.
+      }
+    }
+    void refresh()
+    const timer = window.setInterval(() => void refresh(), 5000)
+    return () => {
+      disposed = true
+      window.clearInterval(timer)
+    }
+  }, [])
 
   useEffect(() => {
     if (!seedPrompt?.trim()) return
@@ -253,15 +335,20 @@ export function RouterChat({
     setResults(null)
     setFollowUp(null)
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+      if (serialDispatch) headers['Idempotency-Key'] = crypto.randomUUID()
       const res = await fetch('/api/swarm-dispatch', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           assignments: plan,
+          dispatchMode: serialDispatch ? 'serial' : 'parallel',
           timeoutSeconds: 300,
           waitForCheckpoint: false,
         }),
-        signal: AbortSignal.timeout(60_000),
+        signal: AbortSignal.timeout(serialDispatch ? 3_600_000 : 60_000),
       })
       if (!res.ok) {
         const text = await res.text()
@@ -296,6 +383,7 @@ export function RouterChat({
             staleMinutes: 3,
             autoContinue: true,
             allowExecution: false,
+            dispatchMode: serialDispatch ? 'serial' : 'parallel',
             reviewWorkerId: reviewer?.id,
           }),
         })
@@ -308,6 +396,68 @@ export function RouterChat({
       setDispatchError(err instanceof Error ? err.message : 'dispatch failed')
     } finally {
       setDispatching(false)
+    }
+  }
+
+  async function cancelQueueJob(id: string) {
+    setCancellingQueueId(id)
+    try {
+      const response = await fetch(
+        `/api/swarm-dispatch?id=${encodeURIComponent(id)}`,
+        {
+          method: 'DELETE',
+        },
+      )
+      if (!response.ok)
+        throw new Error((await response.text()) || `HTTP ${response.status}`)
+      const refreshed = await fetch('/api/swarm-dispatch', {
+        cache: 'no-store',
+      })
+      if (refreshed.ok) setQueueStatus((await refreshed.json()) as QueueStatus)
+    } catch (error) {
+      setDispatchError(
+        error instanceof Error
+          ? error.message
+          : 'Could not cancel queued dispatch.',
+      )
+    } finally {
+      setCancellingQueueId(null)
+    }
+  }
+
+  async function retryQueueJob(id: string) {
+    const confirmed = window.confirm(
+      'This dispatch may already have reached some agents. Inspect their state first. Retrying can send duplicate prompts. Continue?',
+    )
+    if (!confirmed) return
+    setRetryingQueueId(id)
+    try {
+      const response = await fetch(
+        `/api/swarm-dispatch?id=${encodeURIComponent(id)}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ acknowledgePossibleDuplicate: true }),
+        },
+      )
+      if (!response.ok) {
+        const result = (await response.json().catch(() => null)) as {
+          error?: string
+        } | null
+        throw new Error(result?.error ?? `HTTP ${response.status}`)
+      }
+      const refreshed = await fetch('/api/swarm-dispatch', {
+        cache: 'no-store',
+      })
+      if (refreshed.ok) setQueueStatus((await refreshed.json()) as QueueStatus)
+    } catch (error) {
+      setDispatchError(
+        error instanceof Error
+          ? error.message
+          : 'Could not retry dead-letter dispatch.',
+      )
+    } finally {
+      setRetryingQueueId(null)
     }
   }
 
@@ -560,6 +710,134 @@ export function RouterChat({
                   </ul>
                 </div>
               ) : null}
+              <div className="rounded-xl border border-[var(--theme-warning-border)] bg-[var(--theme-warning-soft)] px-2.5 py-2">
+                <div className="flex items-center justify-between gap-2 text-[10px] uppercase tracking-[0.16em] text-[var(--theme-muted)]">
+                  <span>One-at-a-time pacing preview</span>
+                  <span>Advisory only</span>
+                </div>
+                <p className="mt-1 text-[11px] text-[var(--theme-text)]">
+                  {pacingPreview.length
+                    ? `${pacingPreview.length} task${pacingPreview.length === 1 ? '' : 's'} · suggested max concurrency 1 · provider cost unknown`
+                    : 'Add or route work to preview a serial queue.'}
+                </p>
+                {pacingPreview.length > 0 ? (
+                  <ol className="mt-1 space-y-0.5 text-[11px] text-[var(--theme-muted-2)]">
+                    {pacingPreview.map((item) => (
+                      <li key={`${item.position}-${item.workerId}`}>
+                        {item.position}/{item.total} · {item.workerId} ·{' '}
+                        {item.task.slice(0, 90)}
+                        {item.task.length > 90 ? '…' : ''}
+                      </li>
+                    ))}
+                  </ol>
+                ) : null}
+                <p className="mt-1 text-[10px] text-[var(--theme-muted-2)]">
+                  {serialDispatch
+                    ? 'Serial mode is selected for the next dispatch. Unchecked requests keep the existing parallel behavior.'
+                    : 'Recommendation only until serial mode is selected; the existing dispatch behavior is parallel.'}
+                </p>
+                <label className="mt-2 flex items-start gap-2 text-[11px] text-[var(--theme-text)]">
+                  <input
+                    type="checkbox"
+                    checked={serialDispatch}
+                    disabled={dispatching}
+                    onChange={(event) =>
+                      setSerialDispatch(event.target.checked)
+                    }
+                    className="mt-0.5 accent-[var(--theme-accent)]"
+                  />
+                  <span>
+                    Queue this batch serially (one worker at a time). Pending
+                    batches and status are persisted in the shared Postgres
+                    queue; parallel requests remain unchanged.
+                  </span>
+                </label>
+                {queueStatus &&
+                (queueStatus.active ||
+                  queueStatus.waiting.length > 0 ||
+                  queueStatus.recent.length > 0) ? (
+                  <div className="mt-2 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card)] px-2 py-1.5 text-[11px] text-[var(--theme-muted-2)]">
+                    <>
+                      <div>
+                        {queueStatus.active
+                          ? `Shared queue active · ${queueStatus.active.assignmentCount} task${queueStatus.active.assignmentCount === 1 ? '' : 's'}${queueStatus.active.cancelRequestedAt ? ' · cancellation requested' : ''}`
+                          : 'No serial batch is running right now.'}
+                      </div>
+                      {queueStatus.active &&
+                      !queueStatus.active.cancelRequestedAt ? (
+                        <button
+                          type="button"
+                          disabled={cancellingQueueId === queueStatus.active.id}
+                          onClick={() =>
+                            queueStatus.active &&
+                            void cancelQueueJob(queueStatus.active.id)
+                          }
+                          className="mt-1 text-[var(--theme-danger)] underline disabled:opacity-50"
+                        >
+                          {cancellingQueueId === queueStatus.active.id
+                            ? 'Cancelling…'
+                            : 'Cancel active batch'}
+                        </button>
+                      ) : null}
+                      {queueStatus.waiting.length > 0 ? (
+                        <div className="mt-0.5">
+                          {queueStatus.waiting.length} batch
+                          {queueStatus.waiting.length === 1 ? '' : 'es'} waiting
+                          in the shared queue
+                        </div>
+                      ) : null}
+                      {queueStatus.waiting.map((job) => (
+                        <div
+                          key={job.id}
+                          className="mt-1 flex items-center justify-between gap-3"
+                        >
+                          <span>
+                            #{job.position} · {job.assignmentCount} task
+                            {job.assignmentCount === 1 ? '' : 's'} · pending
+                          </span>
+                          <button
+                            type="button"
+                            disabled={cancellingQueueId === job.id}
+                            onClick={() => void cancelQueueJob(job.id)}
+                            className="text-[var(--theme-danger)] underline disabled:opacity-50"
+                            aria-label={`Cancel queued batch ${job.id}`}
+                          >
+                            {cancellingQueueId === job.id
+                              ? 'Cancelling…'
+                              : 'Cancel'}
+                          </button>
+                        </div>
+                      ))}
+                      {queueStatus.recent.slice(0, 3).map((job) => (
+                        <div
+                          key={job.id}
+                          className="mt-1 flex items-center justify-between gap-2 text-[10px] opacity-80"
+                        >
+                          <span>
+                            Recent: {job.deadLetterAt ? 'dead letter · ' : ''}
+                            {job.status} · {job.assignmentCount} task
+                            {job.assignmentCount === 1 ? '' : 's'} ·{' '}
+                            {job.id.slice(0, 8)}
+                          </span>
+                          {job.deadLetterAt &&
+                          ['failed', 'interrupted'].includes(job.status) ? (
+                            <button
+                              type="button"
+                              disabled={retryingQueueId === job.id}
+                              onClick={() => void retryQueueJob(job.id)}
+                              className="text-[var(--theme-accent)] underline disabled:opacity-50"
+                            >
+                              {retryingQueueId === job.id
+                                ? 'Queueing…'
+                                : 'Retry…'}
+                            </button>
+                          ) : null}
+                        </div>
+                      ))}
+                    </>
+                  </div>
+                ) : null}
+              </div>
             </div>
           ) : null}
         </div>

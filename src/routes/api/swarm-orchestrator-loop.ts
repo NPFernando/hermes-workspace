@@ -38,16 +38,13 @@ type LoopRequest = {
   reviewWorkerId?: unknown
   missionId?: unknown
   allowExecution?: unknown
+  dispatchMode?: unknown
 }
 
 type WorkerLoopResult = {
   workerId: string
   status:
-    | 'checkpointed'
-    | 'already_processed'
-    | 'stale'
-    | 'waiting'
-    | 'unavailable'
+    'checkpointed' | 'already_processed' | 'stale' | 'waiting' | 'unavailable'
   checkpoint: ParsedSwarmCheckpoint | null
   action: string
   runtimePath: string
@@ -478,6 +475,7 @@ async function dispatchAssignments(
   request: Request,
   assignments: Array<{ workerId: string; task: string; rationale: string }>,
   missionId?: string | null,
+  dispatchMode?: unknown,
 ): Promise<unknown | null> {
   const merged = mergeAssignments(assignments)
   if (merged.length === 0) return null
@@ -495,6 +493,7 @@ async function dispatchAssignments(
       assignments: merged,
       timeoutSeconds: 90,
       missionId,
+      dispatchMode: dispatchMode === 'serial' ? 'serial' : 'parallel',
       waitForCheckpoint: true,
       checkpointPollSeconds: 90,
     }),
@@ -611,6 +610,7 @@ export const Route = createFileRoute('/api/swarm-orchestrator-loop')({
             request,
             assignments,
             missionId,
+            body.dispatchMode,
           )
         }
 

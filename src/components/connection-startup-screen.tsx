@@ -212,6 +212,7 @@ export function ConnectionStartupScreen({ onConnected }: Props) {
 
   return (
     <div
+      data-testid="connection-startup-screen"
       className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto px-6 py-10 text-white"
       style={{
         backgroundColor: '#0A0E1A',
