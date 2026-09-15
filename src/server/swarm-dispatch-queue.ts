@@ -22,6 +22,7 @@ export type SwarmDispatchQueueJob<TPayload = Record<string, unknown>> = {
   id: string
   status: SwarmDispatchQueueStatus
   assignmentCount: number
+  priority: number
   payload: TPayload
   result: unknown
   error: string | null
@@ -40,6 +41,7 @@ export type SwarmDispatchQueueItem = {
   queuedAt: number
   startedAt: number | null
   assignmentCount: number
+  priority: number
   status: SwarmDispatchQueueStatus
   cancelRequestedAt: number | null
   leaseExpiresAt: number | null
@@ -72,6 +74,7 @@ type QueueRow = {
   id: string
   status: SwarmDispatchQueueStatus
   assignment_count: number
+  priority: number
   payload: Record<string, unknown>
   result: unknown
   error: string | null
@@ -104,6 +107,21 @@ export class SwarmDispatchQueueIdempotencyError extends Error {
     super(message)
     this.name = 'SwarmDispatchQueueIdempotencyError'
   }
+}
+
+export class SwarmDispatchQueuePriorityError extends Error {
+  constructor() {
+    super('Queue priority must be an integer from 0 (normal) to 9 (highest).')
+    this.name = 'SwarmDispatchQueuePriorityError'
+  }
+}
+
+export function normalizeSwarmDispatchPriority(value: unknown): number {
+  if (value === undefined) return 0
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > 9) {
+    throw new SwarmDispatchQueuePriorityError()
+  }
+  return value
 }
 
 export type QueueWorkerContext = { signal: AbortSignal; jobId: string }
@@ -207,6 +225,7 @@ function mapJob<TPayload = Record<string, unknown>>(
     id: row.id,
     status: row.status,
     assignmentCount: Number(row.assignment_count),
+    priority: Number(row.priority),
     payload: row.payload as TPayload,
     result: row.result,
     error: row.error,
@@ -247,6 +266,7 @@ export async function enqueueSwarmDispatch(
   payload: object,
   assignmentCount: number,
   submissionKey?: string,
+  priority: unknown = 0,
 ): Promise<{
   id: string
   position: number
@@ -262,6 +282,7 @@ export async function enqueueSwarmDispatch(
       'Idempotency-Key must contain 1 to 128 letters, digits, dots, underscores, colons, or hyphens.',
     )
   }
+  const normalizedPriority = normalizeSwarmDispatchPriority(priority)
   const pg = await ensureSchema()
   const client = await pg.connect()
   const id = randomUUID()
@@ -276,10 +297,12 @@ export async function enqueueSwarmDispatch(
         id: string
         status: SwarmDispatchQueueStatus
         assignment_count: number
+        priority: number
         payload_matches: boolean
         queued_at: Date | string
       }>(
-        `SELECT id, status, assignment_count, payload = $2::jsonb AS payload_matches, queued_at
+        `SELECT id, status, assignment_count, priority,
+                payload = $2::jsonb AS payload_matches, queued_at
          FROM ${TABLE} WHERE submission_key = $1 FOR UPDATE`,
         [submissionKey, JSON.stringify(payload)],
       )
@@ -288,7 +311,8 @@ export async function enqueueSwarmDispatch(
         if (
           job.assignment_count !==
             Math.max(1, Math.min(12, Math.floor(assignmentCount))) ||
-          !job.payload_matches
+            job.priority !== normalizedPriority ||
+            !job.payload_matches
         ) {
           throw new SwarmDispatchQueueIdempotencyError(
             'payload-conflict',
@@ -299,11 +323,11 @@ export async function enqueueSwarmDispatch(
           job.status === 'pending'
             ? await client.query<{ position: string }>(
                 `WITH target AS (
-                   SELECT queued_at, id FROM ${TABLE} WHERE id = $1::uuid
+                   SELECT priority, queued_at, id FROM ${TABLE} WHERE id = $1::uuid
                  )
                  SELECT count(*)::text AS position FROM ${TABLE} AS jobs, target
                  WHERE jobs.status = 'pending'
-                   AND (jobs.queued_at, jobs.id) <= (target.queued_at, target.id)`,
+                   AND (jobs.priority, jobs.queued_at, jobs.id) >= (target.priority, target.queued_at, target.id)`,
                 [job.id],
               )
             : null
@@ -324,25 +348,26 @@ export async function enqueueSwarmDispatch(
       throw new SwarmDispatchQueueFullError()
     }
     const inserted = await client.query<QueueRow>(
-      `INSERT INTO ${TABLE} (id, status, assignment_count, payload, submission_key)
-       VALUES ($1, 'pending', $2, $3::jsonb, $4)
+      `INSERT INTO ${TABLE} (id, status, assignment_count, priority, payload, submission_key)
+       VALUES ($1, 'pending', $2, $3, $4::jsonb, $5)
        RETURNING id, status, assignment_count, payload, result, error,
-         lease_token, cancel_requested_at, queued_at, started_at, finished_at,
+        priority, lease_token, cancel_requested_at, queued_at, started_at, finished_at,
          lease_expires_at, dead_letter_at, retry_of_job_id`,
       [
         id,
         Math.max(1, Math.min(12, Math.floor(assignmentCount))),
+        normalizedPriority,
         JSON.stringify(payload),
         submissionKey ?? null,
       ],
     )
     const position = await client.query<{ position: string }>(
       `WITH target AS (
-         SELECT queued_at, id FROM ${TABLE} WHERE id = $1::uuid
+         SELECT priority, queued_at, id FROM ${TABLE} WHERE id = $1::uuid
        )
        SELECT count(*)::text AS position FROM ${TABLE} AS jobs, target
        WHERE jobs.status = 'pending'
-         AND (jobs.queued_at, jobs.id) <= (target.queued_at, target.id)`,
+         AND (jobs.priority, jobs.queued_at, jobs.id) >= (target.priority, target.queued_at, target.id)`,
       [id],
     )
     await client.query('COMMIT')
@@ -401,10 +426,11 @@ export async function retrySwarmDispatchQueueJob(
       id: string
       status: SwarmDispatchQueueStatus
       assignment_count: number
+      priority: number
       payload: Record<string, unknown>
       dead_letter_at: Date | string | null
     }>(
-      `SELECT id, status, assignment_count, payload, dead_letter_at
+      `SELECT id, status, assignment_count, priority, payload, dead_letter_at
        FROM ${TABLE} WHERE id = $1::uuid FOR UPDATE`,
       [id],
     )
@@ -440,11 +466,11 @@ export async function retrySwarmDispatchQueueJob(
         existing.status === 'pending'
           ? await client.query<{ position: string }>(
               `WITH target AS (
-                 SELECT queued_at, id FROM ${TABLE} WHERE id = $1::uuid
+                 SELECT priority, queued_at, id FROM ${TABLE} WHERE id = $1::uuid
                )
                SELECT count(*)::text AS position FROM ${TABLE} AS jobs, target
                WHERE jobs.status = 'pending'
-                 AND (jobs.queued_at, jobs.id) <= (target.queued_at, target.id)`,
+                 AND (jobs.priority, jobs.queued_at, jobs.id) >= (target.priority, target.queued_at, target.id)`,
               [existing.id],
             )
           : null
@@ -466,25 +492,26 @@ export async function retrySwarmDispatchQueueJob(
     }
     const retryId = randomUUID()
     const inserted = await client.query<QueueRow>(
-      `INSERT INTO ${TABLE} (id, status, assignment_count, payload, retry_of_job_id)
-       VALUES ($1::uuid, 'pending', $2, $3::jsonb, $4::uuid)
+      `INSERT INTO ${TABLE} (id, status, assignment_count, priority, payload, retry_of_job_id)
+       VALUES ($1::uuid, 'pending', $2, $3, $4::jsonb, $5::uuid)
        RETURNING id, status, assignment_count, payload, result, error,
-         lease_token, cancel_requested_at, queued_at, started_at, finished_at,
+        priority, lease_token, cancel_requested_at, queued_at, started_at, finished_at,
          lease_expires_at, dead_letter_at, retry_of_job_id`,
       [
         retryId,
         source.assignment_count,
+        source.priority,
         JSON.stringify(source.payload),
         source.id,
       ],
     )
     const position = await client.query<{ position: string }>(
       `WITH target AS (
-         SELECT queued_at, id FROM ${TABLE} WHERE id = $1::uuid
+         SELECT priority, queued_at, id FROM ${TABLE} WHERE id = $1::uuid
        )
        SELECT count(*)::text AS position FROM ${TABLE} AS jobs, target
        WHERE jobs.status = 'pending'
-         AND (jobs.queued_at, jobs.id) <= (target.queued_at, target.id)`,
+       AND (jobs.priority, jobs.queued_at, jobs.id) >= (target.priority, target.queued_at, target.id)`,
       [retryId],
     )
     await client.query('COMMIT')
@@ -522,7 +549,7 @@ export async function getSwarmDispatchQueueJob(
   const pg = await ensureSchema()
   const result = await pg.query<QueueRow>(
     `SELECT id, status, assignment_count, payload, result, error,
-       lease_token, cancel_requested_at, queued_at, started_at, finished_at,
+       priority, lease_token, cancel_requested_at, queued_at, started_at, finished_at,
        lease_expires_at, dead_letter_at, retry_of_job_id
      FROM ${TABLE} WHERE id = $1::uuid`,
     [id],
@@ -572,7 +599,7 @@ export async function getSwarmDispatchQueueSnapshot(): Promise<SwarmDispatchQueu
   const [active, waiting, recent] = await Promise.all([
     pg.query<QueueRow>(
       `SELECT id, status, assignment_count, payload, result, error,
-         lease_token, cancel_requested_at, queued_at, started_at, finished_at,
+         priority, lease_token, cancel_requested_at, queued_at, started_at, finished_at,
          lease_expires_at, dead_letter_at, retry_of_job_id
        FROM ${TABLE} WHERE status = 'running' ORDER BY started_at LIMIT 1`,
     ),
@@ -580,7 +607,7 @@ export async function getSwarmDispatchQueueSnapshot(): Promise<SwarmDispatchQueu
       `SELECT id, status, assignment_count, payload, result, error,
          lease_token, cancel_requested_at, queued_at, started_at, finished_at,
          lease_expires_at, dead_letter_at, retry_of_job_id
-       FROM ${TABLE} WHERE status = 'pending' ORDER BY queued_at, id LIMIT 50`,
+       FROM ${TABLE} WHERE status = 'pending' ORDER BY priority DESC, queued_at, id LIMIT 50`,
     ),
     pg.query<QueueRow>(
       `SELECT id, status, assignment_count, payload, result, error,
@@ -598,6 +625,7 @@ export async function getSwarmDispatchQueueSnapshot(): Promise<SwarmDispatchQueu
       queuedAt: job.queuedAt,
       startedAt: job.startedAt,
       assignmentCount: job.assignmentCount,
+      priority: job.priority,
       status: job.status,
       cancelRequestedAt: job.cancelRequestedAt,
       leaseExpiresAt: job.leaseExpiresAt,
@@ -625,7 +653,7 @@ async function claimNextJob(
       `WITH next_job AS (
          SELECT id FROM ${TABLE}
          WHERE status = 'pending'
-         ORDER BY queued_at, id
+         ORDER BY priority DESC, queued_at, id
          FOR UPDATE SKIP LOCKED
          LIMIT 1
        )
@@ -636,7 +664,7 @@ async function claimNextJob(
        FROM next_job
        WHERE jobs.id = next_job.id
        RETURNING jobs.id, jobs.status, jobs.assignment_count, jobs.payload, jobs.result,
-         jobs.error, jobs.lease_token, jobs.cancel_requested_at, jobs.queued_at,
+         jobs.error, jobs.priority, jobs.lease_token, jobs.cancel_requested_at, jobs.queued_at,
          jobs.started_at, jobs.finished_at, jobs.lease_expires_at,
          jobs.dead_letter_at, jobs.retry_of_job_id`,
       [leaseToken, JOB_LEASE_MS],

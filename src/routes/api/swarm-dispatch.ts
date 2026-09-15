@@ -81,6 +81,7 @@ type DispatchRequest = {
   direct?: unknown
   notifySessionKey?: unknown
   dispatchMode?: unknown
+  priority?: unknown
 }
 
 type WorkerResult = {
@@ -1752,6 +1753,20 @@ export async function dispatchSwarmAssignments(
   if (assignments.some((assignment) => assignment.task.length === 0)) {
     throw new SwarmDispatchError('assignment task required')
   }
+  let priority = 0
+  if (body.priority !== undefined) {
+    if (
+      typeof body.priority !== 'number' ||
+      !Number.isInteger(body.priority) ||
+      body.priority < 0 ||
+      body.priority > 9
+    ) {
+      throw new SwarmDispatchError(
+        'priority must be an integer from 0 (normal) to 9 (highest)',
+      )
+    }
+    priority = body.priority
+  }
   if (
     assignments.some((assignment) => assignment.task.length > MAX_PROMPT_CHARS)
   ) {
@@ -1769,6 +1784,7 @@ export async function dispatchSwarmAssignments(
       body,
       assignments.length,
       context.submissionKey,
+      priority,
     )
     ensureSwarmDispatchQueueWorker()
     const job = await waitForSwarmDispatchQueueJob(queued.id)

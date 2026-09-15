@@ -3,18 +3,20 @@ import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { Pool } from 'pg'
 import {
-
   cancelSwarmDispatchQueueJob,
   closeSwarmDispatchQueuePool,
   enqueueSwarmDispatch,
   getSwarmDispatchQueueJob,
   getSwarmDispatchQueueSnapshot,
+  normalizeSwarmDispatchPriority,
   retrySwarmDispatchQueueJob,
   runSwarmDispatchQueueCycle
 } from './swarm-dispatch-queue'
-import type {QueueProcessor,
+import type {
+  QueueProcessor,
   SwarmDispatchQueueIdempotencyError,
-  SwarmDispatchQueueRetryError} from './swarm-dispatch-queue';
+  SwarmDispatchQueueRetryError,
+} from './swarm-dispatch-queue'
 
 const database = process.env.SWARM_QUEUE_PG_DATABASE ?? ''
 const integrationRequested = process.env.RUN_SWARM_QUEUE_PG_INTEGRATION === '1'
@@ -32,6 +34,19 @@ if (integrationRequested && !integrationEnabled) {
 }
 const pgDescribe = describe.skipIf(!integrationEnabled)
 
+describe('swarm dispatch queue priority validation', () => {
+  it('defaults missing priority and accepts the bounded range', () => {
+    expect(normalizeSwarmDispatchPriority(undefined)).toBe(0)
+    expect(normalizeSwarmDispatchPriority(9)).toBe(9)
+  })
+
+  it.each([-1, 1.5, 10, '9', null])('rejects invalid priority %s', (value) => {
+    expect(() => normalizeSwarmDispatchPriority(value)).toThrow(
+      'Queue priority must be an integer',
+    )
+  })
+})
+
 pgDescribe('Postgres-backed serial dispatch queue', () => {
   const inspectionPool = new Pool({
     host: pgHost,
@@ -48,6 +63,23 @@ pgDescribe('Postgres-backed serial dispatch queue', () => {
     await inspectionPool.query(
       'TRUNCATE TABLE public.swarm_dispatch_queue_jobs',
     )
+  })
+
+  it('orders higher-priority jobs first and preserves FIFO within a priority', async () => {
+    const normal = await enqueueSwarmDispatch({ label: 'normal' }, 1)
+    const high = await enqueueSwarmDispatch({ label: 'high' }, 1, undefined, 9)
+    const highLater = await enqueueSwarmDispatch(
+      { label: 'high-later' },
+      1,
+      undefined,
+      9,
+    )
+    const order: Array<string> = []
+    await runSwarmDispatchQueueCycle(async (payload) => {
+      order.push(String(payload.label))
+      return { results: [{ ok: true }] }
+    })
+    expect(order).toEqual(['high', 'high-later', 'normal'])
   })
 
   afterAll(async () => {

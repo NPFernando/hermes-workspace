@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS public.swarm_dispatch_queue_jobs (
     'pending', 'running', 'succeeded', 'failed', 'cancelled', 'interrupted'
   )),
   assignment_count integer NOT NULL CHECK (assignment_count BETWEEN 1 AND 12),
+  priority integer NOT NULL DEFAULT 0 CHECK (priority BETWEEN 0 AND 9),
   payload jsonb NOT NULL,
   result jsonb,
   error text,
@@ -23,7 +24,15 @@ ALTER TABLE public.swarm_dispatch_queue_jobs
   ADD COLUMN IF NOT EXISTS lease_expires_at timestamptz,
   ADD COLUMN IF NOT EXISTS dead_letter_at timestamptz,
   ADD COLUMN IF NOT EXISTS retry_of_job_id uuid REFERENCES public.swarm_dispatch_queue_jobs(id),
-  ADD COLUMN IF NOT EXISTS submission_key text;
+  ADD COLUMN IF NOT EXISTS submission_key text,
+  ADD COLUMN IF NOT EXISTS priority integer NOT NULL DEFAULT 0;
+
+ALTER TABLE public.swarm_dispatch_queue_jobs
+  DROP CONSTRAINT IF EXISTS swarm_dispatch_queue_jobs_priority_check;
+
+ALTER TABLE public.swarm_dispatch_queue_jobs
+  ADD CONSTRAINT swarm_dispatch_queue_jobs_priority_check
+  CHECK (priority BETWEEN 0 AND 9);
 
 -- Preserve old in-flight jobs without permitting a second worker to claim them
 -- until the previous process's advisory lock has been released and its lease
@@ -38,7 +47,7 @@ SET dead_letter_at = COALESCE(finished_at, updated_at, clock_timestamp())
 WHERE status IN ('failed', 'interrupted') AND dead_letter_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS swarm_dispatch_queue_pending_order_idx
-  ON public.swarm_dispatch_queue_jobs (queued_at, id)
+  ON public.swarm_dispatch_queue_jobs (priority DESC, queued_at, id)
   WHERE status = 'pending';
 
 CREATE INDEX IF NOT EXISTS swarm_dispatch_queue_status_recent_idx
