@@ -455,7 +455,7 @@ function makeCacheKey(
  * HIGH-3: statKey now distinguishes ENOENT (bootstrap) from EACCES/ELOOP/
  * other (permission/symlink error → return source:'invalid').
  */
-export async function readPresets(): Promise<ReadPresetsResult> {
+export function readPresets(): ReadPresetsResult {
   const path = presetsFilePath()
 
   // Fast path — file exists and we have a fresh cache entry
