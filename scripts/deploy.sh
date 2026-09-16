@@ -108,6 +108,9 @@ if [ "$CURRENT" != "$TARGET" ]; then
   fi
 fi
 
+echo "==> verifying CodeQL security evidence for $(git rev-parse HEAD)"
+pnpm run security:deployment-gate -- "$(git rev-parse HEAD)"
+
 echo "==> pnpm install"
 pnpm install --frozen-lockfile
 
