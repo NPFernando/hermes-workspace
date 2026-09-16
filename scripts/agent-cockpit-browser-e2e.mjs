@@ -158,14 +158,24 @@ const usagePayload = {
     },
   ],
 }
+const queueFixture = {
+  active: null,
+  waiting: [{ id: 'fixture-job', status: 'pending' }],
+  recent: [
+    {
+      id: 'fixture-dead-job',
+      status: 'failed',
+      priority: 3,
+      assignmentCount: 1,
+      deadLetterAt: now,
+    },
+  ],
+}
+let queueRetryRequests = 0
 const fixtures = {
   '/api/ops-observability': opsPayload,
   '/api/provider-usage': usagePayload,
-  '/api/swarm-dispatch': {
-    active: null,
-    waiting: [{ id: 'fixture-job', status: 'pending' }],
-    recent: [{ id: 'fixture-job', status: 'pending', deadLetterAt: null }],
-  },
+  '/api/swarm-dispatch': queueFixture,
   '/api/swarm-health': {
     checkedAt: now,
     workers: [],
@@ -312,6 +322,23 @@ try {
       })
     }
 
+    if (
+      url.pathname === '/api/swarm-dispatch' &&
+      request.method() === 'PATCH'
+    ) {
+      queueRetryRequests++
+      queueFixture.recent[0] = {
+        ...queueFixture.recent[0],
+        status: 'pending',
+        deadLetterAt: null,
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, queued: true }),
+      })
+    }
+
     requests.push({
       method: request.method(),
       cookie: request.headers().cookie ?? '',
@@ -330,11 +357,16 @@ try {
     'the legacy full-screen splash stays hidden from the first document paint',
   )
   assert.ok(
-    (await page.locator('[data-testid="connection-startup-screen"]').count()) <= 1,
+    (await page.locator('[data-testid="connection-startup-screen"]').count()) <=
+      1,
     'the runtime startup surface is mounted at most once during first paint',
   )
   assert.ok(
-    (await page.locator('#splash-screen:visible, [data-testid="connection-startup-screen"]:visible').count()) <= 1,
+    (await page
+      .locator(
+        '#splash-screen:visible, [data-testid="connection-startup-screen"]:visible',
+      )
+      .count()) <= 1,
     'the themed splash and runtime connection surface never display as duplicate full-screen loaders',
   )
   const login = await page.evaluate(async (loginPassword) => {
@@ -365,11 +397,14 @@ try {
   await page.locator('[data-route-page]').waitFor()
   await page.waitForTimeout(750)
   assert.ok(
-    (await page.locator('[data-testid="connection-startup-screen"]').count()) <= 1,
+    (await page.locator('[data-testid="connection-startup-screen"]').count()) <=
+      1,
     'the dashboard does not mount duplicate Hermes startup screens',
   )
   assert.equal(
-    await page.locator('[data-testid="connection-startup-screen"]:visible').count(),
+    await page
+      .locator('[data-testid="connection-startup-screen"]:visible')
+      .count(),
     0,
     'the authenticated dashboard has no leftover startup overlay',
   )
@@ -395,7 +430,9 @@ try {
   await page.getByText('Unresolved memory conflicts: 1').waitFor()
   await page.getByText('Quality schema: unavailable').waitFor()
   await page
-    .getByText('Execution: disabled · Side effects: false · Operator approval required: true')
+    .getByText(
+      'Execution: disabled · Side effects: false · Operator approval required: true',
+    )
     .waitFor()
   await page
     .getByRole('heading', { name: 'AI agent & provider usage' })
@@ -413,16 +450,18 @@ try {
   await page.getByRole('heading', { name: 'Claude', exact: true }).waitFor()
   await page.getByText('Team plan', { exact: true }).waitFor()
   assert.equal(
-    await page.getByText(/USD \(actual where available; otherwise estimated\)/).count(),
+    await page
+      .getByText(/USD \(actual where available; otherwise estimated\)/)
+      .count(),
     2,
     'both Hermes cost trends identify estimates instead of presenting them as billed cost',
   )
   await page
-    .getByText(/Copilot readings come from local CLI counters, not GitHub billing totals/)
+    .getByText(
+      /Copilot readings come from local CLI counters, not GitHub billing totals/,
+    )
     .waitFor()
-  await page
-    .getByText(/OpenAI API token usage is not billing data/)
-    .waitFor()
+  await page.getByText(/OpenAI API token usage is not billing data/).waitFor()
   await page
     .getByText(/Provider limits are separate and are not a combined budget/)
     .waitFor()
@@ -437,12 +476,16 @@ try {
     'Claude quota is rendered as an 80-percent progress value',
   )
   await page.getByText('75%+ of quota', { exact: true }).waitFor()
-  await page.getByRole('heading', { name: 'Claude · Weekly snapshot' }).waitFor()
+  await page
+    .getByRole('heading', { name: 'Claude · Weekly snapshot' })
+    .waitFor()
   await page
     .getByRole('heading', { name: 'Codex · Session snapshot' })
     .waitFor()
   assert.equal(
-    await page.getByText('Source: browser-e2e fixture', { exact: false }).count(),
+    await page
+      .getByText('Source: browser-e2e fixture', { exact: false })
+      .count(),
     2,
     'Codex and Claude provider cards both show the source of their readings',
   )
@@ -461,6 +504,42 @@ try {
     await page.locator('#splash-screen').isVisible(),
     false,
     'the themed pre-hydration splash is hidden after React takes ownership',
+  )
+
+  const queueRecovery = await page.evaluate(async () => {
+    const before = await (
+      await fetch('/api/swarm-dispatch', { cache: 'no-store' })
+    ).json()
+    const retry = await fetch('/api/swarm-dispatch?id=fixture-dead-job', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ acknowledgePossibleDuplicate: true }),
+    })
+    const after = await (
+      await fetch('/api/swarm-dispatch', { cache: 'no-store' })
+    ).json()
+    return {
+      before,
+      retry: { status: retry.status, body: await retry.json() },
+      after,
+    }
+  })
+  assert.equal(
+    queueRecovery.before.recent[0].deadLetterAt,
+    now,
+    'queue recovery starts from a dead-lettered job',
+  )
+  assert.equal(queueRecovery.retry.status, 200)
+  assert.equal(queueRecovery.retry.body.queued, true)
+  assert.equal(
+    queueRecovery.after.recent[0].deadLetterAt,
+    null,
+    'queue recovery refresh returns the retried job',
+  )
+  assert.equal(
+    queueRetryRequests,
+    1,
+    'dead-letter retry sends one acknowledged request',
   )
 
   await page.goto(`${baseUrl}/dify`, { waitUntil: 'domcontentloaded' })
