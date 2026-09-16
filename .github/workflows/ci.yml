@@ -63,6 +63,16 @@ jobs:
       - name: Check bundle budgets
         run: pnpm run check:bundle
 
+      - name: Verify Electron server bundle
+        run: |
+          pnpm run electron:bundle-server 2>&1 | tee /tmp/hermes-electron-bundle.log
+          if grep -E '(^|\[)WARNING|referenced in .*didn.t resolve' /tmp/hermes-electron-bundle.log; then
+            echo 'Electron bundle emitted a warning'
+            exit 1
+          fi
+          git diff --check -- electron/server-bundle.cjs
+          git diff --exit-code -- electron/server-bundle.cjs
+
   test:
     name: Run Tests
     runs-on: ubuntu-latest
