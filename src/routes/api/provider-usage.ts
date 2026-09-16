@@ -4,6 +4,7 @@ import { getProviderUsage } from '../../server/provider-usage'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { safeErrorMessage } from '../../server/rate-limit'
 import { recordAndReadProviderUsageHistory } from '../../server/provider-usage-history'
+import { buildMonthlyUsageBudget } from '../../server/usage-budget'
 import type { ProviderUsageHistoryPoint } from '../../server/provider-usage-history'
 
 const REQUEST_TIMEOUT_MS = 5000 // 5 second timeout
@@ -48,25 +49,29 @@ export const Route = createFileRoute('/api/provider-usage')({
           )
           let history: Array<ProviderUsageHistoryPoint> = []
           try {
-            history = recordAndReadProviderUsageHistory(payload.providers)
+            history = recordAndReadProviderUsageHistory(payload.providers, {
+              days: 31,
+            })
           } catch {
             // Usage remains available if optional local history storage is unavailable.
           }
-          return json({ ...payload, history })
+          return json({
+            ...payload,
+            history,
+            monthlyBudget: buildMonthlyUsageBudget(history),
+          })
         } catch (err) {
           // Provider usage is optional telemetry. A provider outage or slow
           // upstream must not make the authenticated workspace look unhealthy
           // or blank screens that consume the shared usage meter.
-          return json(
-            {
-              ok: true,
-              updatedAt: Date.now(),
-              providers: [],
-              history: [],
-              degraded: true,
-              error: safeErrorMessage(err),
-            },
-          )
+          return json({
+            ok: true,
+            updatedAt: Date.now(),
+            providers: [],
+            history: [],
+            degraded: true,
+            error: safeErrorMessage(err),
+          })
         }
       },
     },

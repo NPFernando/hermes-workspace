@@ -68,9 +68,10 @@ describe('provider usage API authentication and provenance', () => {
       source: 'GET /api/v1/key',
       lines: [{ measure: 'spend' }],
     })
-    expect(getUsageHistory).toHaveBeenCalledWith([
-      expect.objectContaining({ provider: 'openrouter' }),
-    ])
+    expect(getUsageHistory).toHaveBeenCalledWith(
+      [expect.objectContaining({ provider: 'openrouter' })],
+      { days: 31 },
+    )
     expect(payload.history).toEqual([])
   })
 
