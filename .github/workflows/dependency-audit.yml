@@ -4,14 +4,38 @@ on:
   schedule:
     - cron: '30 5 * * 1'
   workflow_dispatch:
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'Dockerfile'
+      - '.github/dependabot.yml'
+      - 'renovate.json'
+
+concurrency:
+  group: dependency-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  audit:
-    name: Audit and report dependencies
+  dependency-review:
+    name: Review dependency changes
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@v4
+
+  audit:
+    name: Audit and validate dependency upgrades
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -41,6 +65,21 @@ jobs:
         continue-on-error: true
         run: pnpm outdated --format json > dependency-outdated.json
 
+      - name: Run repository tests
+        run: pnpm test -- --reporter=dot
+
+      - name: Type check
+        run: pnpm run typecheck
+
+      - name: Build production artifacts
+        run: pnpm build
+
+      - name: Check asset and bundle integrity
+        run: |
+          node scripts/check-bundle-budget.mjs
+          test -d dist/client/assets
+          test "$(find dist/client/assets -type f | wc -l)" -gt 0
+
       - name: Upload dependency reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -57,6 +96,7 @@ jobs:
         run: |
           if [ "${{ steps.audit.outcome }}" = "failure" ]; then
             echo "High-severity dependency findings were reported in the uploaded artifact."
+            exit 1
           else
             echo "No high-severity dependency findings were reported."
           fi
