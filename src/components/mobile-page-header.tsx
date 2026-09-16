@@ -4,6 +4,9 @@
  */
 import type { ReactNode } from 'react'
 import { openHamburgerMenu } from '@/components/mobile-hamburger-menu'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { Search01Icon } from '@hugeicons/core-free-icons'
+import { openCommandPalette } from '@/components/command-palette'
 import { cn } from '@/lib/utils'
 
 type MobilePageHeaderProps = {
@@ -53,7 +56,17 @@ export function MobilePageHeader({
       <span className="flex-1 text-center text-[15px] font-semibold truncate -ml-11 text-[var(--theme-text)]">
         {title}
       </span>
-      <div className="shrink-0 w-9">{right ?? null}</div>
+      <div className="shrink-0 flex items-center gap-1">
+        <button
+          type="button"
+          aria-label="Search commands"
+          onClick={openCommandPalette}
+          className="flex size-10 items-center justify-center rounded-xl text-[var(--theme-muted)] transition-colors active:bg-white/10 touch-manipulation"
+        >
+          <HugeiconsIcon icon={Search01Icon} size={19} strokeWidth={1.7} />
+        </button>
+        {right ?? null}
+      </div>
     </div>
   )
 }

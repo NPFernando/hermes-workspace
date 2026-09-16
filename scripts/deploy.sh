@@ -38,6 +38,37 @@ artifact_build_id() {
 
 RUNTIME_DIR="${HERMES_RUNTIME_STATE_DIR:-.runtime}"
 BUILD_MARKER="$RUNTIME_DIR/build-commit"
+ROLLBACK_DIR=""
+ROLLBACK_ACTIVE=0
+
+rollback_failed_release() {
+  local exit_code=$?
+  if [ "$ROLLBACK_ACTIVE" = "1" ] || [ -z "$ROLLBACK_DIR" ] || [ ! -d "$ROLLBACK_DIR" ]; then
+    exit "$exit_code"
+  fi
+  ROLLBACK_ACTIVE=1
+  trap - ERR
+  echo "error: deployment validation failed; restoring previous compiled artifact" >&2
+  rm -rf dist
+  mv "$ROLLBACK_DIR/dist" dist
+  if [ -f "$ROLLBACK_DIR/build-commit" ]; then
+    cp "$ROLLBACK_DIR/build-commit" "$BUILD_MARKER"
+  else
+    rm -f "$BUILD_MARKER"
+  fi
+  if sudo systemctl restart hermes-workspace && curl -sf -o /dev/null http://127.0.0.1:3000/; then
+    local rollback_build
+    rollback_build="$(artifact_build_id)"
+    if RELEASE_SMOKE_EXPECTED_BUILD="$rollback_build" node scripts/release-smoke.mjs http://127.0.0.1:3000; then
+      echo "==> rollback recovered the previous release" >&2
+    else
+      echo "error: rollback release smoke failed; manual intervention required" >&2
+    fi
+  else
+    echo "error: rollback service restart or health check failed; manual intervention required" >&2
+  fi
+  exit "$exit_code"
+}
 
 if [ -n "$(git status --porcelain)" ]; then
   echo "error: deploy directory has uncommitted changes — refusing deployment." >&2
@@ -81,6 +112,11 @@ echo "==> pnpm install"
 pnpm install --frozen-lockfile
 
 echo "==> pnpm build"
+mkdir -p "$RUNTIME_DIR"
+ROLLBACK_DIR="$(mktemp -d "$RUNTIME_DIR/rollback.XXXXXX")"
+cp -a dist "$ROLLBACK_DIR/dist"
+if [ -f "$BUILD_MARKER" ]; then cp "$BUILD_MARKER" "$ROLLBACK_DIR/build-commit"; fi
+trap rollback_failed_release ERR
 pnpm build
 
 EXPECTED_BUILD="$(artifact_build_id)"
@@ -99,8 +135,10 @@ for i in $(seq 1 15); do
       exit 1
     fi
     RELEASE_SMOKE_EXPECTED_BUILD="$EXPECTED_BUILD" node scripts/release-smoke.mjs http://127.0.0.1:3000
-    mkdir -p "$RUNTIME_DIR"
     printf '%s\n' "$(git rev-parse HEAD)" > "$BUILD_MARKER"
+    rm -rf "$ROLLBACK_DIR"
+    ROLLBACK_DIR=""
+    trap - ERR
     echo "==> deployed $(git rev-parse --short HEAD), service healthy (pid=${NEW_PID:-unknown})"
     exit 0
   fi

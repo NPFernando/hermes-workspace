@@ -5181,6 +5181,7 @@ describe('scheduled_transaction (planned future income/expense)', () => {
       counterparty: 'Landlord',
       amount: 85_000,
       status: 'pending',
+      recurrence: 'none',
     })
     const id = db.scheduled_transactions[0].id
 
@@ -5205,6 +5206,23 @@ describe('scheduled_transaction (planned future income/expense)', () => {
 
     store.deleteFinanceRecord('scheduled_transaction', id)
     expect(store.readFinanceStore().scheduled_transactions).toHaveLength(0)
+  })
+
+  it('supports recurring schedules and clamps month-end dates safely', async () => {
+    const store = await freshFinanceStore()
+    store.addFinanceRecord('scheduled_transaction', {
+      dueDate: '2026-01-31',
+      kind: 'expense',
+      counterparty: 'Rent',
+      category: 'Housing',
+      amount: 100,
+      recurrence: 'monthly',
+    })
+    expect(store.readFinanceStore().scheduled_transactions[0].recurrence).toBe('monthly')
+    expect(store.nextScheduledDate('2026-01-31', 'monthly')).toBe('2026-02-28')
+    expect(store.nextScheduledDate('2028-02-29', 'yearly')).toBe('2029-02-28')
+    expect(store.nextScheduledDate('2026-09-10', 'weekly')).toBe('2026-09-17')
+    expect(store.nextScheduledDate('2026-09-10', 'none')).toBe('2026-09-10')
   })
 
   it('getUpcomingMoney.scheduled lists pending items in a -14..+45 day window, sorted by days', async () => {

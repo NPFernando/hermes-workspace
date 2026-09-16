@@ -95,3 +95,10 @@ jobs:
 
       - name: Run finance browser journey
         run: pnpm run test:e2e:finance
+
+      - name: Run authenticated workspace journey
+        if: ${{ secrets.AUTH_E2E_PASSWORD != '' && secrets.AUTH_E2E_BASE_URL != '' }}
+        env:
+          AUTH_E2E_PASSWORD: ${{ secrets.AUTH_E2E_PASSWORD }}
+          AUTH_E2E_BASE_URL: ${{ secrets.AUTH_E2E_BASE_URL }}
+        run: pnpm run test:e2e:auth

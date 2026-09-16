@@ -24,7 +24,7 @@ if (!password) {
 const routes = [
   { path: '/dashboard', pattern: /Hermes Workspace|Dashboard/i },
   { path: '/ops-cost', pattern: /Cost & Routing/i },
-  { path: '/personal-finance', pattern: /Money clarity|Personal finance/i },
+  { path: '/personal-finance', pattern: /Your money at a glance/i, timeout: 45_000 },
   { path: '/dify', pattern: /Dify Workbench/i },
 ]
 // Allow hosts with a system Chromium but no Playwright browser download.
@@ -50,13 +50,13 @@ function check(condition, message) {
   }
 }
 
-async function bodyMatches(pattern, message) {
+async function bodyMatches(pattern, message, timeout = 15_000) {
   await page
     .waitForFunction(
       ({ source, flags }) =>
         new RegExp(source, flags).test(document.body?.innerText || ''),
       { source: pattern.source, flags: pattern.flags },
-      { timeout: 15_000 },
+      { timeout },
     )
     .catch(() => {})
   const text = await page
@@ -124,6 +124,7 @@ try {
     await bodyMatches(
       route.pattern,
       `${route.path} renders its authenticated surface`,
+      route.timeout,
     )
     if (route.path === '/ops-cost') {
       await bodyMatches(
@@ -143,12 +144,53 @@ try {
   await promptInput
     .waitFor({ state: 'visible', timeout: 30_000 })
   await promptInput.fill('/queue browser smoke')
-  await promptInput.press('Enter')
-  await bodyMatches(
-    /browser smoke|queue/i,
-    '/queue command is accepted in the authenticated chat',
+  await page.getByRole('button', { name: 'Send message', exact: true }).click()
+  await page.waitForFunction(
+    () =>
+      Object.entries(window.localStorage).some(([key, value]) => {
+        if (!key.startsWith('claude.chat-queue.v1.')) return false
+        try {
+          const prompts = JSON.parse(value)
+          return Array.isArray(prompts) && prompts.some((prompt) => prompt?.text === 'browser smoke')
+        } catch {
+          return false
+        }
+      }),
+    undefined,
+    { timeout: 15_000 },
   )
+  check(true, '/queue command is accepted and persisted in the authenticated chat')
   await page.unroute('**/api/send-stream')
+
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.waitForFunction(
+    () =>
+      Object.entries(window.localStorage).some(([key, value]) => {
+        if (!key.startsWith('claude.chat-queue.v1.')) return false
+        try {
+          const prompts = JSON.parse(value)
+          return Array.isArray(prompts) && prompts.some((prompt) => prompt?.text === 'browser smoke')
+        } catch {
+          return false
+        }
+      }),
+    undefined,
+    { timeout: 15_000 },
+  )
+  check(true, '/queue item survives an authenticated page reload')
+
+  // Verify the touch-first command path and recover back to the dashboard.
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(`${baseUrl}/dashboard`, { waitUntil: 'domcontentloaded' })
+  await page.getByRole('button', { name: 'Search commands' }).click()
+  const commandInput = page.getByPlaceholder(
+    'Search screens, sessions, and commands',
+  )
+  await commandInput.fill('Settings')
+  await page.getByText('Settings', { exact: true }).last().click()
+  await page.waitForURL(/\/settings(?:[/?]|$)/)
+  check(true, 'mobile command search opens Settings')
+  await page.setViewportSize({ width: 1280, height: 900 })
 } finally {
   await context.close()
   await browser.close()

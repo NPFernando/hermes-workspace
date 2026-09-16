@@ -52,6 +52,8 @@ import {
   setKnownSenderPassword,
   setNonLiveExecutionMode,
   snoozeAlert,
+  nextScheduledDate,
+  scheduledRecurrence,
   storeIntelligenceRecords,
   tradingPerformanceSummary,
   updateExchangeRate,
@@ -2088,10 +2090,26 @@ export const Route = createFileRoute('/api/finance')({
               status: 'posted',
               postedRecordId: newRecord.id,
             })
+            const recurrence = scheduledRecurrence(sched.recurrence)
+            let nextScheduledId: string | undefined
+            if (recurrence !== 'none') {
+              const next = addFinanceRecord('scheduled_transaction', {
+                dueDate: nextScheduledDate(sched.dueDate, recurrence),
+                kind: sched.kind,
+                counterparty: sched.counterparty,
+                category: sched.category,
+                amount: sched.amount,
+                accountId: sched.accountId,
+                notes: sched.notes,
+                recurrence,
+              })
+              nextScheduledId = next.scheduled_transactions[next.scheduled_transactions.length - 1]?.id
+            }
             appendAuditLog('scheduled_transaction_posted', {
               id,
               kind: sched.kind,
               recordId: newRecord.id,
+              nextScheduledId,
             })
             return json(personalFinancePayload())
           }

@@ -213,6 +213,7 @@ function normalizePortableHistory(
 }
 
 function normalizeClaudeErrorMessage(error: unknown): string {
+  if (process.env.NODE_ENV === 'production') return 'Claude request failed'
   const raw = safeErrorMessage(error)
   const message = raw.trim()
   if (!message) return 'Claude request failed'

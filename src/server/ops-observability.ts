@@ -474,7 +474,7 @@ function readCronJobsFile(path: string): Array<CronJobRecord> | null {
   }
 }
 
-function getOpsCronJobs(): Array<OpsCronJob> | null {
+export function getOpsCronJobs(): Array<OpsCronJob> | null {
   const path = join(HERMES_HOME, 'cron', 'jobs.json')
   const jobs = readCronJobsFile(path)
   if (!jobs) return null

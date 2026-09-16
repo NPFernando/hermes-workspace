@@ -61,8 +61,8 @@ export const Route = createFileRoute('/api/openrouter-credits')({
           else if (remaining <= 2.0) level = 'warning'
 
           return jsonResponse({ total, used, remaining, level })
-        } catch (err) {
-          return jsonResponse({ error: String(err) }, 502)
+        } catch {
+          return jsonResponse({ error: 'OpenRouter credits unavailable' }, 502)
         }
       },
     },

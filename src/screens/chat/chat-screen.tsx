@@ -25,10 +25,12 @@ import {
 import {
   MAX_CHAT_QUEUE_ITEMS,
   MAX_CHAT_QUEUE_TEXT_LENGTH,
+  CHAT_QUEUE_DEFAULT_MAX_ATTEMPTS,
   createQueuedChatPrompt,
   getChatQueuePausedStorageKey,
   getChatQueueStorageKey,
   parseQueueCommand,
+  nextEligibleChatQueueIndex,
   readChatQueue,
   readChatQueuePaused,
   refreshChatQueueLock,
@@ -603,9 +605,9 @@ export function ChatScreen({
   } | null>(null)
   const queuedPromptsRef = useRef(queuedPrompts)
   const drainQueuedPromptRef = useRef<() => void>(() => {})
-  const restoreQueuedPromptRef = useRef<(prompt: QueuedChatPrompt) => void>(
-    () => {},
-  )
+  const restoreQueuedPromptRef = useRef<
+    (prompt: QueuedChatPrompt, automaticRetry?: boolean) => void
+  >(() => {})
   const activeQueuedPromptRef = useRef<QueuedChatPrompt | null>(null)
   const queueLockOwnerRef = useRef<string | null>(null)
   const queuePausedRef = useRef(false)
@@ -764,7 +766,7 @@ export function ChatScreen({
   }, [])
 
   const enqueueQueuedPrompt = useCallback(
-    (text: string) => {
+    (text: string, options: Parameters<typeof createQueuedChatPrompt>[1] = {}) => {
       const normalizedText = text.trim()
       if (!normalizedText) {
         toast('Queued message cannot be empty', { type: 'error' })
@@ -783,10 +785,14 @@ export function ChatScreen({
         })
         return
       }
-      const prompt = createQueuedChatPrompt(normalizedText)
+      const prompt = createQueuedChatPrompt(normalizedText, options)
       queuePausedRef.current = false
       setQueuePaused(false)
-      const nextQueue = [...queuedPromptsRef.current, prompt]
+      const nextQueue = [...queuedPromptsRef.current, prompt].sort(
+        (a, b) =>
+          (b.priority ?? 1) - (a.priority ?? 1) ||
+          a.createdAt - b.createdAt,
+      )
       queuedPromptsRef.current = nextQueue
       setQueuedPrompts(nextQueue)
       writeChatQueue(queueSessionKey, nextQueue)
@@ -1542,7 +1548,7 @@ export function ChatScreen({
         activeQueuedPromptRef.current = null
         setActiveQueuedPrompt(null)
         if (activeQueuedPrompt) {
-          restoreQueuedPromptRef.current(activeQueuedPrompt)
+          restoreQueuedPromptRef.current(activeQueuedPrompt, true)
         }
         setSending(false)
         if (isMissingAuth(messageText)) {
@@ -2782,7 +2788,7 @@ export function ChatScreen({
       const queueCommand = parseQueueCommand(trimmedCommand)
       if (queueCommand) {
         if (queueCommand.kind === 'enqueue') {
-          enqueueQueuedPrompt(queueCommand.text)
+          enqueueQueuedPrompt(queueCommand.text, queueCommand)
         } else if (queueCommand.kind === 'clear') {
           clearQueuedPrompts()
         } else if (queueCommand.kind === 'resume') {
@@ -3041,7 +3047,15 @@ export function ChatScreen({
     if (queuedPromptsRef.current.length === 0) return
     const lockOwner = tryAcquireChatQueueLock(queueSessionKey)
     if (!lockOwner) return
-    const [nextPrompt, ...remaining] = queuedPromptsRef.current
+    const nextIndex = nextEligibleChatQueueIndex(queuedPromptsRef.current)
+    if (nextIndex < 0) {
+      releaseChatQueueLock(queueSessionKey, lockOwner)
+      return
+    }
+    const nextPrompt = queuedPromptsRef.current[nextIndex]
+    const remaining = queuedPromptsRef.current.filter(
+      (_prompt, index) => index !== nextIndex,
+    )
 
     queueLockOwnerRef.current = lockOwner
     queuedPromptsRef.current = remaining
@@ -3049,21 +3063,37 @@ export function ChatScreen({
     writeChatQueue(queueSessionKey, remaining)
     activeQueuedPromptRef.current = nextPrompt
     setActiveQueuedPrompt(nextPrompt)
+    const previousSisterId = selectedSisterIdRef.current
+    if (nextPrompt.agentId) selectedSisterIdRef.current = nextPrompt.agentId
     send(nextPrompt.text, [], false, commandHelpers)
+    selectedSisterIdRef.current = previousSisterId
   }, [queueSessionKey, send])
 
   const restoreQueuedPrompt = useCallback(
-    (prompt: QueuedChatPrompt) => {
-      const nextQueue = [prompt, ...queuedPromptsRef.current]
-      queuePausedRef.current = true
-      setQueuePaused(true)
+    (prompt: QueuedChatPrompt, automaticRetry = false) => {
+      const attempts = (prompt.attempts ?? 0) + (automaticRetry ? 1 : 0)
+      const maxAttempts = prompt.maxAttempts ?? 2
+      const canRetry = automaticRetry && attempts <= maxAttempts
+      const retryPrompt = canRetry
+        ? {
+            ...prompt,
+            attempts,
+            runAt: Date.now() + Math.min(60_000, 2 ** attempts * 1_000),
+          }
+        : prompt
+      const nextQueue = [retryPrompt, ...queuedPromptsRef.current]
+      queuePausedRef.current = !canRetry
+      setQueuePaused(!canRetry)
       queuedPromptsRef.current = nextQueue
       setQueuedPrompts(nextQueue)
       writeChatQueue(queueSessionKey, nextQueue)
-      writeChatQueuePaused(queueSessionKey, true)
-      toast('Queued message kept after send stopped — use /queue resume', {
-        type: 'error',
-      })
+      writeChatQueuePaused(queueSessionKey, !canRetry)
+      toast(
+        canRetry
+          ? `Queued message retry ${attempts}/${maxAttempts} scheduled`
+          : 'Queued message kept after send stopped — use /queue resume',
+        { type: 'error' },
+      )
     },
     [queueSessionKey],
   )
@@ -3100,6 +3130,23 @@ export function ChatScreen({
     const timer = window.setTimeout(() => drainQueuedPromptRef.current(), 0)
     return () => window.clearTimeout(timer)
   }, [activeRunCheckDone, queuedPrompts.length, sending, waitingForResponse])
+
+  // Wake the queue when its next scheduled item becomes eligible. The timer
+  // is bounded so a clock change or tab suspension cannot create a stale lock.
+  useEffect(() => {
+    if (queuePausedRef.current || queuedPrompts.length === 0) return
+    const now = Date.now()
+    const nextRunAt = queuedPrompts.reduce<number | null>((soonest, prompt) => {
+      if (prompt.runAt === undefined || prompt.runAt <= now) return soonest
+      return soonest === null ? prompt.runAt : Math.min(soonest, prompt.runAt)
+    }, null)
+    if (nextRunAt === null) return
+    const timer = window.setTimeout(
+      () => drainQueuedPromptRef.current(),
+      Math.min(Math.max(0, nextRunAt - now), 2 ** 31 - 1),
+    )
+    return () => window.clearTimeout(timer)
+  }, [queuedPrompts, queuePaused, sending, waitingForResponse])
 
   const handleAbortStreaming = useCallback(() => {
     const activeQueuedPrompt = activeQueuedPromptRef.current
@@ -3578,6 +3625,21 @@ export function ChatScreen({
                         >
                           {prompt.text}
                         </span>
+                        {(prompt.priority !== undefined && prompt.priority > 1) ||
+                        prompt.runAt !== undefined ||
+                        prompt.agentId ? (
+                          <span className="shrink-0 text-[9px] text-[var(--theme-muted)]">
+                            {prompt.priority !== undefined && prompt.priority > 1
+                              ? prompt.priority >= 3
+                                ? 'urgent'
+                                : 'high'
+                              : null}
+                            {prompt.agentId ? ` · ${prompt.agentId}` : ''}
+                            {prompt.runAt
+                              ? ` · ${new Date(prompt.runAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                              : ''}
+                          </span>
+                        ) : null}
                         <button
                           type="button"
                           className="shrink-0 px-1 text-[var(--theme-muted)] hover:text-[var(--theme-danger)]"

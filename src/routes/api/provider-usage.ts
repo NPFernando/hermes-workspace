@@ -54,14 +54,18 @@ export const Route = createFileRoute('/api/provider-usage')({
           }
           return json({ ...payload, history })
         } catch (err) {
+          // Provider usage is optional telemetry. A provider outage or slow
+          // upstream must not make the authenticated workspace look unhealthy
+          // or blank screens that consume the shared usage meter.
           return json(
             {
-              ok: false,
+              ok: true,
               updatedAt: Date.now(),
               providers: [],
+              history: [],
+              degraded: true,
               error: safeErrorMessage(err),
             },
-            { status: 503 },
           )
         }
       },

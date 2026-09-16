@@ -24,6 +24,26 @@ const BUBBLE_TTL_MS = 7000
 const MAX_BUBBLES = 80
 const PROXIMITY_PX = 220
 
+function randomInt(maxExclusive: number): number {
+  if (maxExclusive <= 1) return 0
+  if (typeof crypto === 'undefined') return 0
+
+  const range = 0x1_0000_0000
+  const limit = range - (range % maxExclusive)
+  const sample = new Uint32Array(1)
+  do {
+    crypto.getRandomValues(sample)
+  } while (sample[0] >= limit)
+  return sample[0] % maxExclusive
+}
+
+function randomId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID()
+  }
+  return `${Date.now()}-${randomInt(1_000_000_000)}`
+}
+
 interface UseAgoraRoomOpts {
   profile: AgoraProfile
   world?: AgoraWorld
@@ -137,7 +157,7 @@ export function useAgoraRoom({
     const id = window.setInterval(() => {
       setOthers((prev) =>
         prev.map((u) =>
-          Math.random() < 0.5
+          randomInt(2) === 0
             ? driftUser(u, {
                 worldWidth: world.width,
                 worldHeight: world.height,
@@ -180,10 +200,7 @@ export function useAgoraRoom({
       const trimmed = body.trim().slice(0, 280)
       if (!trimmed) return
       const msg: AgoraMessage = {
-        id:
-          typeof crypto !== 'undefined' && 'randomUUID' in crypto
-            ? crypto.randomUUID()
-            : `${Date.now()}-${Math.random()}`,
+        id: randomId(),
         userId: profile.id,
         body: trimmed,
         createdAt: Date.now(),
@@ -214,16 +231,13 @@ export function useAgoraRoom({
     const tick = () => {
       if (cancelled) return
       if (others.length === 0) return
-      const speaker = others[Math.floor(Math.random() * others.length)]
-      const line = lines[Math.floor(Math.random() * lines.length)]
+      const speaker = others[randomInt(others.length)]
+      const line = lines[randomInt(lines.length)]
       setMessages((prev) => {
         const next: Array<AgoraMessage> = [
           ...prev,
           {
-            id:
-              typeof crypto !== 'undefined' && 'randomUUID' in crypto
-                ? crypto.randomUUID()
-                : `${Date.now()}-${Math.random()}`,
+            id: randomId(),
             userId: speaker.profile.id,
             body: line,
             createdAt: Date.now(),
@@ -231,7 +245,7 @@ export function useAgoraRoom({
         ]
         return next.length > MAX_BUBBLES ? next.slice(-MAX_BUBBLES) : next
       })
-      window.setTimeout(tick, 12000 + Math.random() * 13000)
+      window.setTimeout(tick, 12000 + randomInt(13001))
     }
     const initial = window.setTimeout(tick, 4000)
     return () => {

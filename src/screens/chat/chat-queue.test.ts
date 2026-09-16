@@ -6,6 +6,7 @@ import {
   getChatQueueLockStorageKey,
   getChatQueuePausedStorageKey,
   getChatQueueStorageKey,
+  nextEligibleChatQueueIndex,
   parseQueueCommand,
   readChatQueue,
   readChatQueuePaused,
@@ -64,6 +65,27 @@ describe('/queue command', () => {
         'Usage: /queue edit <number> <replacement> or /queue remove <number>',
     })
     expect(parseQueueCommand('/queued message')).toBeNull()
+    expect(parseQueueCommand('/queue urgent fix production')).toMatchObject({
+      kind: 'enqueue',
+      priority: 3,
+      text: 'fix production',
+    })
+    expect(parseQueueCommand('/queue at 2030-01-02T03:04:05Z agent codex audit')).toMatchObject({
+      kind: 'enqueue',
+      agentId: 'codex',
+      runAt: Date.parse('2030-01-02T03:04:05Z'),
+      text: 'audit',
+    })
+  })
+
+  it('selects the highest-priority eligible item and skips scheduled work', () => {
+    const queue = [
+      { id: 'future', text: 'future', createdAt: 1, priority: 3, runAt: 500 },
+      { id: 'normal', text: 'normal', createdAt: 2, priority: 1 },
+      { id: 'high', text: 'high', createdAt: 3, priority: 2 },
+    ]
+    expect(nextEligibleChatQueueIndex(queue, 100)).toBe(2)
+    expect(nextEligibleChatQueueIndex(queue, 500)).toBe(0)
   })
 
   it('edits a pending prompt in place and rejects invalid replacements', () => {

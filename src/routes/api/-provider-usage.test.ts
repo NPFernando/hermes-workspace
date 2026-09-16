@@ -89,4 +89,23 @@ describe('provider usage API authentication and provenance', () => {
     expect(response.status).toBe(200)
     expect(payload).toMatchObject({ ok: true, providers: [], history: [] })
   })
+
+  it('returns a degraded success when provider polling fails', async () => {
+    state.authenticated = true
+    getUsage.mockRejectedValue(new Error('provider temporarily unavailable'))
+
+    const response = await handlers.GET({
+      request: new Request('http://localhost/api/provider-usage'),
+    })
+    const payload = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(payload).toMatchObject({
+      ok: true,
+      providers: [],
+      history: [],
+      degraded: true,
+      error: 'provider temporarily unavailable',
+    })
+  })
 })

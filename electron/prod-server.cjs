@@ -34,6 +34,22 @@ const MIME_TYPES = {
   '.webmanifest': 'application/manifest+json',
 }
 
+function buildStaticFileIndex(root) {
+  const index = new Map()
+  const visit = (directory, relativeDirectory) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const relativePath = relativeDirectory
+        ? path.posix.join(relativeDirectory, entry.name)
+        : entry.name
+      const absolutePath = path.join(directory, entry.name)
+      if (entry.isDirectory()) visit(absolutePath, relativePath)
+      else if (entry.isFile()) index.set(`/${relativePath}`, absolutePath)
+    }
+  }
+  visit(root, '')
+  return index
+}
+
 async function loadServerBuild() {
   if (fs.existsSync(BUNDLED_SERVER)) {
     const bundled = require(BUNDLED_SERVER)
@@ -53,14 +69,15 @@ async function main() {
     process.env.HERMES_DASHBOARD_URL || 'http://127.0.0.1:9119'
 
   const serverBuild = await loadServerBuild()
+  const staticFiles = buildStaticFileIndex(DIST_CLIENT)
 
   const server = http.createServer(async (req, res) => {
     const url = req.url || '/'
     const pathname = url.split('?')[0]
 
     if (pathname !== '/' && !pathname.startsWith('/api/')) {
-      const filePath = path.join(DIST_CLIENT, pathname)
-      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      const filePath = staticFiles.get(pathname)
+      if (filePath) {
         const ext = path.extname(filePath)
         const mime = MIME_TYPES[ext] || 'application/octet-stream'
         const content = fs.readFileSync(filePath)

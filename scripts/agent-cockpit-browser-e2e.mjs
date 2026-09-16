@@ -28,6 +28,7 @@ const apiPaths = [
   '/api/harp-observability',
   '/api/workspace-session-health',
   '/api/dify-status',
+  '/api/dify-integration',
 ]
 const seen = new Map(apiPaths.map((path) => [path, []]))
 const opsPayload = {
@@ -226,6 +227,13 @@ const fixtures = {
     available: true,
     url: 'https://dify.example.test',
     detail: 'Dify provider is reachable.',
+  },
+  '/api/dify-integration': {
+    ok: true,
+    workflows: [],
+    history: [],
+    privacy: { mode: 'public-only', historyStores: 'metadata-only' },
+    detail: 'No workflows configured in the fixture.',
   },
 }
 
@@ -457,7 +465,7 @@ try {
 
   await page.goto(`${baseUrl}/dify`, { waitUntil: 'domcontentloaded' })
   await page.getByRole('heading', { name: 'Dify Workbench' }).waitFor()
-  const difyLink = page.getByRole('link', { name: 'Open Dify Workbench' })
+  const difyLink = page.getByRole('link', { name: /Open full Dify Workbench/ })
   assert.equal(await difyLink.getAttribute('href'), 'https://dify.example.test')
   assert.equal(await difyLink.getAttribute('target'), '_blank')
   assert.match(await difyLink.getAttribute('rel'), /noopener/)

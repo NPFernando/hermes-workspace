@@ -18,6 +18,7 @@ import {
   getDiscoveredModels,
   getDiscoveryStatus,
 } from './local-provider-discovery'
+import { isSafeObjectKey } from './security-utils'
 import { createCapabilityUnavailablePayload } from '@/lib/feature-gates'
 
 type AuthResult = Response | true
@@ -132,6 +133,7 @@ function deepMerge(
   source: Record<string, unknown>,
 ): void {
   for (const [key, value] of Object.entries(source)) {
+    if (!isSafeObjectKey(key)) continue
     if (
       value &&
       typeof value === 'object' &&

@@ -103,6 +103,26 @@ interface HeadroomStats {
   savingsPct: number
   agents: Array<HeadroomAgent>
 }
+
+interface SystemMetricsPayload {
+  process: { uptimeSeconds: number; pid: number }
+  api: {
+    windowMinutes: number
+    requests: number
+    errorCount: number
+    errorRatePercent: number
+    averageLatencyMs: number | null
+    p95LatencyMs: number | null
+    topRoutes: Array<{ path: string; requests: number; averageLatencyMs: number }>
+  }
+  jobs: {
+    totalCronJobs: number | null
+    failedCronJobs: number | null
+    queueDepth: number | null
+    queueRunning: number | null
+    queueFailedRecent: number | null
+  }
+}
 interface OpsPayload {
   ok: boolean
   error?: string
@@ -184,6 +204,74 @@ function shortFileName(path: string): string {
   return path.split('/').pop() || path
 }
 
+function formatUptime(seconds: number): string {
+  const days = Math.floor(seconds / 86400)
+  const hours = Math.floor((seconds % 86400) / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  return days > 0 ? `${days}d ${hours}h` : hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
+}
+
+function OperationalHealthPanel() {
+  const query = useQuery({
+    queryKey: ['system-metrics-observability'],
+    queryFn: async () => {
+      const response = await fetch('/api/system-metrics', { cache: 'no-store' })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      return (await response.json()) as SystemMetricsPayload
+    },
+    refetchInterval: 15_000,
+  })
+  const data = query.data
+  return (
+    <Panel title="Operational health">
+      {query.isPending ? (
+        <p className="text-sm text-[var(--theme-muted)]">Loading live health…</p>
+      ) : query.isError || !data ? (
+        <p className="text-sm text-[var(--theme-muted)]">Live health is unavailable.</p>
+      ) : (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+            <StatTile label="Uptime" value={formatUptime(data.process.uptimeSeconds)} />
+            <StatTile
+              label={`API p95 · ${data.api.windowMinutes}m`}
+              value={data.api.p95LatencyMs == null ? '—' : `${data.api.p95LatencyMs}ms`}
+              hint={data.api.averageLatencyMs == null ? undefined : `avg ${data.api.averageLatencyMs}ms`}
+            />
+            <StatTile
+              label="API errors"
+              value={`${data.api.errorRatePercent.toFixed(1)}%`}
+              hint={`${data.api.errorCount} / ${data.api.requests} requests`}
+            />
+            <StatTile
+              label="Queue depth"
+              value={data.jobs.queueDepth == null ? '—' : String(data.jobs.queueDepth)}
+              hint={data.jobs.queueRunning == null ? undefined : `${data.jobs.queueRunning} running`}
+            />
+            <StatTile
+              label="Failed jobs"
+              value={data.jobs.failedCronJobs == null ? '—' : String(data.jobs.failedCronJobs)}
+              hint={data.jobs.queueFailedRecent == null ? undefined : `${data.jobs.queueFailedRecent} queue failures recent`}
+            />
+          </div>
+          {data.api.topRoutes.length > 0 && (
+            <div>
+              <div className="mb-1 text-xs uppercase tracking-wide text-[var(--theme-muted)]">Busy API routes</div>
+              <div className="grid gap-1 text-xs text-[var(--theme-muted)] md:grid-cols-2">
+                {data.api.topRoutes.slice(0, 6).map((route) => (
+                  <div key={route.path} className="flex justify-between gap-3">
+                    <code className="truncate text-[var(--theme-text)]">{route.path}</code>
+                    <span className="shrink-0 tabular-nums">{route.requests} · {route.averageLatencyMs}ms avg</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </Panel>
+  )
+}
+
 function Panel({
   title,
   children,
@@ -198,6 +286,70 @@ function Panel({
       </h2>
       {children}
     </section>
+  )
+}
+
+type ReadinessCheck = { status: string; detail: string }
+type ReadinessReport = {
+  overall: string
+  generatedAt: string
+  blockers: Array<string>
+  warnings: Array<string>
+  checks: Record<string, ReadinessCheck>
+}
+
+function ProductionReadinessPanel() {
+  const query = useQuery({
+    queryKey: ['production-readiness'],
+    enabled: false,
+    queryFn: async () => {
+      const response = await fetch('/api/production-readiness', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const data = (await response.json()) as { ok?: boolean; error?: string; report?: ReadinessReport }
+      if (!response.ok || !data.ok || !data.report) throw new Error(data.error || `HTTP ${response.status}`)
+      return data.report
+    },
+  })
+  const report = query.data
+  return (
+    <Panel title="Production readiness report">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="max-w-2xl text-sm text-[var(--theme-muted)]">
+          Runs tests, security-alert checks, migration evidence, service health,
+          asset integrity, release smoke, and deployment-identity verification.
+          Missing external evidence is shown as a warning, never as a pass.
+        </p>
+        <button
+          type="button"
+          onClick={() => void query.refetch()}
+          disabled={query.isFetching}
+          className="min-h-10 rounded-lg bg-accent-500 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {query.isFetching ? 'Running checks…' : 'Run readiness report'}
+        </button>
+      </div>
+      {query.error && <p className="mt-3 text-sm text-[var(--theme-danger)]">{query.error instanceof Error ? query.error.message : 'Readiness report failed.'}</p>}
+      {report && (
+        <div className="mt-4 space-y-3">
+          <div className={`rounded-lg border p-3 text-sm font-semibold ${report.overall === 'ready' ? 'border-[var(--theme-success)]/40 text-[var(--theme-success)]' : report.overall === 'blocked' ? 'border-[var(--theme-danger)]/40 text-[var(--theme-danger)]' : 'border-[var(--theme-warning)]/40 text-[var(--theme-warning)]'}`}>
+            Overall: {report.overall} · {new Date(report.generatedAt).toLocaleString()}
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {Object.entries(report.checks).map(([name, check]) => (
+              <div key={name} className="rounded-lg border border-[var(--theme-border)] p-2 text-xs">
+                <div className="flex justify-between gap-2 font-semibold"><span>{name}</span><span className={check.status === 'pass' ? 'text-[var(--theme-success)]' : check.status === 'fail' ? 'text-[var(--theme-danger)]' : 'text-[var(--theme-warning)]'}>{check.status}</span></div>
+                <p className="mt-1 text-[var(--theme-muted)]">{check.detail}</p>
+              </div>
+            ))}
+          </div>
+          {report.blockers.length > 0 && <p className="text-xs text-[var(--theme-danger)]">Blockers: {report.blockers.join(' · ')}</p>}
+          {report.warnings.length > 0 && <p className="text-xs text-[var(--theme-warning)]">Warnings: {report.warnings.join(' · ')}</p>}
+        </div>
+      )}
+    </Panel>
   )
 }
 
@@ -295,6 +447,9 @@ export function OpsCostScreen() {
             : ''}
         </p>
       </header>
+
+      <OperationalHealthPanel />
+      <ProductionReadinessPanel />
 
       {/* Headline stat tiles */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

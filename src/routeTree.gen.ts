@@ -65,6 +65,7 @@ import { Route as ApiDemoTradingRouteImport } from './routes/api/demo-trading'
 import { Route as ApiDemoTradingGridRouteImport } from './routes/api/demo-trading-grid'
 import { Route as ApiDemoTradingLlmRouteImport } from './routes/api/demo-trading-llm'
 import { Route as ApiDemoTradingRebalanceRouteImport } from './routes/api/demo-trading-rebalance'
+import { Route as ApiDifyIntegrationRouteImport } from './routes/api/dify-integration'
 import { Route as ApiDifyStatusRouteImport } from './routes/api/dify-status'
 import { Route as ApiDownloadApkRouteImport } from './routes/api/download-apk'
 import { Route as ApiEnvResetRouteImport } from './routes/api/env-reset'
@@ -101,6 +102,7 @@ import { Route as ApiPersonalitySwarmRouteImport } from './routes/api/personalit
 import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiPluginsRouteImport } from './routes/api/plugins'
 import { Route as ApiPreviewFileRouteImport } from './routes/api/preview-file'
+import { Route as ApiProductionReadinessRouteImport } from './routes/api/production-readiness'
 import { Route as ApiProviderUsageRouteImport } from './routes/api/provider-usage'
 import { Route as ApiRiskCheckRouteImport } from './routes/api/risk-check'
 import { Route as ApiRouteSisterRouteImport } from './routes/api/route-sister'
@@ -540,6 +542,11 @@ const ApiDemoTradingRebalanceRoute = ApiDemoTradingRebalanceRouteImport.update({
   path: '/api/demo-trading-rebalance',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDifyIntegrationRoute = ApiDifyIntegrationRouteImport.update({
+  id: '/api/dify-integration',
+  path: '/api/dify-integration',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDifyStatusRoute = ApiDifyStatusRouteImport.update({
   id: '/api/dify-status',
   path: '/api/dify-status',
@@ -718,6 +725,11 @@ const ApiPluginsRoute = ApiPluginsRouteImport.update({
 const ApiPreviewFileRoute = ApiPreviewFileRouteImport.update({
   id: '/api/preview-file',
   path: '/api/preview-file',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProductionReadinessRoute = ApiProductionReadinessRouteImport.update({
+  id: '/api/production-readiness',
+  path: '/api/production-readiness',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiProviderUsageRoute = ApiProviderUsageRouteImport.update({
@@ -1578,6 +1590,7 @@ export interface FileRoutesByFullPath {
   '/api/demo-trading-grid': typeof ApiDemoTradingGridRoute
   '/api/demo-trading-llm': typeof ApiDemoTradingLlmRoute
   '/api/demo-trading-rebalance': typeof ApiDemoTradingRebalanceRoute
+  '/api/dify-integration': typeof ApiDifyIntegrationRoute
   '/api/dify-status': typeof ApiDifyStatusRoute
   '/api/download-apk': typeof ApiDownloadApkRoute
   '/api/env-reset': typeof ApiEnvResetRoute
@@ -1614,6 +1627,7 @@ export interface FileRoutesByFullPath {
   '/api/ping': typeof ApiPingRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/production-readiness': typeof ApiProductionReadinessRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/risk-check': typeof ApiRiskCheckRoute
   '/api/route-sister': typeof ApiRouteSisterRoute
@@ -1829,6 +1843,7 @@ export interface FileRoutesByTo {
   '/api/demo-trading-grid': typeof ApiDemoTradingGridRoute
   '/api/demo-trading-llm': typeof ApiDemoTradingLlmRoute
   '/api/demo-trading-rebalance': typeof ApiDemoTradingRebalanceRoute
+  '/api/dify-integration': typeof ApiDifyIntegrationRoute
   '/api/dify-status': typeof ApiDifyStatusRoute
   '/api/download-apk': typeof ApiDownloadApkRoute
   '/api/env-reset': typeof ApiEnvResetRoute
@@ -1865,6 +1880,7 @@ export interface FileRoutesByTo {
   '/api/ping': typeof ApiPingRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/production-readiness': typeof ApiProductionReadinessRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/risk-check': typeof ApiRiskCheckRoute
   '/api/route-sister': typeof ApiRouteSisterRoute
@@ -2082,6 +2098,7 @@ export interface FileRoutesById {
   '/api/demo-trading-grid': typeof ApiDemoTradingGridRoute
   '/api/demo-trading-llm': typeof ApiDemoTradingLlmRoute
   '/api/demo-trading-rebalance': typeof ApiDemoTradingRebalanceRoute
+  '/api/dify-integration': typeof ApiDifyIntegrationRoute
   '/api/dify-status': typeof ApiDifyStatusRoute
   '/api/download-apk': typeof ApiDownloadApkRoute
   '/api/env-reset': typeof ApiEnvResetRoute
@@ -2118,6 +2135,7 @@ export interface FileRoutesById {
   '/api/ping': typeof ApiPingRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/production-readiness': typeof ApiProductionReadinessRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/risk-check': typeof ApiRiskCheckRoute
   '/api/route-sister': typeof ApiRouteSisterRoute
@@ -2336,6 +2354,7 @@ export interface FileRouteTypes {
     | '/api/demo-trading-grid'
     | '/api/demo-trading-llm'
     | '/api/demo-trading-rebalance'
+    | '/api/dify-integration'
     | '/api/dify-status'
     | '/api/download-apk'
     | '/api/env-reset'
@@ -2372,6 +2391,7 @@ export interface FileRouteTypes {
     | '/api/ping'
     | '/api/plugins'
     | '/api/preview-file'
+    | '/api/production-readiness'
     | '/api/provider-usage'
     | '/api/risk-check'
     | '/api/route-sister'
@@ -2587,6 +2607,7 @@ export interface FileRouteTypes {
     | '/api/demo-trading-grid'
     | '/api/demo-trading-llm'
     | '/api/demo-trading-rebalance'
+    | '/api/dify-integration'
     | '/api/dify-status'
     | '/api/download-apk'
     | '/api/env-reset'
@@ -2623,6 +2644,7 @@ export interface FileRouteTypes {
     | '/api/ping'
     | '/api/plugins'
     | '/api/preview-file'
+    | '/api/production-readiness'
     | '/api/provider-usage'
     | '/api/risk-check'
     | '/api/route-sister'
@@ -2839,6 +2861,7 @@ export interface FileRouteTypes {
     | '/api/demo-trading-grid'
     | '/api/demo-trading-llm'
     | '/api/demo-trading-rebalance'
+    | '/api/dify-integration'
     | '/api/dify-status'
     | '/api/download-apk'
     | '/api/env-reset'
@@ -2875,6 +2898,7 @@ export interface FileRouteTypes {
     | '/api/ping'
     | '/api/plugins'
     | '/api/preview-file'
+    | '/api/production-readiness'
     | '/api/provider-usage'
     | '/api/risk-check'
     | '/api/route-sister'
@@ -3092,6 +3116,7 @@ export interface RootRouteChildren {
   ApiDemoTradingGridRoute: typeof ApiDemoTradingGridRoute
   ApiDemoTradingLlmRoute: typeof ApiDemoTradingLlmRoute
   ApiDemoTradingRebalanceRoute: typeof ApiDemoTradingRebalanceRoute
+  ApiDifyIntegrationRoute: typeof ApiDifyIntegrationRoute
   ApiDifyStatusRoute: typeof ApiDifyStatusRoute
   ApiDownloadApkRoute: typeof ApiDownloadApkRoute
   ApiEnvResetRoute: typeof ApiEnvResetRoute
@@ -3128,6 +3153,7 @@ export interface RootRouteChildren {
   ApiPingRoute: typeof ApiPingRoute
   ApiPluginsRoute: typeof ApiPluginsRoute
   ApiPreviewFileRoute: typeof ApiPreviewFileRoute
+  ApiProductionReadinessRoute: typeof ApiProductionReadinessRoute
   ApiProviderUsageRoute: typeof ApiProviderUsageRoute
   ApiRiskCheckRoute: typeof ApiRiskCheckRoute
   ApiRouteSisterRoute: typeof ApiRouteSisterRoute
@@ -3642,6 +3668,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDemoTradingRebalanceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/dify-integration': {
+      id: '/api/dify-integration'
+      path: '/api/dify-integration'
+      fullPath: '/api/dify-integration'
+      preLoaderRoute: typeof ApiDifyIntegrationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/dify-status': {
       id: '/api/dify-status'
       path: '/api/dify-status'
@@ -3892,6 +3925,13 @@ declare module '@tanstack/react-router' {
       path: '/api/preview-file'
       fullPath: '/api/preview-file'
       preLoaderRoute: typeof ApiPreviewFileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/production-readiness': {
+      id: '/api/production-readiness'
+      path: '/api/production-readiness'
+      fullPath: '/api/production-readiness'
+      preLoaderRoute: typeof ApiProductionReadinessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/provider-usage': {
@@ -5316,6 +5356,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDemoTradingGridRoute: ApiDemoTradingGridRoute,
   ApiDemoTradingLlmRoute: ApiDemoTradingLlmRoute,
   ApiDemoTradingRebalanceRoute: ApiDemoTradingRebalanceRoute,
+  ApiDifyIntegrationRoute: ApiDifyIntegrationRoute,
   ApiDifyStatusRoute: ApiDifyStatusRoute,
   ApiDownloadApkRoute: ApiDownloadApkRoute,
   ApiEnvResetRoute: ApiEnvResetRoute,
@@ -5352,6 +5393,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPingRoute: ApiPingRoute,
   ApiPluginsRoute: ApiPluginsRoute,
   ApiPreviewFileRoute: ApiPreviewFileRoute,
+  ApiProductionReadinessRoute: ApiProductionReadinessRoute,
   ApiProviderUsageRoute: ApiProviderUsageRoute,
   ApiRiskCheckRoute: ApiRiskCheckRoute,
   ApiRouteSisterRoute: ApiRouteSisterRoute,

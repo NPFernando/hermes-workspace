@@ -19,7 +19,6 @@ function fetchText(url) {
   return new Promise((resolve, reject) => {
     const request = https.get(
       url,
-      { rejectUnauthorized: false },
       (response) => {
         const chunks = []
         response.on('data', (chunk) => chunks.push(chunk))

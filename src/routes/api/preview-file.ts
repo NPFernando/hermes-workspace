@@ -12,7 +12,6 @@ import os from 'node:os'
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
 
-import { safeErrorMessage } from '../../server/rate-limit'
 
 const MAX_BYTES = 5 * 1024 * 1024 // 5MB ceiling for embedded previews
 const MIME_BY_EXT: Record<string, string> = {
@@ -98,8 +97,8 @@ export const Route = createFileRoute('/api/preview-file')({
               'Referrer-Policy': 'no-referrer',
             },
           })
-        } catch (error) {
-          return new Response(safeErrorMessage(error), { status: 500 })
+        } catch {
+          return new Response('Internal server error', { status: 500 })
         }
       },
     },

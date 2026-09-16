@@ -26,6 +26,7 @@ type ProviderUsage = {
 
 type ProviderUsageResponse = {
   ok: boolean
+  degraded?: boolean
   updatedAt: number
   providers: Array<ProviderUsage>
   history?: Array<UsageHistoryPoint>
@@ -538,6 +539,24 @@ export function AiUsagePanel({
           </button>
         </div>
       </div>
+
+      {query.data?.degraded ? (
+        <div
+          role="status"
+          className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-[var(--theme-text)]"
+        >
+          Provider readings are temporarily unavailable. Usage limits are not
+          treated as zero; retry when the provider service is reachable.
+          {query.data.error ? ` ${query.data.error}` : ''}
+          <button
+            type="button"
+            onClick={() => void query.refetch()}
+            className="ml-2 underline underline-offset-2"
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
         <AgentSummary

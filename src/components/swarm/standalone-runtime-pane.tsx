@@ -23,7 +23,9 @@ function shellCommandForRuntime(
   if (runtime?.tmuxAttachable && runtime.tmuxSession) {
     return ['tmux', 'attach', '-t', runtime.tmuxSession]
   }
-  const cwd = runtime?.cwd?.replace(/"/g, '\\"')
+  const cwd = runtime?.cwd
+    ?.replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
   return ['zsh', '-lc', cwd ? `cd "${cwd}" && exec zsh -l` : 'exec zsh -l']
 }
 

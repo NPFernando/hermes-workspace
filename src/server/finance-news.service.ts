@@ -76,11 +76,23 @@ function httpsGetText(url: string): Promise<string> {
 function decodeXml(value: string): string {
   return value
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
+    .replace(/&(#39|apos|quot|amp|lt|gt);/gi, (_, entity: string) => {
+      switch (entity.toLowerCase()) {
+        case 'quot':
+          return '"'
+        case '#39':
+        case 'apos':
+          return "'"
+        case 'lt':
+          return '<'
+        case 'gt':
+          return '>'
+        case 'amp':
+          return '&'
+        default:
+          return _
+      }
+    })
     .replace(/\s+/g, ' ')
     .trim()
 }

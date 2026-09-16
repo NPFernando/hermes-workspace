@@ -226,11 +226,51 @@ export type ScheduledTransaction = {
   amount: number
   accountId?: string
   notes?: string
+  /** A posted recurring item creates the next pending occurrence. */
+  recurrence?: 'none' | 'weekly' | 'monthly' | 'yearly'
   status: 'pending' | 'paused' | 'posted' | 'cancelled'
   postedRecordId?: string
   source: string
   createdAt: string
   updatedAt: string
+}
+
+export type ScheduledRecurrence = NonNullable<ScheduledTransaction['recurrence']>
+
+const SCHEDULED_RECURRENCES = new Set<ScheduledRecurrence>([
+  'none',
+  'weekly',
+  'monthly',
+  'yearly',
+])
+
+export function scheduledRecurrence(value: unknown): ScheduledRecurrence {
+  return typeof value === 'string' && SCHEDULED_RECURRENCES.has(value as ScheduledRecurrence)
+    ? (value as ScheduledRecurrence)
+    : 'none'
+}
+
+/** Advance an ISO calendar date without timezone/DST drift. */
+export function nextScheduledDate(date: string, recurrence: ScheduledRecurrence): string {
+  const [year, month, day] = date.split('-').map(Number)
+  if (![year, month, day].every(Number.isInteger)) return date
+  const result = new Date(Date.UTC(year, month - 1, day))
+  if (recurrence === 'weekly') result.setUTCDate(result.getUTCDate() + 7)
+  if (recurrence === 'monthly') {
+    const originalDay = result.getUTCDate()
+    result.setUTCDate(1)
+    result.setUTCMonth(result.getUTCMonth() + 1)
+    const lastDay = new Date(Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0)).getUTCDate()
+    result.setUTCDate(Math.min(originalDay, lastDay))
+  }
+  if (recurrence === 'yearly') {
+    const originalMonth = result.getUTCMonth()
+    const originalDay = result.getUTCDate()
+    result.setUTCFullYear(result.getUTCFullYear() + 1, originalMonth, 1)
+    const lastDay = new Date(Date.UTC(result.getUTCFullYear(), originalMonth + 1, 0)).getUTCDate()
+    result.setUTCDate(Math.min(originalDay, lastDay))
+  }
+  return result.toISOString().slice(0, 10)
 }
 
 /**
@@ -1864,6 +1904,7 @@ export function addFinanceRecord(
       amount: numberField(payload, 'amount', 0),
       accountId: optionalString(payload, 'accountId'),
       notes: optionalString(payload, 'notes'),
+      recurrence: scheduledRecurrence(payload.recurrence),
       status: 'pending',
     })
   } else if (kind === 'trading_plan') {
@@ -2085,9 +2126,10 @@ export function updateFinanceRecord(
   } else if (kind === 'scheduled_transaction') {
     const index = db.scheduled_transactions.findIndex((r) => r.id === id)
     if (index !== -1) {
+      const merged = { ...db.scheduled_transactions[index], ...payload }
       db.scheduled_transactions[index] = {
-        ...db.scheduled_transactions[index],
-        ...payload,
+        ...merged,
+        recurrence: scheduledRecurrence(merged.recurrence),
         updatedAt: nowIso(),
       }
       updated = true

@@ -152,6 +152,22 @@ describe('lastSevenUtcDays', () => {
 })
 
 describe('AiUsagePanel rendered provider dashboard', () => {
+  it('shows a non-blocking warning when provider readings are degraded', async () => {
+    queryState.data = {
+      ok: true,
+      degraded: true,
+      updatedAt: Date.now(),
+      providers: [],
+      history: [],
+      error: 'Provider usage request timed out',
+    }
+
+    await renderPanel()
+    expect(document.body.textContent).toContain('Provider readings are temporarily unavailable')
+    expect(document.body.textContent).toContain('Usage limits are not treated as zero')
+    expect(document.body.textContent).toContain('Retry')
+  })
+
   it('labels missing feeds, source and estimates without inventing a shared budget', async () => {
     queryState.data = {
       ok: true,
