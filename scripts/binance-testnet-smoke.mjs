@@ -111,11 +111,9 @@ async function main() {
       {
         ok: true,
         mode: 'spot-testnet-readonly-smoke',
-        baseUrl,
         canPing: true,
         canReadAccount: true,
         nonZeroBalanceCount: nonZeroBalances.length,
-        nonZeroAssets: nonZeroBalances.map((item) => item.asset),
       },
       null,
       2,

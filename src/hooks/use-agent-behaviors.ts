@@ -9,6 +9,7 @@ import type {
   AgentBehaviorState,
 } from '@/components/agent-swarm/agent-behaviors'
 import { assignPersona, releasePersona } from '@/lib/agent-personas'
+import { secureRandomInt } from '@/lib/secure-random'
 import {
   DESK_POSITIONS,
   createBehaviorState,
@@ -32,7 +33,7 @@ const CELEBRATE_MS = 5_000
 const LERP_SPEED = 0.08 // Faster than default for visible movement
 
 function randomBetween(min: number, max: number): number {
-  return min + Math.floor(Math.random() * (max - min))
+  return min + secureRandomInt(max - min)
 }
 
 function getActivityEmoji(activity: AgentActivity): string {
@@ -180,7 +181,7 @@ export function useAgentBehaviors(
             state.chatMessage = getRandomMessage('break')
             // Store intended break type in chatTarget temporarily
             state.chatTarget = breakType
-          } else if (state.activity === 'coding' && Math.random() < 0.15) {
+          } else if (state.activity === 'coding' && secureRandomInt(20) < 3) {
             // Random work chat bubble
             if (!state.chatMessage) {
               state.chatMessage = getRandomMessage('working')
@@ -274,8 +275,8 @@ export function useAgentBehaviors(
           (s) => s.swarmStatus === 'running',
         )
         if (runningSessions.length >= 2) {
-          const idx1 = Math.floor(Math.random() * runningSessions.length)
-          let idx2 = Math.floor(Math.random() * (runningSessions.length - 1))
+          const idx1 = secureRandomInt(runningSessions.length)
+          let idx2 = secureRandomInt(runningSessions.length - 1)
           if (idx2 >= idx1) idx2++
 
           const session1 = runningSessions[idx1]

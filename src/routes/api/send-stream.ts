@@ -367,7 +367,7 @@ export const Route = createFileRoute('/api/send-stream')({
               },
             )
           }
-          return new Response(JSON.stringify({ ok: false, error: errorMsg }), {
+          return new Response(JSON.stringify({ ok: false, error: 'Claude request failed' }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' },
           })
