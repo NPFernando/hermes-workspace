@@ -5,6 +5,9 @@
  *
  * AUTH_E2E_PASSWORD='...' AUTH_E2E_BASE_URL=https://... \
  *   node scripts/authenticated-browser-smoke.mjs
+ *
+ * Set AUTH_E2E_EXPECTED_BUILD to the build header captured before a rollback
+ * to prove the authenticated browser is served by the restored artifact.
  */
 import { chromium } from 'playwright'
 
@@ -14,6 +17,7 @@ const baseUrl = (
   'http://127.0.0.1:3000'
 ).replace(/\/$/, '')
 const password = process.env.AUTH_E2E_PASSWORD
+const expectedBuild = process.env.AUTH_E2E_EXPECTED_BUILD?.trim() || null
 if (!password) {
   console.error(
     'Set AUTH_E2E_PASSWORD explicitly; no credential files are read.',
@@ -78,6 +82,12 @@ try {
     Boolean(initial && initial.status() < 500),
     'dashboard responds without a server error',
   )
+  if (expectedBuild) {
+    check(
+      initial?.headers()['x-workspace-build'] === expectedBuild,
+      `authenticated browser is served by expected build ${expectedBuild}`,
+    )
+  }
   const login = page.locator('#lp-pw')
   const workspaceHeading = page.getByRole('heading', {
     name: /Hermes Workspace/i,

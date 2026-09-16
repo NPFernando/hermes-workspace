@@ -60,7 +60,15 @@ rollback_failed_release() {
     local rollback_build
     rollback_build="$(artifact_build_id)"
     if RELEASE_SMOKE_EXPECTED_BUILD="$rollback_build" node scripts/release-smoke.mjs http://127.0.0.1:3000; then
-      echo "==> rollback recovered the previous release" >&2
+      if [[ -n "${AUTH_E2E_PASSWORD:-}" && -n "${AUTH_E2E_BASE_URL:-}" ]]; then
+        if AUTH_E2E_EXPECTED_BUILD="$rollback_build" node scripts/authenticated-browser-smoke.mjs; then
+          echo "==> rollback recovered the previous release and passed authenticated browser smoke" >&2
+        else
+          echo "error: rollback release smoke passed but authenticated browser smoke failed" >&2
+        fi
+      else
+        echo "==> rollback recovered the previous release" >&2
+      fi
     else
       echo "error: rollback release smoke failed; manual intervention required" >&2
     fi
