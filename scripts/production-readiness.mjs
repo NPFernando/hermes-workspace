@@ -7,7 +7,8 @@
 import { execFile as nodeExecFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
 import { runAssetIntegrity } from './asset-integrity.mjs'
 import { runReleaseSmoke } from './release-smoke.mjs'
@@ -152,7 +153,8 @@ export async function buildReadinessReport({ skipTests = false, fetchImpl = fetc
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+const invokedScript = process.argv[1] ? resolve(process.argv[1]) : null
+if (invokedScript === fileURLToPath(import.meta.url)) {
   const skipTests = process.argv.includes('--skip-tests')
   const report = await buildReadinessReport({ skipTests })
   if (process.argv.includes('--json')) console.log(JSON.stringify(report, null, 2))
