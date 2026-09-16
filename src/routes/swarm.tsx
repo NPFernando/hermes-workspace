@@ -1,12 +1,22 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { Suspense, lazy } from 'react'
 import { usePageTitle } from '@/hooks/use-page-title'
-import { Swarm2Screen } from '@/screens/swarm2/swarm2-screen'
+
+const Swarm2Screen = lazy(() =>
+  import('@/screens/swarm2/swarm2-screen').then((module) => ({
+    default: module.Swarm2Screen,
+  })),
+)
 
 export const Route = createFileRoute('/swarm')({
   ssr: false,
   component: function SwarmRoute() {
     usePageTitle('Swarm')
-    return <Swarm2Screen />
+    return (
+      <Suspense fallback={<SwarmPending />}>
+        <Swarm2Screen />
+      </Suspense>
+    )
   },
   errorComponent: function SwarmError({ error }) {
     return (

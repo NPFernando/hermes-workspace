@@ -1,12 +1,22 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { Suspense, lazy } from 'react'
 import { usePageTitle } from '@/hooks/use-page-title'
-import { OpsCostScreen } from '@/screens/ops/ops-cost-screen'
+
+const OpsCostScreen = lazy(() =>
+  import('@/screens/ops/ops-cost-screen').then((module) => ({
+    default: module.OpsCostScreen,
+  })),
+)
 
 export const Route = createFileRoute('/ops-cost')({
   ssr: false,
   component: function OpsCostRoute() {
     usePageTitle('Cost & Routing')
-    return <OpsCostScreen />
+    return (
+      <Suspense fallback={<OpsCostPending />}>
+        <OpsCostScreen />
+      </Suspense>
+    )
   },
   errorComponent: function OpsCostError({ error }) {
     return (
