@@ -163,11 +163,12 @@ export function SettingsDialog({
                   mobileView === 'content' && 'hidden md:block',
                 )}
               >
-                <nav className="space-y-1">
+                <nav className="space-y-1" aria-label="Settings sections">
                   {SECTIONS.map((s) => (
                     <button
                       key={s.id}
                       type="button"
+                      aria-current={active === s.id ? 'page' : undefined}
                       onClick={() => handleSectionSelect(s.id)}
                       className={cn(
                         'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-hover)]',
