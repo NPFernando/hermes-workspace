@@ -5,6 +5,7 @@ import {
   cpSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs'
@@ -50,7 +51,20 @@ function fixture() {
   writeFileSync(join(root, 'dist/server/server.js'), 'fixture build\n')
   const bin = join(root, 'fake-bin')
   mkdirSync(bin)
-  for (const name of ['pnpm', 'curl', 'node']) writeFileSync(join(bin, name), '#!/bin/sh\nexit 0\n')
+  writeFileSync(join(bin, 'pnpm'), `#!/bin/sh
+if [ "$1" = "build" ]; then
+  printf 'new build\\n' > "${join(root, 'dist/server/server.js')}"
+fi
+exit 0
+`)
+  writeFileSync(join(bin, 'curl'), '#!/bin/sh\nexit 0\n')
+  writeFileSync(join(bin, 'node'), `#!/bin/sh
+if [ "${'${DEPLOY_TEST_FAIL_SMOKE:-0}'}" = "1" ] && [ "$1" = "scripts/release-smoke.mjs" ] && [ ! -f "${join(root, 'smoke.failed')}" ]; then
+  touch "${join(root, 'smoke.failed')}"
+  exit 1
+fi
+exit 0
+`)
   writeFileSync(join(bin, 'sudo'), '#!/bin/sh\nexec "$@"\n')
   writeFileSync(join(bin, 'systemctl'), `#!/bin/sh\nstate="${join(root, 'pid.state')}"\nif [ "$1" = "show" ]; then cat "$state"; exit 0; fi\nif [ "$1" = "restart" ]; then echo 456 > "$state"; exit 0; fi\nexit 0\n`)
   for (const name of ['pnpm', 'curl', 'node', 'sudo', 'systemctl']) chmodSync(join(bin, name), 0o755)
@@ -78,5 +92,18 @@ describe('deploy local-ahead guard', () => {
     assert.equal(result.status, 0, result.stderr)
     assert.match(result.stdout, /retaining explicitly approved local-ahead release/)
     assert.match(result.stdout, /service healthy \(pid=456\)/)
+  })
+
+  it('restores the previous artifact when release validation fails', () => {
+    const f = fixture()
+    const failed = spawnSync('bash', [f.script, '--allow-local-ahead'], {
+      cwd: f.root,
+      encoding: 'utf8',
+      env: { ...f.env, DEPLOY_TEST_FAIL_SMOKE: '1' },
+    })
+    assert.equal(failed.status, 1)
+    assert.match(failed.stderr, /restoring previous compiled artifact/)
+    assert.match(failed.stderr, /rollback recovered the previous release/)
+    assert.equal(readFileSync(join(f.root, 'dist/server/server.js'), 'utf8'), 'fixture build\n')
   })
 })
