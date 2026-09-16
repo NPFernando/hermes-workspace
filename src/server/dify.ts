@@ -1,5 +1,6 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { getStateDir } from './workspace-state-dir'
 
 export type DifyStatus = {
@@ -198,7 +199,7 @@ export async function runDifyWorkflow(workflowId: string, inputs: unknown, fetch
   if (!config.enabled || !enabledEnv('DIFY_API_ENABLED') || !config.apiBaseUrl || !config.apiKey || !workflow) throw new Error('Dify workflow execution is not configured for this workflow.')
   const cleanInputs = publicInputs(inputs)
   const startedAt = new Date().toISOString()
-  const executionId = `dify-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const executionId = `dify-${randomUUID()}`
   try {
     const response = await fetchImpl(`${config.apiBaseUrl}/workflows/run`, {
       method: 'POST',
