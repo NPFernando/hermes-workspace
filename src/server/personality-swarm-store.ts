@@ -15,6 +15,7 @@ import YAML from 'yaml'
 import { getHermesRoot, getProfilesDir } from './claude-paths'
 import { readSwarmRoster } from './swarm-roster'
 import { safeErrorMessage } from './rate-limit'
+import { isSafeObjectKey } from './security-utils'
 
 // ── Personality presets — The 12 Sisters ────────────────────────────────────
 // Each prompt defines the sister's identity, role, and behavior.
@@ -252,12 +253,14 @@ function setNestedKey(
   let cur = obj
   for (let i = 0; i < parts.length - 1; i++) {
     const k = parts[i]
+    if (!isSafeObjectKey(k)) return
     if (!cur[k] || typeof cur[k] !== 'object' || Array.isArray(cur[k])) {
       cur[k] = {}
     }
     cur = cur[k] as Record<string, unknown>
   }
-  cur[parts[parts.length - 1]] = value
+  const leaf = parts[parts.length - 1]
+  if (isSafeObjectKey(leaf)) cur[leaf] = value
 }
 
 // ── Main API ───────────────────────────────────────────────────────────────

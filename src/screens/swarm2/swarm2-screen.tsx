@@ -426,7 +426,9 @@ export function commandForRuntime(
   runtime: RuntimeEntry | undefined,
   mode: RuntimeCommandMode = 'auto',
 ): RuntimeCommand {
-  const cwd = runtime?.cwd?.replace(/"/g, '\\"')
+  const cwd = runtime?.cwd
+    ?.replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
   const shellCommand = (): RuntimeCommand => ({
     command: ['zsh', '-lc', cwd ? `cd "${cwd}" && exec zsh -l` : 'exec zsh -l'],
     kind: 'shell',

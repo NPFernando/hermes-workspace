@@ -59,8 +59,11 @@ async function main() {
     const pathname = url.split('?')[0]
 
     if (pathname !== '/' && !pathname.startsWith('/api/')) {
-      const filePath = path.join(DIST_CLIENT, pathname)
-      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      const relativePath = pathname.replace(/^\/+/, '')
+      const filePath = path.resolve(DIST_CLIENT, relativePath)
+      const insideClient =
+        filePath === DIST_CLIENT || filePath.startsWith(`${DIST_CLIENT}${path.sep}`)
+      if (insideClient && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
         const ext = path.extname(filePath)
         const mime = MIME_TYPES[ext] || 'application/octet-stream'
         const content = fs.readFileSync(filePath)

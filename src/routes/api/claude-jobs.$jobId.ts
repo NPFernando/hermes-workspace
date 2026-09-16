@@ -4,7 +4,6 @@
  */
 import { createFileRoute } from '@tanstack/react-router'
 import { isAuthenticated } from '../../server/auth-middleware'
-import { safeErrorMessage } from '../../server/rate-limit'
 import {
   BEARER_TOKEN,
   CLAUDE_API,
@@ -127,7 +126,7 @@ export const Route = createFileRoute('/api/claude-jobs/$jobId')({
             return new Response(
               JSON.stringify({
                 ok: false,
-                error: safeErrorMessage(error),
+                error: 'Job request failed',
               }),
               {
                 status: 500,
@@ -234,7 +233,7 @@ export const Route = createFileRoute('/api/claude-jobs/$jobId')({
             return new Response(
               JSON.stringify({
                 ok: false,
-                error: safeErrorMessage(error),
+                error: 'Job request failed',
               }),
               { status: 400, headers: { 'Content-Type': 'application/json' } },
             )
@@ -281,7 +280,7 @@ export const Route = createFileRoute('/api/claude-jobs/$jobId')({
             return new Response(
               JSON.stringify({
                 ok: false,
-                error: safeErrorMessage(error),
+                error: 'Job request failed',
               }),
               { status: 400, headers: { 'Content-Type': 'application/json' } },
             )

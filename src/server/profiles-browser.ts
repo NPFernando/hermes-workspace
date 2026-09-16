@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import YAML from 'yaml'
+import { isSafeObjectKey } from './security-utils'
 
 export type ProfileSummary = {
   name: string
@@ -630,6 +631,7 @@ export function updateProfileConfig(
     source: Record<string, unknown>,
   ) {
     for (const [key, value] of Object.entries(source)) {
+      if (!isSafeObjectKey(key)) continue
       if (
         value &&
         typeof value === 'object' &&

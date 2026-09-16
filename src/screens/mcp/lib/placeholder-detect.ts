@@ -28,7 +28,14 @@ export function isArgPlaceholder(value: string): boolean {
 }
 
 export function isUrlPlaceholder(value: string): boolean {
-  if (value.includes('example.com')) return true
+  try {
+    const hostname = new URL(value).hostname.toLowerCase()
+    if (hostname === 'example.com' || hostname.endsWith('.example.com')) {
+      return true
+    }
+  } catch {
+    // Continue with token checks for incomplete URL templates.
+  }
   if (value.includes('<your-host>')) return true
   // Substring angle-bracket match (e.g. https://<host>/mcp)
   if (/<[^>]+>/.test(value)) return true
@@ -86,6 +93,5 @@ export function isStillPlaceholder(
   if (!value) return true
   if (kind === 'arg') return isArgPlaceholder(value)
   if (kind === 'url') return isUrlPlaceholder(value)
-  if (kind === 'env') return ANGLE_BRACKET_RE.test(value)
-  return false
+  return ANGLE_BRACKET_RE.test(value)
 }

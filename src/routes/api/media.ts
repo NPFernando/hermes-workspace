@@ -11,7 +11,6 @@ import { extname, isAbsolute, resolve as resolvePath } from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { requireLocalOrAuth } from '../../server/auth-middleware'
 
-import { safeErrorMessage } from '../../server/rate-limit'
 
 const MAX_BYTES = 10 * 1024 * 1024
 
@@ -113,8 +112,8 @@ export const Route = createFileRoute('/api/media')({
               'X-Content-Type-Options': 'nosniff',
             },
           })
-        } catch (err) {
-          return new Response(safeErrorMessage(err), { status: 500 })
+        } catch {
+          return new Response('Internal server error', { status: 500 })
         }
       },
     },
