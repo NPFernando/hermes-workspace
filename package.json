@@ -22,6 +22,7 @@
     "test:e2e:auth": "node scripts/authenticated-browser-smoke.mjs",
     "test:pg-integration": "tsx scripts/finance-pg-integration.ts",
     "finance:postgres-backup-restore": "tsx scripts/finance-pg-backup-restore.ts",
+    "finance:offsite-backup": "tsx scripts/finance-offsite-backup.ts",
     "security:deployment-gate": "node scripts/deployment-security-gate.mjs",
     "swarm-queue:provision": "node scripts/provision-swarm-dispatch-queue.mjs",
     "swarm-queue:migrate": "node scripts/migrate-swarm-dispatch-queue.mjs",

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run encrypted Hermes Finance off-site backup daily
+
+[Timer]
+OnCalendar=*-*-* 03:20:00
+Persistent=true
+RandomizedDelaySec=15m
+Unit=hermes-finance-offsite-backup.service
+
+[Install]
+WantedBy=timers.target
