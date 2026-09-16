@@ -63,6 +63,9 @@ jobs:
       - name: Check bundle budgets
         run: pnpm run check:bundle
 
+      - name: Check theme accessibility contrast
+        run: pnpm run check:accessibility
+
       - name: Verify Electron server bundle
         run: |
           pnpm run electron:bundle-server 2>&1 | tee /tmp/hermes-electron-bundle.log
