@@ -161,6 +161,36 @@ try {
   )
   check(true, '/queue command is accepted and persisted in the authenticated chat')
   await page.unroute('**/api/send-stream')
+
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.waitForFunction(
+    () =>
+      Object.entries(window.localStorage).some(([key, value]) => {
+        if (!key.startsWith('claude.chat-queue.v1.')) return false
+        try {
+          const prompts = JSON.parse(value)
+          return Array.isArray(prompts) && prompts.some((prompt) => prompt?.text === 'browser smoke')
+        } catch {
+          return false
+        }
+      }),
+    undefined,
+    { timeout: 15_000 },
+  )
+  check(true, '/queue item survives an authenticated page reload')
+
+  // Verify the touch-first command path and recover back to the dashboard.
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(`${baseUrl}/dashboard`, { waitUntil: 'domcontentloaded' })
+  await page.getByRole('button', { name: 'Search commands' }).click()
+  const commandInput = page.getByPlaceholder(
+    'Search screens, sessions, and commands',
+  )
+  await commandInput.fill('Settings')
+  await page.getByText('Settings', { exact: true }).last().click()
+  await page.waitForURL(/\/settings(?:[/?]|$)/)
+  check(true, 'mobile command search opens Settings')
+  await page.setViewportSize({ width: 1280, height: 900 })
 } finally {
   await context.close()
   await browser.close()

@@ -19,6 +19,7 @@
     "test:finance": "vitest run src/server/finance-store.test.ts src/server/finance-extraction.test.ts src/server/finance-postgres-store.test.ts src/server/finance-storage-monitor.test.ts src/server/harp-memory-client.test.ts src/server/trading-readiness.test.ts src/routes/api/-finance.test.ts src/routes/api/-finance-learned-facts.test.ts src/screens/personal-finance/utils.test.ts src/screens/personal-finance/components/-assistant-memory-card.test.tsx",
     "test:e2e:finance": "node scripts/finance-browser-e2e.mjs",
     "test:e2e:agent-cockpit": "node scripts/agent-cockpit-browser-e2e.mjs",
+    "test:e2e:auth": "node scripts/authenticated-browser-smoke.mjs",
     "test:pg-integration": "tsx scripts/finance-pg-integration.ts",
     "swarm-queue:provision": "node scripts/provision-swarm-dispatch-queue.mjs",
     "swarm-queue:migrate": "node scripts/migrate-swarm-dispatch-queue.mjs",
