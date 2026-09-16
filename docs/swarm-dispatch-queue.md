@@ -41,6 +41,12 @@ retry job instead of creating duplicates. Serial POST requests can also send an
 HTTP submission returns the original queued job, while reusing the key for a
 different payload returns HTTP 409.
 
+When a worker successfully records a failed or interrupted terminal state, it
+publishes one chat notification to the job's `notifySessionKey` (or `main`).
+The notification includes the queue ID and failure state, but never includes
+the queued prompt payload. Lost leases cannot emit a duplicate notification;
+delivery failures are non-fatal and the dead-letter record remains durable.
+
 Pending jobs can be cancelled immediately. Cancelling the active job interrupts
 its current agent command (SIGTERM for one-shot execution or Ctrl-C in the
 managed tmux session). Serial batches require a terminal agent checkpoint before

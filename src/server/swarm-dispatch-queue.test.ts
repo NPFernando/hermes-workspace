@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { Pool } from 'pg'
 import {
   cancelSwarmDispatchQueueJob,
+  buildSwarmDispatchQueueNotification,
   closeSwarmDispatchQueuePool,
   enqueueSwarmDispatch,
   getSwarmDispatchQueueJob,
@@ -44,6 +45,43 @@ describe('swarm dispatch queue priority validation', () => {
     expect(() => normalizeSwarmDispatchPriority(value)).toThrow(
       'Queue priority must be an integer',
     )
+  })
+})
+
+describe('swarm dispatch queue terminal notifications', () => {
+  it('builds a dead-letter notification with a safe default session', () => {
+    expect(
+      buildSwarmDispatchQueueNotification({
+        id: 'job-123',
+        status: 'failed',
+        error: 'agent failed',
+      }),
+    ).toMatchObject({
+      sessionKey: 'main',
+      title: 'Serial dispatch failed',
+      details: {
+        source: 'swarm-dispatch-queue',
+        queueId: 'job-123',
+        status: 'failed',
+      },
+    })
+  })
+
+  it('does not notify for successful or intentionally cancelled jobs', () => {
+    expect(
+      buildSwarmDispatchQueueNotification({
+        id: 'job-123',
+        status: 'succeeded',
+        error: null,
+      }),
+    ).toBeNull()
+    expect(
+      buildSwarmDispatchQueueNotification({
+        id: 'job-123',
+        status: 'cancelled',
+        error: null,
+      }),
+    ).toBeNull()
   })
 })
 
