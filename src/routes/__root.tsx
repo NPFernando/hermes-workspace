@@ -33,6 +33,7 @@ import {
 import { LoginScreen } from '@/components/auth/login-screen'
 import { fetchClaudeAuthStatus } from '@/lib/claude-auth'
 import { safeErrorMessage } from '@/lib/error-utils'
+import { OfflineStatusBanner } from '@/components/offline-status-banner'
 
 const UsageMeter = lazy(() =>
   import('@/components/usage-meter').then((m) => ({ default: m.UsageMeter })),
@@ -418,6 +419,7 @@ function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <Toaster />
       <StaleAssetRecoveryListener />
+      <OfflineStatusBanner />
       {isPublicSurface ? (
         <ErrorBoundary
           className="min-h-dvh"
