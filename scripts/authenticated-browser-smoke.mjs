@@ -24,7 +24,11 @@ if (!password) {
 const routes = [
   { path: '/dashboard', pattern: /Hermes Workspace|Dashboard/i },
   { path: '/ops-cost', pattern: /Cost & Routing/i },
-  { path: '/personal-finance', pattern: /Your money at a glance/i, timeout: 45_000 },
+  {
+    path: '/personal-finance',
+    pattern: /Your money at a glance/i,
+    timeout: 45_000,
+  },
   { path: '/dify', pattern: /Dify Workbench/i },
 ]
 // Allow hosts with a system Chromium but no Playwright browser download.
@@ -101,10 +105,15 @@ try {
     .evaluate((element) => getComputedStyle(element).display !== 'none')
   check(!splashVisible, 'pre-hydration splash is hidden after app mount')
   check(
-    (await page.locator('[data-testid="connection-startup-screen"]:visible').count()) === 0,
+    (await page
+      .locator('[data-testid="connection-startup-screen"]:visible')
+      .count()) === 0,
     'connection startup overlay is not duplicated over the authenticated workspace',
   )
-  check(pageErrors.length === 0, `dashboard has no uncaught browser errors${pageErrors.length ? `: ${pageErrors.join('; ')}` : ''}`)
+  check(
+    pageErrors.length === 0,
+    `dashboard has no uncaught browser errors${pageErrors.length ? `: ${pageErrors.join('; ')}` : ''}`,
+  )
   const auth = await page.evaluate(async () =>
     (await fetch('/api/auth-check', { cache: 'no-store' })).json(),
   )
@@ -134,6 +143,36 @@ try {
     }
   }
 
+  const authenticatedApiChecks = [
+    {
+      path: '/api/finance/summary',
+      valid: (body) => body?.ok === true && body?.summary,
+      label: 'Finance summary API returns an authenticated payload',
+    },
+    {
+      path: '/api/dify-status',
+      valid: (body) =>
+        body?.ok === true && typeof body?.available === 'boolean',
+      label: 'Dify status API returns an authenticated provider result',
+    },
+    {
+      path: '/api/swarm-dispatch',
+      valid: (body) =>
+        Array.isArray(body?.waiting) && Array.isArray(body?.recent),
+      label: 'queue API returns an authenticated recovery snapshot',
+    },
+  ]
+  for (const api of authenticatedApiChecks) {
+    const result = await page.evaluate(async (path) => {
+      const response = await fetch(path, { cache: 'no-store' })
+      return {
+        status: response.status,
+        body: await response.json().catch(() => null),
+      }
+    }, api.path)
+    check(result.status === 200 && api.valid(result.body), api.label)
+  }
+
   // Keep the smoke test side-effect free: exercise `/queue` parsing/UI while
   // preventing a real prompt from reaching an agent backend.
   await page.route('**/api/send-stream', (route) =>
@@ -141,8 +180,7 @@ try {
   )
   await page.goto(`${baseUrl}/chat/main`, { waitUntil: 'domcontentloaded' })
   const promptInput = page.locator('textarea:visible').last()
-  await promptInput
-    .waitFor({ state: 'visible', timeout: 30_000 })
+  await promptInput.waitFor({ state: 'visible', timeout: 30_000 })
   await promptInput.fill('/queue browser smoke')
   await page.getByRole('button', { name: 'Send message', exact: true }).click()
   await page.waitForFunction(
@@ -151,7 +189,10 @@ try {
         if (!key.startsWith('claude.chat-queue.v1.')) return false
         try {
           const prompts = JSON.parse(value)
-          return Array.isArray(prompts) && prompts.some((prompt) => prompt?.text === 'browser smoke')
+          return (
+            Array.isArray(prompts) &&
+            prompts.some((prompt) => prompt?.text === 'browser smoke')
+          )
         } catch {
           return false
         }
@@ -159,7 +200,10 @@ try {
     undefined,
     { timeout: 15_000 },
   )
-  check(true, '/queue command is accepted and persisted in the authenticated chat')
+  check(
+    true,
+    '/queue command is accepted and persisted in the authenticated chat',
+  )
   await page.unroute('**/api/send-stream')
 
   await page.reload({ waitUntil: 'domcontentloaded' })
@@ -169,7 +213,10 @@ try {
         if (!key.startsWith('claude.chat-queue.v1.')) return false
         try {
           const prompts = JSON.parse(value)
-          return Array.isArray(prompts) && prompts.some((prompt) => prompt?.text === 'browser smoke')
+          return (
+            Array.isArray(prompts) &&
+            prompts.some((prompt) => prompt?.text === 'browser smoke')
+          )
         } catch {
           return false
         }
