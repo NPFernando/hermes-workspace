@@ -1,0 +1,17 @@
+[Unit]
+Description=Hermes read-only fork synchronization preview
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/hermes-workspace-deploy
+EnvironmentFile=-/home/ubuntu/.hermes/fork-sync-preview.env
+ExecStart=/usr/bin/python3 /home/ubuntu/hermes-workspace-deploy/scripts/fork_sync_scheduled_preview.py
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/.hermes/fork-sync-previews
+
