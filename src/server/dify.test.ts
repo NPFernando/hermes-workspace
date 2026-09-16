@@ -204,4 +204,38 @@ describe('Dify public workflow adapter', () => {
     expect(result.execution.workflowVersion).toBe('2026-09-16')
     expect(result.execution.runId).toBe('run-retried')
   })
+
+  it('records operator cancellation distinctly from provider failure', async () => {
+    configure()
+    const directory = await mkdtemp(join(tmpdir(), 'dify-cancel-'))
+    const historyFile = join(directory, 'history.json')
+    const controller = new AbortController()
+    const fetchImpl = vi.fn(
+      (_url: string | URL | Request, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener(
+            'abort',
+            () => reject(init.signal?.reason ?? new Error('cancelled')),
+            { once: true },
+          )
+        }),
+    )
+    const run = runDifyWorkflow(
+      'public-faq',
+      { prompt: 'Summarize a public release note.' },
+      fetchImpl,
+      historyFile,
+      { signal: controller.signal, timeoutMs: 5_000 },
+    )
+    controller.abort('operator-cancelled')
+    await expect(run).rejects.toBe('operator-cancelled')
+    const history = JSON.parse(await readFile(historyFile, 'utf8')) as Array<{
+      status: string
+      error: string | null
+    }>
+    expect(history[0]).toMatchObject({
+      status: 'cancelled',
+      error: 'Dify workflow cancelled.',
+    })
+  })
 })

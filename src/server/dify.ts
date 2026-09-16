@@ -33,7 +33,7 @@ export type DifyExecution = {
   workflowName: string
   provider: string
   workflowVersion?: string
-  status: 'running' | 'succeeded' | 'failed'
+  status: 'running' | 'succeeded' | 'failed' | 'cancelled'
   startedAt: string
   finishedAt: string
   runId: string | null
@@ -401,6 +401,7 @@ export async function runDifyWorkflow(
   const cleanInputs = publicInputs(inputs)
   const startedAt = new Date().toISOString()
   const executionId = `dify-${randomUUID()}`
+  let requestSignal: AbortSignal | undefined
   try {
     const retries = workflowRetries(options)
     const timeoutMs = workflowTimeoutMs(options)
@@ -408,6 +409,7 @@ export async function runDifyWorkflow(
     const signal = options?.signal
       ? AbortSignal.any([options.signal, timeoutSignal])
       : timeoutSignal
+    requestSignal = signal
     for (let attempt = 0; attempt <= retries; attempt += 1) {
       try {
         const response = await fetchImpl(`${config.apiBaseUrl}/workflows/run`, {
@@ -477,11 +479,15 @@ export async function runDifyWorkflow(
       workflowName: workflow.name,
       provider: workflow.provider,
       ...(workflow.version ? { workflowVersion: workflow.version } : {}),
-      status: 'failed',
+      status: requestSignal?.aborted ? 'cancelled' : 'failed',
       startedAt,
       finishedAt: new Date().toISOString(),
       runId: null,
-      error: error instanceof Error ? error.message : 'Dify workflow failed.',
+      error: requestSignal?.aborted
+        ? 'Dify workflow cancelled.'
+        : error instanceof Error
+          ? error.message
+          : 'Dify workflow failed.',
     }
     recordExecution(execution, file)
     throw error
