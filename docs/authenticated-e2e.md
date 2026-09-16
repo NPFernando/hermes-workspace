@@ -17,3 +17,15 @@ For rollback verification, capture the restored artifact's
 smoke. Missing credentials do not make the deploy script read a password from
 disk or fail closed on an otherwise successful unauthenticated rollback smoke;
 the authenticated check remains explicitly reported as not run.
+
+## GitHub Actions setup
+
+For the CI journey, add these repository Actions secrets under **Settings →
+Secrets and variables → Actions**:
+
+- `AUTH_E2E_PASSWORD`: the test account password, stored only as a secret.
+- `AUTH_E2E_BASE_URL`: the HTTPS base URL of the deployed test workspace.
+
+Then run the **CI** workflow with **Run workflow**. Pull requests without these
+secrets receive an explicit skipped notice; the workflow never prints or
+attempts to discover a password from the runner filesystem.

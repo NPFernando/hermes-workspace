@@ -4,6 +4,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [main, production]
   pull_request:
@@ -102,3 +103,7 @@ jobs:
           AUTH_E2E_PASSWORD: ${{ secrets.AUTH_E2E_PASSWORD }}
           AUTH_E2E_BASE_URL: ${{ secrets.AUTH_E2E_BASE_URL }}
         run: pnpm run test:e2e:auth
+
+      - name: Report authenticated journey skip
+        if: ${{ secrets.AUTH_E2E_PASSWORD == '' || secrets.AUTH_E2E_BASE_URL == '' }}
+        run: echo '::notice::Authenticated workspace journey skipped; configure AUTH_E2E_PASSWORD and AUTH_E2E_BASE_URL, then rerun workflow_dispatch.'
