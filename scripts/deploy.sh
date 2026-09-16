@@ -137,6 +137,7 @@ for i in $(seq 1 15); do
       echo "error: health check passed but service PID did not change ($NEW_PID)" >&2
       exit 1
     fi
+    node scripts/canary-smoke.mjs http://127.0.0.1:3000
     RELEASE_SMOKE_EXPECTED_BUILD="$EXPECTED_BUILD" node scripts/release-smoke.mjs http://127.0.0.1:3000
     printf '%s\n' "$(git rev-parse HEAD)" > "$BUILD_MARKER"
     rm -rf "$ROLLBACK_DIR"
