@@ -103,6 +103,26 @@ interface HeadroomStats {
   savingsPct: number
   agents: Array<HeadroomAgent>
 }
+
+interface SystemMetricsPayload {
+  process: { uptimeSeconds: number; pid: number }
+  api: {
+    windowMinutes: number
+    requests: number
+    errorCount: number
+    errorRatePercent: number
+    averageLatencyMs: number | null
+    p95LatencyMs: number | null
+    topRoutes: Array<{ path: string; requests: number; averageLatencyMs: number }>
+  }
+  jobs: {
+    totalCronJobs: number | null
+    failedCronJobs: number | null
+    queueDepth: number | null
+    queueRunning: number | null
+    queueFailedRecent: number | null
+  }
+}
 interface OpsPayload {
   ok: boolean
   error?: string
@@ -182,6 +202,74 @@ function minutesAgo(ms: number | null): string {
 
 function shortFileName(path: string): string {
   return path.split('/').pop() || path
+}
+
+function formatUptime(seconds: number): string {
+  const days = Math.floor(seconds / 86400)
+  const hours = Math.floor((seconds % 86400) / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  return days > 0 ? `${days}d ${hours}h` : hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
+}
+
+function OperationalHealthPanel() {
+  const query = useQuery({
+    queryKey: ['system-metrics-observability'],
+    queryFn: async () => {
+      const response = await fetch('/api/system-metrics', { cache: 'no-store' })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      return (await response.json()) as SystemMetricsPayload
+    },
+    refetchInterval: 15_000,
+  })
+  const data = query.data
+  return (
+    <Panel title="Operational health">
+      {query.isPending ? (
+        <p className="text-sm text-[var(--theme-muted)]">Loading live health…</p>
+      ) : query.isError || !data ? (
+        <p className="text-sm text-[var(--theme-muted)]">Live health is unavailable.</p>
+      ) : (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+            <StatTile label="Uptime" value={formatUptime(data.process.uptimeSeconds)} />
+            <StatTile
+              label={`API p95 · ${data.api.windowMinutes}m`}
+              value={data.api.p95LatencyMs == null ? '—' : `${data.api.p95LatencyMs}ms`}
+              hint={data.api.averageLatencyMs == null ? undefined : `avg ${data.api.averageLatencyMs}ms`}
+            />
+            <StatTile
+              label="API errors"
+              value={`${data.api.errorRatePercent.toFixed(1)}%`}
+              hint={`${data.api.errorCount} / ${data.api.requests} requests`}
+            />
+            <StatTile
+              label="Queue depth"
+              value={data.jobs.queueDepth == null ? '—' : String(data.jobs.queueDepth)}
+              hint={data.jobs.queueRunning == null ? undefined : `${data.jobs.queueRunning} running`}
+            />
+            <StatTile
+              label="Failed jobs"
+              value={data.jobs.failedCronJobs == null ? '—' : String(data.jobs.failedCronJobs)}
+              hint={data.jobs.queueFailedRecent == null ? undefined : `${data.jobs.queueFailedRecent} queue failures recent`}
+            />
+          </div>
+          {data.api.topRoutes.length > 0 && (
+            <div>
+              <div className="mb-1 text-xs uppercase tracking-wide text-[var(--theme-muted)]">Busy API routes</div>
+              <div className="grid gap-1 text-xs text-[var(--theme-muted)] md:grid-cols-2">
+                {data.api.topRoutes.slice(0, 6).map((route) => (
+                  <div key={route.path} className="flex justify-between gap-3">
+                    <code className="truncate text-[var(--theme-text)]">{route.path}</code>
+                    <span className="shrink-0 tabular-nums">{route.requests} · {route.averageLatencyMs}ms avg</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </Panel>
+  )
 }
 
 function Panel({
@@ -295,6 +383,8 @@ export function OpsCostScreen() {
             : ''}
         </p>
       </header>
+
+      <OperationalHealthPanel />
 
       {/* Headline stat tiles */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

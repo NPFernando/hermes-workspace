@@ -29,6 +29,36 @@ const WORKSPACE_BUILD_ID = (() => {
 })()
 
 const port = parseInt(process.env.PORT || '3000', 10)
+const HTTP_METRIC_WINDOW_MS = 15 * 60 * 1000
+const HTTP_METRIC_MAX_SAMPLES = 2000
+
+// Keep a small, process-local request ledger. It intentionally stores only
+// route/method/status/timing metadata — never query strings, bodies, cookies,
+// prompts, or response content. The authenticated system-metrics route reads
+// this same global to expose a live operational view without adding a
+// telemetry dependency or persistent sensitive log.
+const HTTP_METRICS = {
+  startedAt: Date.now(),
+  samples: [],
+}
+globalThis.__hermesHttpMetrics = HTTP_METRICS
+
+function recordHttpMetric(pathname, method, statusCode, durationMs) {
+  const now = Date.now()
+  HTTP_METRICS.samples.push({
+    at: now,
+    pathname: pathname.startsWith('/api/') ? pathname : '<page>',
+    method,
+    statusCode,
+    durationMs: Math.max(0, Math.round(durationMs)),
+  })
+  if (HTTP_METRICS.samples.length > HTTP_METRIC_MAX_SAMPLES) {
+    HTTP_METRICS.samples.splice(
+      0,
+      HTTP_METRICS.samples.length - HTTP_METRIC_MAX_SAMPLES,
+    )
+  }
+}
 // Keep enough headroom for the largest supported multipart upload (25 MB)
 // while bounding memory used before a route-specific parser can run.
 const MAX_REQUEST_BODY_BYTES = 32 * 1024 * 1024
@@ -229,6 +259,17 @@ function parseRequestUrl(rawUrl, host) {
 }
 
 async function requestHandler(req, res) {
+  const requestStartedAt = performance.now()
+  const requestUrl = parseRequestUrl(req.url, req.headers.host)
+  const requestPathname = requestUrl?.pathname || '<invalid-request>'
+  res.once('finish', () => {
+    recordHttpMetric(
+      requestPathname,
+      req.method || 'UNKNOWN',
+      res.statusCode,
+      performance.now() - requestStartedAt,
+    )
+  })
   // Apply conservative browser hardening at the HTTP boundary. The CSP is
   // still owned by the application document because the client uses a small
   // set of runtime-generated styles/scripts; these headers cover framing,

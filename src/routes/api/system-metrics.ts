@@ -9,6 +9,8 @@ import {
   ensureGatewayProbed,
   getConnectionStatus,
 } from '../../server/gateway-capabilities'
+import { getOpsCronJobs } from '../../server/ops-observability'
+import { getSwarmDispatchQueueSnapshot } from '../../server/swarm-dispatch-queue'
 
 type SystemMetricsResponse = {
   checkedAt: number
@@ -32,6 +34,81 @@ type SystemMetricsResponse = {
     status: 'connected' | 'enhanced' | 'partial' | 'disconnected'
     health: boolean
     dashboard: boolean
+  }
+  process: {
+    uptimeSeconds: number
+    pid: number
+  }
+  api: {
+    windowMinutes: number
+    requests: number
+    errorCount: number
+    errorRatePercent: number
+    averageLatencyMs: number | null
+    p95LatencyMs: number | null
+    topRoutes: Array<{ path: string; requests: number; averageLatencyMs: number }>
+  }
+  jobs: {
+    totalCronJobs: number | null
+    failedCronJobs: number | null
+    queueDepth: number | null
+    queueRunning: number | null
+    queueFailedRecent: number | null
+  }
+}
+
+type HttpMetricSample = {
+  at: number
+  pathname: string
+  method: string
+  statusCode: number
+  durationMs: number
+}
+
+type HttpMetricState = {
+  startedAt: number
+  samples: Array<HttpMetricSample>
+}
+
+function readHttpMetrics(now: number) {
+  const state = (globalThis as typeof globalThis & {
+    __hermesHttpMetrics?: HttpMetricState
+  }).__hermesHttpMetrics
+  const cutoff = now - 15 * 60 * 1000
+  const samples = (state?.samples ?? []).filter(
+    (sample) => sample.at >= cutoff && sample.pathname.startsWith('/api/'),
+  )
+  const durations = samples.map((sample) => sample.durationMs).sort((a, b) => a - b)
+  const errorCount = samples.filter((sample) => sample.statusCode >= 400).length
+  const percentile = (ratio: number) =>
+    durations.length === 0
+      ? null
+      : durations[Math.min(durations.length - 1, Math.ceil(durations.length * ratio) - 1)]
+  const routeMap = new Map<string, { requests: number; totalMs: number }>()
+  for (const sample of samples) {
+    const current = routeMap.get(sample.pathname) ?? { requests: 0, totalMs: 0 }
+    current.requests += 1
+    current.totalMs += sample.durationMs
+    routeMap.set(sample.pathname, current)
+  }
+  return {
+    windowMinutes: 15,
+    requests: samples.length,
+    errorCount,
+    errorRatePercent: samples.length === 0 ? 0 : Math.round((errorCount / samples.length) * 1000) / 10,
+    averageLatencyMs:
+      durations.length === 0
+        ? null
+        : Math.round(durations.reduce((sum, value) => sum + value, 0) / durations.length),
+    p95LatencyMs: percentile(0.95),
+    topRoutes: [...routeMap.entries()]
+      .sort((a, b) => b[1].requests - a[1].requests)
+      .slice(0, 8)
+      .map(([path, value]) => ({
+        path,
+        requests: value.requests,
+        averageLatencyMs: Math.round(value.totalMs / value.requests),
+      })),
   }
 }
 
@@ -160,9 +237,11 @@ export const Route = createFileRoute('/api/system-metrics')({
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const [caps, cpu] = await Promise.all([
+        const [caps, cpu, queue, cronJobs] = await Promise.all([
           ensureGatewayProbed(),
           readCpu(),
+          getSwarmDispatchQueueSnapshot().catch(() => null),
+          Promise.resolve(getOpsCronJobs()),
         ])
         const status = getConnectionStatus()
 
@@ -175,6 +254,21 @@ export const Route = createFileRoute('/api/system-metrics')({
             status,
             health: caps.health,
             dashboard: caps.dashboard.available,
+          },
+          process: {
+            uptimeSeconds: Math.floor(process.uptime()),
+            pid: process.pid,
+          },
+          api: readHttpMetrics(Date.now()),
+          jobs: {
+            totalCronJobs: cronJobs?.length ?? null,
+            failedCronJobs:
+              cronJobs?.filter((job) => /fail|error/i.test(job.lastStatus ?? '')).length ?? null,
+            queueDepth: queue ? queue.waiting.length : null,
+            queueRunning: queue?.active ? 1 : queue ? 0 : null,
+            queueFailedRecent: queue
+              ? queue.recent.filter((job) => job.status === 'failed').length
+              : null,
           },
         }
 
