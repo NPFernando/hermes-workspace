@@ -2,10 +2,27 @@ export type QueuedChatPrompt = {
   id: string
   text: string
   createdAt: number
+  /** Higher values run first; omitted legacy entries are normal priority. */
+  priority?: number
+  /** Unix milliseconds; omitted means run as soon as the queue is idle. */
+  runAt?: number
+  /** Optional Hermes sister/agent id to use for this queued prompt. */
+  agentId?: string
+  /** Number of failed delivery attempts already made. */
+  attempts?: number
+  /** Maximum automatic retries after a delivery failure. */
+  maxAttempts?: number
+}
+
+export type QueueEnqueueOptions = {
+  priority?: number
+  runAt?: number
+  agentId?: string
+  maxAttempts?: number
 }
 
 export type QueueCommand =
-  | { kind: 'enqueue'; text: string }
+  | ({ kind: 'enqueue'; text: string } & QueueEnqueueOptions)
   | { kind: 'list' }
   | { kind: 'clear' }
   | { kind: 'resume' }
@@ -19,6 +36,8 @@ export const MAX_CHAT_QUEUE_TEXT_LENGTH = 4_000
 const CHAT_QUEUE_PAUSED_SUFFIX = '.paused'
 const CHAT_QUEUE_LOCK_SUFFIX = '.lock'
 export const CHAT_QUEUE_LOCK_TTL_MS = 15 * 60 * 1000
+export const CHAT_QUEUE_DEFAULT_MAX_ATTEMPTS = 2
+export const CHAT_QUEUE_MAX_ATTEMPTS = 5
 
 type ChatQueueLock = { owner: string; expiresAt: number }
 
@@ -78,7 +97,64 @@ export function parseQueueCommand(value: string): QueueCommand | null {
         'Usage: /queue edit <number> <replacement> or /queue remove <number>',
     }
   }
-  return { kind: 'enqueue', text: argument }
+  let text = argument
+  let priority: number | undefined
+  let runAt: number | undefined
+  let agentId: string | undefined
+  let maxAttempts: number | undefined
+
+  const priorityMatch = /^(?:priority\s+)?(low|normal|high|urgent|[0-3])\s+([\s\S]+)$/i.exec(text)
+  if (priorityMatch) {
+    const named = priorityMatch[1].toLowerCase()
+    priority = named === 'low' ? 0 : named === 'normal' ? 1 : named === 'high' ? 2 : named === 'urgent' ? 3 : Number(named)
+    text = priorityMatch[2].trim()
+  }
+  const atMatch = /^at\s+(\S+)\s+([\s\S]+)$/i.exec(text)
+  if (atMatch) {
+    const parsed = Date.parse(atMatch[1])
+    if (!Number.isNaN(parsed)) {
+      runAt = parsed
+      text = atMatch[2].trim()
+    }
+  }
+  const agentMatch = /^agent\s+([a-z0-9_-]+)\s+([\s\S]+)$/i.exec(text)
+  if (agentMatch) {
+    agentId = agentMatch[1]
+    text = agentMatch[2].trim()
+  }
+  return { kind: 'enqueue', text, priority, runAt, agentId }
+}
+
+export function sortChatQueue(queue: Array<QueuedChatPrompt>): Array<QueuedChatPrompt> {
+  return queue
+    .map((prompt, index) => ({ prompt, index }))
+    .sort((a, b) =>
+      (b.prompt.priority ?? 1) - (a.prompt.priority ?? 1) ||
+      a.prompt.createdAt - b.prompt.createdAt ||
+      a.index - b.index,
+    )
+    .map(({ prompt }) => prompt)
+}
+
+export function nextEligibleChatQueueIndex(
+  queue: Array<QueuedChatPrompt>,
+  now = Date.now(),
+): number {
+  let bestIndex = -1
+  for (let index = 0; index < queue.length; index += 1) {
+    const prompt = queue[index]
+    if (prompt.runAt !== undefined && prompt.runAt > now) continue
+    if (bestIndex === -1) {
+      bestIndex = index
+      continue
+    }
+    const best = queue[bestIndex]
+    if ((prompt.priority ?? 1) > (best.priority ?? 1) ||
+      ((prompt.priority ?? 1) === (best.priority ?? 1) && prompt.createdAt < best.createdAt)) {
+      bestIndex = index
+    }
+  }
+  return bestIndex
 }
 
 /** Replace one pending prompt without changing its FIFO position or identity. */
@@ -298,10 +374,17 @@ export function writeChatQueuePaused(
   }
 }
 
-export function createQueuedChatPrompt(text: string): QueuedChatPrompt {
+export function createQueuedChatPrompt(
+  text: string,
+  options: QueueEnqueueOptions = {},
+): QueuedChatPrompt {
   return {
     id: crypto.randomUUID(),
     text: text.trim(),
     createdAt: Date.now(),
+    ...(options.priority === undefined ? {} : { priority: Math.max(0, Math.min(3, Math.round(options.priority))) }),
+    ...(options.runAt === undefined ? {} : { runAt: options.runAt }),
+    ...(options.agentId ? { agentId: options.agentId } : {}),
+    maxAttempts: Math.max(0, Math.min(CHAT_QUEUE_MAX_ATTEMPTS, Math.round(options.maxAttempts ?? CHAT_QUEUE_DEFAULT_MAX_ATTEMPTS))),
   }
 }
