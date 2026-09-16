@@ -1,0 +1,164 @@
+#!/usr/bin/env node
+/**
+ * Produce one read-only production-readiness report. This composes local
+ * evidence and optional GitHub alert counts; it never deploys, migrates,
+ * restarts, changes files, or treats unavailable evidence as passing.
+ */
+import { execFile as nodeExecFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { createHash } from 'node:crypto'
+import { runAssetIntegrity } from './asset-integrity.mjs'
+import { runReleaseSmoke } from './release-smoke.mjs'
+
+const execFile = promisify(nodeExecFile)
+const rootDir = process.cwd()
+const baseUrl = process.env.READINESS_BASE_URL || 'http://127.0.0.1:3000'
+const timeoutMs = Number(process.env.READINESS_TIMEOUT_MS || 180_000)
+
+export async function command(command, args = [], options = {}) {
+  try {
+    const result = await execFile(command, args, {
+      cwd: options.cwd || rootDir,
+      timeout: options.timeout || timeoutMs,
+      maxBuffer: 2 * 1024 * 1024,
+      env: options.env || process.env,
+    })
+    return { ok: true, code: 0, stdout: result.stdout.trim(), stderr: result.stderr.trim() }
+  } catch (error) {
+    return {
+      ok: false,
+      code: typeof error?.code === 'number' ? error.code : 1,
+      stdout: String(error?.stdout || '').trim(),
+      stderr: String(error?.stderr || error?.message || '').trim().slice(0, 1000),
+    }
+  }
+}
+
+function result(status, detail, extra = {}) {
+  return { status, detail, ...extra }
+}
+
+function artifactBuildId() {
+  try {
+    return createHash('sha256').update(readFileSync(join(rootDir, 'dist/server/server.js'))).digest('hex').slice(0, 16)
+  } catch {
+    return null
+  }
+}
+
+function repositorySlug(remote) {
+  if (!remote) return null
+  const match = remote.match(/github\.com[/:]([^/]+\/[^/]+?)(?:\.git)?$/i)
+  return match?.[1] || null
+}
+
+async function deploymentIdentity() {
+  const [head, branch, dirty, remote, marker, servicePid] = await Promise.all([
+    command('git', ['rev-parse', 'HEAD']),
+    command('git', ['branch', '--show-current']),
+    command('git', ['status', '--porcelain']),
+    command('git', ['remote', 'get-url', 'origin']),
+    command('cat', ['.runtime/build-commit']),
+    command('systemctl', ['show', '-p', 'MainPID', '--value', 'hermes-workspace.service']),
+  ])
+  const served = await fetch(`${baseUrl}/`, { cache: 'no-store' }).then((response) => response.headers.get('x-workspace-build')).catch(() => null)
+  const artifact = artifactBuildId()
+  const expected = marker.ok && head.ok ? artifact : null
+  const matches = Boolean(served && artifact && served === artifact)
+  return {
+    status: matches && !dirty.stdout ? 'pass' : 'degraded',
+    head: head.stdout || null,
+    branch: branch.stdout || null,
+    dirty: Boolean(dirty.stdout),
+    remote: repositorySlug(remote.stdout),
+    buildMarker: marker.stdout || null,
+    artifactBuild: artifact,
+    servedBuild: served,
+    markerMatchesHead: Boolean(expected && marker.stdout === head.stdout),
+    artifactMatchesServed: matches,
+    servicePid: servicePid.stdout || null,
+    detail: matches ? 'The live build header matches the local compiled artifact.' : 'Live build identity could not be fully verified.',
+  }
+}
+
+async function serviceCheck() {
+  const active = await command('systemctl', ['is-active', 'hermes-workspace.service'])
+  const pid = await command('systemctl', ['show', '-p', 'MainPID', '--value', 'hermes-workspace.service'])
+  return result(active.ok && active.stdout === 'active' ? 'pass' : 'fail', active.stdout || active.stderr || 'Service status unavailable', { service: 'hermes-workspace.service', pid: pid.stdout || null })
+}
+
+async function testCheck(skipTests) {
+  if (skipTests) return result('not-run', 'Tests skipped by --skip-tests.')
+  const started = Date.now()
+  const test = await command('pnpm', ['test', '--', '--reporter=dot'])
+  return result(test.ok ? 'pass' : 'fail', test.ok ? 'Repository test suite passed.' : test.stderr || 'Repository test suite failed.', { command: 'pnpm test -- --reporter=dot', durationMs: Date.now() - started })
+}
+
+async function securityCheck() {
+  const gh = await command('gh', ['--version'], { timeout: 5000 })
+  if (!gh.ok) return result('unavailable', 'GitHub CLI is not installed or unavailable.')
+  const remote = await command('git', ['remote', 'get-url', 'origin'])
+  const slug = repositorySlug(remote.stdout)
+  if (!slug) return result('unavailable', 'A GitHub repository could not be derived from origin.')
+  const [codeql, dependabot] = await Promise.all([
+    command('gh', ['api', `repos/${slug}/code-scanning/alerts?state=open&per_page=100`, '--jq', 'length'], { timeout: 15_000 }),
+    command('gh', ['api', `repos/${slug}/dependabot/alerts?state=open&per_page=100`, '--jq', 'length'], { timeout: 15_000 }),
+  ])
+  const parseCount = (value) => /^\d+$/.test(value) ? Number(value) : null
+  const codeqlOpen = parseCount(codeql.stdout)
+  const dependabotOpen = parseCount(dependabot.stdout)
+  if (codeqlOpen == null || dependabotOpen == null) return result('unavailable', 'GitHub alert APIs were not fully available.', { codeqlOpen, dependabotOpen })
+  return result(codeqlOpen === 0 && dependabotOpen === 0 ? 'pass' : 'fail', `${codeqlOpen} CodeQL and ${dependabotOpen} Dependabot alerts open.`, { codeqlOpen, dependabotOpen })
+}
+
+async function migrationCheck() {
+  const schema = existsSync(join(rootDir, 'src/server/finance-schema.sql'))
+  const store = existsSync(join(rootDir, 'src/server/finance-store.ts'))
+  const postgres = existsSync(join(rootDir, 'src/server/finance-postgres-store.ts'))
+  const migrationDocs = existsSync(join(rootDir, 'docs/finance-cutover-open-questions.md'))
+  const complete = schema && store && postgres
+  return result(complete ? 'degraded' : 'fail', complete ? 'Migration artifacts exist; live migration state requires operator/database evidence.' : 'Required finance persistence artifacts are missing.', { schema, store, postgres, migrationDocs, evidence: 'filesystem-only' })
+}
+
+export async function buildReadinessReport({ skipTests = false, fetchImpl = fetch } = {}) {
+  const originalFetch = globalThis.fetch
+  if (fetchImpl !== originalFetch) globalThis.fetch = fetchImpl
+  try {
+    const [tests, security, migrations, service, identity] = await Promise.all([
+      testCheck(skipTests),
+      securityCheck(),
+      migrationCheck(),
+      serviceCheck(),
+      deploymentIdentity(),
+    ])
+    let assets = result('fail', 'Asset check did not run.')
+    let release = result('fail', 'Release smoke did not run.')
+    try {
+      const assetReport = await runAssetIntegrity(baseUrl, fetchImpl)
+      assets = result('pass', 'All local HTML asset references are available.', assetReport)
+    } catch (error) { assets = result('fail', error instanceof Error ? error.message : String(error)) }
+    try {
+      const smokeReport = await runReleaseSmoke(baseUrl, fetchImpl)
+      release = result('pass', 'Release smoke passed.', smokeReport)
+    } catch (error) { release = result('fail', error instanceof Error ? error.message : String(error)) }
+    const checks = { tests, security, migrations, service, assets, release, deploymentIdentity: identity }
+    const blockers = Object.entries(checks).filter(([, check]) => check.status === 'fail').map(([name, check]) => `${name}: ${check.detail}`)
+    const warnings = Object.entries(checks).filter(([, check]) => ['degraded', 'unavailable', 'not-run'].includes(check.status)).map(([name, check]) => `${name}: ${check.detail}`)
+    return { generatedAt: new Date().toISOString(), overall: blockers.length ? 'blocked' : warnings.length ? 'degraded' : 'ready', blockers, warnings, checks }
+  } finally {
+    if (fetchImpl !== originalFetch) globalThis.fetch = originalFetch
+  }
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const skipTests = process.argv.includes('--skip-tests')
+  const report = await buildReadinessReport({ skipTests })
+  if (process.argv.includes('--json')) console.log(JSON.stringify(report, null, 2))
+  else {
+    console.log(`production readiness: ${report.overall}`)
+    for (const [name, check] of Object.entries(report.checks)) console.log(`${check.status === 'pass' ? '✓' : check.status === 'fail' ? '✗' : '⚠'} ${name}: ${check.detail}`)
+    if (report.blockers.length) process.exitCode = 1
+  }
+}

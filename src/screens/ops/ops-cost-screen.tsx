@@ -289,6 +289,70 @@ function Panel({
   )
 }
 
+type ReadinessCheck = { status: string; detail: string }
+type ReadinessReport = {
+  overall: string
+  generatedAt: string
+  blockers: Array<string>
+  warnings: Array<string>
+  checks: Record<string, ReadinessCheck>
+}
+
+function ProductionReadinessPanel() {
+  const query = useQuery({
+    queryKey: ['production-readiness'],
+    enabled: false,
+    queryFn: async () => {
+      const response = await fetch('/api/production-readiness', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const data = (await response.json()) as { ok?: boolean; error?: string; report?: ReadinessReport }
+      if (!response.ok || !data.ok || !data.report) throw new Error(data.error || `HTTP ${response.status}`)
+      return data.report
+    },
+  })
+  const report = query.data
+  return (
+    <Panel title="Production readiness report">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="max-w-2xl text-sm text-[var(--theme-muted)]">
+          Runs tests, security-alert checks, migration evidence, service health,
+          asset integrity, release smoke, and deployment-identity verification.
+          Missing external evidence is shown as a warning, never as a pass.
+        </p>
+        <button
+          type="button"
+          onClick={() => void query.refetch()}
+          disabled={query.isFetching}
+          className="min-h-10 rounded-lg bg-accent-500 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {query.isFetching ? 'Running checks…' : 'Run readiness report'}
+        </button>
+      </div>
+      {query.error && <p className="mt-3 text-sm text-[var(--theme-danger)]">{query.error instanceof Error ? query.error.message : 'Readiness report failed.'}</p>}
+      {report && (
+        <div className="mt-4 space-y-3">
+          <div className={`rounded-lg border p-3 text-sm font-semibold ${report.overall === 'ready' ? 'border-[var(--theme-success)]/40 text-[var(--theme-success)]' : report.overall === 'blocked' ? 'border-[var(--theme-danger)]/40 text-[var(--theme-danger)]' : 'border-[var(--theme-warning)]/40 text-[var(--theme-warning)]'}`}>
+            Overall: {report.overall} · {new Date(report.generatedAt).toLocaleString()}
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {Object.entries(report.checks).map(([name, check]) => (
+              <div key={name} className="rounded-lg border border-[var(--theme-border)] p-2 text-xs">
+                <div className="flex justify-between gap-2 font-semibold"><span>{name}</span><span className={check.status === 'pass' ? 'text-[var(--theme-success)]' : check.status === 'fail' ? 'text-[var(--theme-danger)]' : 'text-[var(--theme-warning)]'}>{check.status}</span></div>
+                <p className="mt-1 text-[var(--theme-muted)]">{check.detail}</p>
+              </div>
+            ))}
+          </div>
+          {report.blockers.length > 0 && <p className="text-xs text-[var(--theme-danger)]">Blockers: {report.blockers.join(' · ')}</p>}
+          {report.warnings.length > 0 && <p className="text-xs text-[var(--theme-warning)]">Warnings: {report.warnings.join(' · ')}</p>}
+        </div>
+      )}
+    </Panel>
+  )
+}
+
 export function OpsCostScreen() {
   const opsQuery = useQuery({
     queryKey: ['ops-observability'],
@@ -385,6 +449,7 @@ export function OpsCostScreen() {
       </header>
 
       <OperationalHealthPanel />
+      <ProductionReadinessPanel />
 
       {/* Headline stat tiles */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

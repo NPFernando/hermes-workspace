@@ -102,6 +102,7 @@ import { Route as ApiPersonalitySwarmRouteImport } from './routes/api/personalit
 import { Route as ApiPingRouteImport } from './routes/api/ping'
 import { Route as ApiPluginsRouteImport } from './routes/api/plugins'
 import { Route as ApiPreviewFileRouteImport } from './routes/api/preview-file'
+import { Route as ApiProductionReadinessRouteImport } from './routes/api/production-readiness'
 import { Route as ApiProviderUsageRouteImport } from './routes/api/provider-usage'
 import { Route as ApiRiskCheckRouteImport } from './routes/api/risk-check'
 import { Route as ApiRouteSisterRouteImport } from './routes/api/route-sister'
@@ -724,6 +725,11 @@ const ApiPluginsRoute = ApiPluginsRouteImport.update({
 const ApiPreviewFileRoute = ApiPreviewFileRouteImport.update({
   id: '/api/preview-file',
   path: '/api/preview-file',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProductionReadinessRoute = ApiProductionReadinessRouteImport.update({
+  id: '/api/production-readiness',
+  path: '/api/production-readiness',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiProviderUsageRoute = ApiProviderUsageRouteImport.update({
@@ -1621,6 +1627,7 @@ export interface FileRoutesByFullPath {
   '/api/ping': typeof ApiPingRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/production-readiness': typeof ApiProductionReadinessRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/risk-check': typeof ApiRiskCheckRoute
   '/api/route-sister': typeof ApiRouteSisterRoute
@@ -1873,6 +1880,7 @@ export interface FileRoutesByTo {
   '/api/ping': typeof ApiPingRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/production-readiness': typeof ApiProductionReadinessRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/risk-check': typeof ApiRiskCheckRoute
   '/api/route-sister': typeof ApiRouteSisterRoute
@@ -2127,6 +2135,7 @@ export interface FileRoutesById {
   '/api/ping': typeof ApiPingRoute
   '/api/plugins': typeof ApiPluginsRoute
   '/api/preview-file': typeof ApiPreviewFileRoute
+  '/api/production-readiness': typeof ApiProductionReadinessRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/risk-check': typeof ApiRiskCheckRoute
   '/api/route-sister': typeof ApiRouteSisterRoute
@@ -2382,6 +2391,7 @@ export interface FileRouteTypes {
     | '/api/ping'
     | '/api/plugins'
     | '/api/preview-file'
+    | '/api/production-readiness'
     | '/api/provider-usage'
     | '/api/risk-check'
     | '/api/route-sister'
@@ -2634,6 +2644,7 @@ export interface FileRouteTypes {
     | '/api/ping'
     | '/api/plugins'
     | '/api/preview-file'
+    | '/api/production-readiness'
     | '/api/provider-usage'
     | '/api/risk-check'
     | '/api/route-sister'
@@ -2887,6 +2898,7 @@ export interface FileRouteTypes {
     | '/api/ping'
     | '/api/plugins'
     | '/api/preview-file'
+    | '/api/production-readiness'
     | '/api/provider-usage'
     | '/api/risk-check'
     | '/api/route-sister'
@@ -3141,6 +3153,7 @@ export interface RootRouteChildren {
   ApiPingRoute: typeof ApiPingRoute
   ApiPluginsRoute: typeof ApiPluginsRoute
   ApiPreviewFileRoute: typeof ApiPreviewFileRoute
+  ApiProductionReadinessRoute: typeof ApiProductionReadinessRoute
   ApiProviderUsageRoute: typeof ApiProviderUsageRoute
   ApiRiskCheckRoute: typeof ApiRiskCheckRoute
   ApiRouteSisterRoute: typeof ApiRouteSisterRoute
@@ -3912,6 +3925,13 @@ declare module '@tanstack/react-router' {
       path: '/api/preview-file'
       fullPath: '/api/preview-file'
       preLoaderRoute: typeof ApiPreviewFileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/production-readiness': {
+      id: '/api/production-readiness'
+      path: '/api/production-readiness'
+      fullPath: '/api/production-readiness'
+      preLoaderRoute: typeof ApiProductionReadinessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/provider-usage': {
@@ -5373,6 +5393,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPingRoute: ApiPingRoute,
   ApiPluginsRoute: ApiPluginsRoute,
   ApiPreviewFileRoute: ApiPreviewFileRoute,
+  ApiProductionReadinessRoute: ApiProductionReadinessRoute,
   ApiProviderUsageRoute: ApiProviderUsageRoute,
   ApiRiskCheckRoute: ApiRiskCheckRoute,
   ApiRouteSisterRoute: ApiRouteSisterRoute,
