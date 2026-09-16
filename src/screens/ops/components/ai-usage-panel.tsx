@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 
 type UsageLine = {
   type: 'progress' | 'text' | 'badge'
@@ -140,6 +141,22 @@ export function lastSevenUtcDays(now = Date.now()): Array<string> {
   return days
 }
 
+export function lastThirtyOneUtcDays(now = Date.now()): Array<string> {
+  const today = new Date(now)
+  const days: Array<string> = []
+  for (let offset = 30; offset >= 0; offset -= 1) {
+    const date = new Date(
+      Date.UTC(
+        today.getUTCFullYear(),
+        today.getUTCMonth(),
+        today.getUTCDate() - offset,
+      ),
+    )
+    days.push(date.toISOString().slice(0, 10))
+  }
+  return days
+}
+
 function DailyTrendCard({
   title,
   unit,
@@ -158,32 +175,39 @@ function DailyTrendCard({
     <article className="rounded-lg border border-[var(--theme-border,rgba(128,128,128,0.2))] bg-[var(--theme-panel)] p-3">
       <h3 className="text-xs font-medium text-[var(--theme-text)]">{title}</h3>
       <p className="text-[10px] text-[var(--theme-muted)]">{unit}</p>
-      <div
-        className="mt-3 grid grid-cols-7 items-end gap-1"
-        aria-label={`${title}, last seven days`}
-      >
-        {days.map((day) => {
-          const value = values.get(day)
-          const height =
-            value === undefined ? 0 : Math.max(4, (value / maximum) * 48)
-          return (
-            <div key={day} className="flex min-w-0 flex-col items-center gap-1">
-              <span className="max-w-full truncate text-[9px] tabular-nums text-[var(--theme-muted)]">
-                {value === undefined ? '—' : formatValue(value)}
-              </span>
-              <div className="flex h-12 w-full items-end rounded bg-[var(--theme-hover)]">
-                <div
-                  className="w-full rounded bg-accent-500"
-                  style={{ height: `${height}px` }}
-                  aria-hidden="true"
-                />
+      <div className="mt-3 overflow-x-auto" aria-label={`${title}, history`}>
+        <div
+          className="grid min-w-full items-end gap-1"
+          style={{
+            gridTemplateColumns: `repeat(${days.length}, minmax(28px, 1fr))`,
+          }}
+        >
+          {days.map((day) => {
+            const value = values.get(day)
+            const height =
+              value === undefined ? 0 : Math.max(4, (value / maximum) * 48)
+            return (
+              <div
+                key={day}
+                className="flex min-w-0 flex-col items-center gap-1"
+              >
+                <span className="max-w-full truncate text-[9px] tabular-nums text-[var(--theme-muted)]">
+                  {value === undefined ? '—' : formatValue(value)}
+                </span>
+                <div className="flex h-12 w-full items-end rounded bg-[var(--theme-hover)]">
+                  <div
+                    className="w-full rounded bg-accent-500"
+                    style={{ height: `${height}px` }}
+                    aria-hidden="true"
+                  />
+                </div>
+                <span className="text-[9px] text-[var(--theme-muted)]">
+                  {day.slice(5)}
+                </span>
               </div>
-              <span className="text-[9px] text-[var(--theme-muted)]">
-                {day.slice(5)}
-              </span>
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
       </div>
     </article>
   )
@@ -443,6 +467,7 @@ export function AiUsagePanel({
   copilotDailyUsage: Array<CopilotDailyUsage> | null
   hermesDailyUsage: Array<HermesDailyUsage> | null
 }) {
+  const [historyRange, setHistoryRange] = useState<7 | 31>(7)
   const query = useQuery({
     queryKey: ['provider-usage', 'ops-cost'],
     queryFn: async () => {
@@ -469,7 +494,7 @@ export function AiUsagePanel({
   const lastUpdated = query.data?.updatedAt
   const sharedBudget = query.data?.sharedBudget
   const monthlyBudget = query.data?.monthlyBudget
-  const days = lastSevenUtcDays()
+  const days = historyRange === 31 ? lastThirtyOneUtcDays() : lastSevenUtcDays()
   const trendSeries: Array<{
     key: string
     title: string
@@ -693,16 +718,36 @@ export function AiUsagePanel({
 
       {trendSeries.length > 0 ? (
         <section aria-label="Daily AI usage trends" className="space-y-2">
-          <div>
-            <h3 className="text-xs font-semibold text-[var(--theme-text)]">
-              Daily trends · last 7 days
-            </h3>
-            <p className="text-[10px] text-[var(--theme-muted)]">
-              UTC days. Copilot and Hermes are daily totals; provider quota and
-              spend cards show the latest reading that day. Missing days mean no
-              source data was observed, not zero usage. Provider history
-              accumulates after the first authenticated dashboard read.
-            </p>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h3 className="text-xs font-semibold text-[var(--theme-text)]">
+                Daily trends · last {historyRange} days
+              </h3>
+              <p className="text-[10px] text-[var(--theme-muted)]">
+                UTC days. Copilot and Hermes are daily totals; provider quota
+                and spend cards show the latest reading that day. Missing days
+                mean no source data was observed, not zero usage. Provider
+                history accumulates after the first authenticated dashboard
+                read.
+              </p>
+            </div>
+            <div
+              className="flex shrink-0 rounded-lg border border-[var(--theme-border)] p-0.5"
+              role="group"
+              aria-label="Usage history range"
+            >
+              {([7, 31] as const).map((range) => (
+                <button
+                  key={range}
+                  type="button"
+                  aria-pressed={historyRange === range}
+                  onClick={() => setHistoryRange(range)}
+                  className="rounded-md px-2 py-1 text-[10px] text-[var(--theme-text)] transition hover:bg-[var(--theme-hover)] aria-pressed:bg-[var(--theme-hover)]"
+                >
+                  {range}d
+                </button>
+              ))}
+            </div>
           </div>
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {trendSeries.map((series) => (
