@@ -578,7 +578,25 @@ const config = defineConfig(({ mode, command }) => {
       exclude: ['playwright'],
     },
     build: {
+      // Mermaid's optional diagram registry emits a 1.46 MB lazy chunk
+      // (currently below check:bundle's 1.5 MB hard limit). Keep the warning
+      // aligned with that enforced budget instead of treating this optional
+      // payload as a regression.
+      chunkSizeWarningLimit: 1500,
       rollupOptions: {
+        onwarn(warning, warn) {
+          // These imports intentionally remain lazy to break the server-only
+          // gateway-capabilities ↔ dashboard-api cycle. Rollup reports them
+          // as ineffective because API routes also statically use the module;
+          // changing them would reintroduce the cycle, not improve chunking.
+          if (
+            warning.code === 'INEFFECTIVE_DYNAMIC_IMPORT' &&
+            warning.message.includes('claude-dashboard-api.ts')
+          ) {
+            return
+          }
+          warn(warning)
+        },
         output: {
           manualChunks(id) {
             if (!id.includes('node_modules')) return undefined

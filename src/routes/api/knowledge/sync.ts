@@ -1,7 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../../server/auth-middleware'
-import { readKnowledgeBaseConfig } from '../../../server/knowledge-config'
+import {
+  readKnowledgeBaseConfig,
+  writeKnowledgeBaseConfig,
+} from '../../../server/knowledge-config'
 import { syncKnowledgeSource } from '../../../server/knowledge-browser'
 import { safeErrorMessage } from '../../../server/rate-limit'
 import type { KnowledgeBaseConfig } from '../../../server/knowledge-config'
@@ -26,8 +29,6 @@ export const Route = createFileRoute('/api/knowledge/sync')({
         }
 
         if (config) {
-          const { writeKnowledgeBaseConfig } =
-            await import('../../../server/knowledge-config')
           writeKnowledgeBaseConfig(config)
         }
 
@@ -43,7 +44,7 @@ export const Route = createFileRoute('/api/knowledge/sync')({
           )
         }
       },
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         if (!isAuthenticated(request)) {
           return json({ error: 'Unauthorized' }, { status: 401 })
         }
