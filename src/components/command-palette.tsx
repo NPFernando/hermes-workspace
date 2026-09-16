@@ -43,6 +43,14 @@ type CommandPaletteProps = {
   sessions: Array<SessionMeta>
 }
 
+export const COMMAND_PALETTE_OPEN_EVENT = 'workspace:open-command-palette'
+
+/** Open the shared command palette from touch UI or other workspace surfaces. */
+export function openCommandPalette() {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent(COMMAND_PALETTE_OPEN_EVENT))
+}
+
 type HugeiconsIconProps = React.ComponentProps<typeof HugeiconsIcon>
 
 type CommandAction = {
@@ -112,10 +120,6 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
-  const [isDesktop, setIsDesktop] = useState(() => {
-    if (typeof window === 'undefined') return true
-    return window.matchMedia('(min-width: 768px)').matches
-  })
   const isMacPlatform = isMac
 
   const runSlashCommand = (command: string) => {
@@ -381,15 +385,6 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
   )
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const media = window.matchMedia('(min-width: 768px)')
-    const updateDesktop = () => setIsDesktop(media.matches)
-    updateDesktop()
-    media.addEventListener('change', updateDesktop)
-    return () => media.removeEventListener('change', updateDesktop)
-  }, [])
-
-  useEffect(() => {
     setSelectedIndex(0)
   }, [query, open])
 
@@ -400,7 +395,7 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
 
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent) {
-      if (event.defaultPrevented || event.isComposing || !isDesktop) return
+      if (event.defaultPrevented || event.isComposing) return
       if (!(event.metaKey || event.ctrlKey) || event.shiftKey || event.altKey) {
         return
       }
@@ -412,7 +407,17 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
 
     window.addEventListener('keydown', handleShortcut, true)
     return () => window.removeEventListener('keydown', handleShortcut, true)
-  }, [isDesktop])
+  }, [])
+
+  useEffect(() => {
+    function handleOpenRequest() {
+      setOpen(true)
+    }
+
+    window.addEventListener(COMMAND_PALETTE_OPEN_EVENT, handleOpenRequest)
+    return () =>
+      window.removeEventListener(COMMAND_PALETTE_OPEN_EVENT, handleOpenRequest)
+  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -462,11 +467,9 @@ export function CommandPalette({ pathname, sessions }: CommandPaletteProps) {
     }
   }, [open])
 
-  if (!isDesktop) return null
-
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
-      <CommandDialogPopup className="mx-auto self-start">
+      <CommandDialogPopup className="mx-auto self-start max-h-[calc(100dvh-2rem)]">
         <Command
           items={filteredActions}
           value={query}
