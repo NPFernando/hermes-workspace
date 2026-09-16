@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-import { dirname, resolve } from 'node:path'
+import { resolve } from 'node:path'
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
@@ -43,12 +42,7 @@ type ConductorSpawnBody = {
 }
 
 function repoRoot(): string {
-  try {
-    const here = dirname(fileURLToPath(import.meta.url))
-    return resolve(here, '..', '..', '..')
-  } catch {
-    return process.cwd()
-  }
+  return resolve(process.env.HERMES_WORKSPACE_ROOT?.trim() || process.cwd())
 }
 
 function loadDispatchSkill(): string {

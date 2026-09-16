@@ -23,7 +23,6 @@ import {
   writeSync,
 } from 'node:fs'
 import { dirname, join, resolve as pathResolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { randomBytes } from 'node:crypto'
 import { parseMcpServerInput } from './mcp-input-validate'
 import { getStateDir } from './workspace-state-dir'
@@ -104,13 +103,12 @@ export function presetsFilePath(): string {
 export function seedAssetPath(): string {
   const override = process.env.MCP_PRESETS_SEED_PATH?.trim()
   if (override) return override
-  // Walk up from this module to find the repo root that owns `assets/`.
-  const here = fileURLToPath(new URL('.', import.meta.url))
-  // Try a few candidates; first match wins.
+  // The server runs from the workspace root in development and production.
+  // Keep the candidate list independent of ESM URL semantics so the Electron
+  // CommonJS bundle can resolve the seed without import.meta rewriting.
   const candidates = [
-    pathResolve(here, '../../assets/mcp-presets.seed.json'),
-    pathResolve(here, '../../../assets/mcp-presets.seed.json'),
     pathResolve(process.cwd(), 'assets/mcp-presets.seed.json'),
+    pathResolve(process.cwd(), '../assets/mcp-presets.seed.json'),
   ]
   for (const c of candidates) {
     if (existsSync(c)) return c
@@ -582,13 +580,11 @@ export async function readPresets(): Promise<ReadPresetsResult> {
     const text2 = stat2.ok ? readFileText(path) : null
     if (stat2.ok && text2 !== null) {
       const parsed2 = parseFromText(text2)
-      if (
-        !(
-          parsed2 &&
-          typeof parsed2 === 'object' &&
-          '__jsonError' in (parsed2 as Record<string, unknown>)
-        )
-      ) {
+      if (!(
+        parsed2 &&
+        typeof parsed2 === 'object' &&
+        '__jsonError' in (parsed2 as Record<string, unknown>)
+      )) {
         const validation = validatePayload(parsed2)
         if (validation.errors.length === 0) {
           const result: ReadPresetsResult = {
