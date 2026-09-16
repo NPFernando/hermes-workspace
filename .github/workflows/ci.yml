@@ -104,6 +104,9 @@ jobs:
       - name: Run tests
         run: pnpm test
 
+      - name: Run isolated Postgres queue integration
+        run: pnpm run test:queue:isolated
+
       - name: Run finance browser journey
         run: pnpm run test:e2e:finance
 

@@ -754,9 +754,9 @@ async function finishJob(
          END,
          lease_token = NULL, lease_expires_at = NULL,
        finished_at = clock_timestamp(), updated_at = clock_timestamp()
-     RETURNING status
      WHERE id = $1::uuid AND status = 'running' AND lease_token = $5::uuid
-       AND lease_expires_at > clock_timestamp()`,
+       AND lease_expires_at > clock_timestamp()
+     RETURNING status`,
     [
       id,
       status,
