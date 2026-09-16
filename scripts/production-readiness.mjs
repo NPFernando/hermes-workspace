@@ -110,8 +110,29 @@ async function securityCheck() {
   const parseCount = (value) => /^\d+$/.test(value) ? Number(value) : null
   const codeqlOpen = parseCount(codeql.stdout)
   const dependabotOpen = parseCount(dependabot.stdout)
-  if (codeqlOpen == null || dependabotOpen == null) return result('unavailable', 'GitHub alert APIs were not fully available.', { codeqlOpen, dependabotOpen })
-  return result(codeqlOpen === 0 && dependabotOpen === 0 ? 'pass' : 'fail', `${codeqlOpen} CodeQL and ${dependabotOpen} Dependabot alerts open.`, { codeqlOpen, dependabotOpen })
+  const dependabotDisabled = /Dependabot alerts are disabled/i.test(dependabot.stderr)
+  if (codeqlOpen == null) {
+    return result('unavailable', 'GitHub CodeQL alert API was not available.', {
+      codeqlOpen,
+      dependabotOpen,
+      dependabotStatus: dependabotDisabled ? 'disabled' : 'unavailable',
+    })
+  }
+  if (dependabotDisabled) {
+    return result(
+      codeqlOpen === 0 ? 'pass' : 'fail',
+      `${codeqlOpen} CodeQL alerts open; Dependabot alerts are disabled for this repository.`,
+      { codeqlOpen, dependabotOpen: null, dependabotStatus: 'disabled' },
+    )
+  }
+  if (dependabotOpen == null) {
+    return result('unavailable', 'GitHub Dependabot alert API was not available.', {
+      codeqlOpen,
+      dependabotOpen,
+      dependabotStatus: 'unavailable',
+    })
+  }
+  return result(codeqlOpen === 0 && dependabotOpen === 0 ? 'pass' : 'fail', `${codeqlOpen} CodeQL and ${dependabotOpen} Dependabot alerts open.`, { codeqlOpen, dependabotOpen, dependabotStatus: 'enabled' })
 }
 
 async function migrationCheck() {
