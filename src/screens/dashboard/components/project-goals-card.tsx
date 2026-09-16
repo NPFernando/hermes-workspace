@@ -84,9 +84,11 @@ const GOALS: Array<Goal> = [
     id: 9,
     title: 'AI usage dashboard',
     state: 'deployed',
-    detail: 'Provider usage and history are integrated.',
-    evidence: 'Provider history, limits, and warning panel.',
-    nextAction: 'Add monthly budget views.',
+    detail:
+      'Provider usage, 31-day history, limits, alerts, and budgets are integrated.',
+    evidence:
+      'Provider history, limit warnings, monthly budget API, and chart panel.',
+    nextAction: 'Tune thresholds from observed provider usage.',
   },
   {
     id: 10,
@@ -101,17 +103,20 @@ const GOALS: Array<Goal> = [
     id: 11,
     title: 'Shared usage budgets',
     state: 'deployed',
-    detail: 'Warnings and provider history are live.',
-    evidence: 'Shared budget state and provider usage APIs.',
-    nextAction: 'Add a configurable monthly cap.',
+    detail: 'Shared warnings and configurable monthly caps are live.',
+    evidence:
+      'Budget configuration, provider usage APIs, and monthly cap tests.',
+    nextAction: 'Review budget thresholds monthly.',
   },
   {
     id: 12,
     title: 'Fork sync protection',
     state: 'completed',
-    detail: 'Dry-run and custom-change safeguards are present.',
-    evidence: 'Fork preview assistant tests pass.',
-    nextAction: 'Schedule read-only preview reports.',
+    detail:
+      'Dry-run, scheduled previews, custom-change safeguards, and approval evidence are present.',
+    evidence:
+      'Fork preview, scheduled-report, and approval-evidence tests pass.',
+    nextAction: 'Review scheduled reports before approving a sync.',
   },
   {
     id: 13,
@@ -158,9 +163,12 @@ const GOALS: Array<Goal> = [
     id: 18,
     title: 'Private-data-safe Dify pilot',
     state: 'active',
-    detail: 'Optional workbench remains isolated from private data.',
-    evidence: 'Allowlisted workflows and metadata-only history.',
-    nextAction: 'Add workflow cancellation and version visibility.',
+    detail:
+      'Optional workbench remains isolated from private data with versioned, bounded runs.',
+    evidence:
+      'Allowlisted workflows, metadata-only history, retries, timeouts, cancellation, and version tests.',
+    nextAction:
+      'Run the public-only pilot and review quality before enabling broader use.',
   },
   {
     id: 19,
