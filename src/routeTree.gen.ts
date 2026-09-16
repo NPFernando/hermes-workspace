@@ -65,6 +65,7 @@ import { Route as ApiDemoTradingRouteImport } from './routes/api/demo-trading'
 import { Route as ApiDemoTradingGridRouteImport } from './routes/api/demo-trading-grid'
 import { Route as ApiDemoTradingLlmRouteImport } from './routes/api/demo-trading-llm'
 import { Route as ApiDemoTradingRebalanceRouteImport } from './routes/api/demo-trading-rebalance'
+import { Route as ApiDifyIntegrationRouteImport } from './routes/api/dify-integration'
 import { Route as ApiDifyStatusRouteImport } from './routes/api/dify-status'
 import { Route as ApiDownloadApkRouteImport } from './routes/api/download-apk'
 import { Route as ApiEnvResetRouteImport } from './routes/api/env-reset'
@@ -538,6 +539,11 @@ const ApiDemoTradingLlmRoute = ApiDemoTradingLlmRouteImport.update({
 const ApiDemoTradingRebalanceRoute = ApiDemoTradingRebalanceRouteImport.update({
   id: '/api/demo-trading-rebalance',
   path: '/api/demo-trading-rebalance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDifyIntegrationRoute = ApiDifyIntegrationRouteImport.update({
+  id: '/api/dify-integration',
+  path: '/api/dify-integration',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDifyStatusRoute = ApiDifyStatusRouteImport.update({
@@ -1578,6 +1584,7 @@ export interface FileRoutesByFullPath {
   '/api/demo-trading-grid': typeof ApiDemoTradingGridRoute
   '/api/demo-trading-llm': typeof ApiDemoTradingLlmRoute
   '/api/demo-trading-rebalance': typeof ApiDemoTradingRebalanceRoute
+  '/api/dify-integration': typeof ApiDifyIntegrationRoute
   '/api/dify-status': typeof ApiDifyStatusRoute
   '/api/download-apk': typeof ApiDownloadApkRoute
   '/api/env-reset': typeof ApiEnvResetRoute
@@ -1829,6 +1836,7 @@ export interface FileRoutesByTo {
   '/api/demo-trading-grid': typeof ApiDemoTradingGridRoute
   '/api/demo-trading-llm': typeof ApiDemoTradingLlmRoute
   '/api/demo-trading-rebalance': typeof ApiDemoTradingRebalanceRoute
+  '/api/dify-integration': typeof ApiDifyIntegrationRoute
   '/api/dify-status': typeof ApiDifyStatusRoute
   '/api/download-apk': typeof ApiDownloadApkRoute
   '/api/env-reset': typeof ApiEnvResetRoute
@@ -2082,6 +2090,7 @@ export interface FileRoutesById {
   '/api/demo-trading-grid': typeof ApiDemoTradingGridRoute
   '/api/demo-trading-llm': typeof ApiDemoTradingLlmRoute
   '/api/demo-trading-rebalance': typeof ApiDemoTradingRebalanceRoute
+  '/api/dify-integration': typeof ApiDifyIntegrationRoute
   '/api/dify-status': typeof ApiDifyStatusRoute
   '/api/download-apk': typeof ApiDownloadApkRoute
   '/api/env-reset': typeof ApiEnvResetRoute
@@ -2336,6 +2345,7 @@ export interface FileRouteTypes {
     | '/api/demo-trading-grid'
     | '/api/demo-trading-llm'
     | '/api/demo-trading-rebalance'
+    | '/api/dify-integration'
     | '/api/dify-status'
     | '/api/download-apk'
     | '/api/env-reset'
@@ -2587,6 +2597,7 @@ export interface FileRouteTypes {
     | '/api/demo-trading-grid'
     | '/api/demo-trading-llm'
     | '/api/demo-trading-rebalance'
+    | '/api/dify-integration'
     | '/api/dify-status'
     | '/api/download-apk'
     | '/api/env-reset'
@@ -2839,6 +2850,7 @@ export interface FileRouteTypes {
     | '/api/demo-trading-grid'
     | '/api/demo-trading-llm'
     | '/api/demo-trading-rebalance'
+    | '/api/dify-integration'
     | '/api/dify-status'
     | '/api/download-apk'
     | '/api/env-reset'
@@ -3092,6 +3104,7 @@ export interface RootRouteChildren {
   ApiDemoTradingGridRoute: typeof ApiDemoTradingGridRoute
   ApiDemoTradingLlmRoute: typeof ApiDemoTradingLlmRoute
   ApiDemoTradingRebalanceRoute: typeof ApiDemoTradingRebalanceRoute
+  ApiDifyIntegrationRoute: typeof ApiDifyIntegrationRoute
   ApiDifyStatusRoute: typeof ApiDifyStatusRoute
   ApiDownloadApkRoute: typeof ApiDownloadApkRoute
   ApiEnvResetRoute: typeof ApiEnvResetRoute
@@ -3640,6 +3653,13 @@ declare module '@tanstack/react-router' {
       path: '/api/demo-trading-rebalance'
       fullPath: '/api/demo-trading-rebalance'
       preLoaderRoute: typeof ApiDemoTradingRebalanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dify-integration': {
+      id: '/api/dify-integration'
+      path: '/api/dify-integration'
+      fullPath: '/api/dify-integration'
+      preLoaderRoute: typeof ApiDifyIntegrationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/dify-status': {
@@ -5316,6 +5336,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDemoTradingGridRoute: ApiDemoTradingGridRoute,
   ApiDemoTradingLlmRoute: ApiDemoTradingLlmRoute,
   ApiDemoTradingRebalanceRoute: ApiDemoTradingRebalanceRoute,
+  ApiDifyIntegrationRoute: ApiDifyIntegrationRoute,
   ApiDifyStatusRoute: ApiDifyStatusRoute,
   ApiDownloadApkRoute: ApiDownloadApkRoute,
   ApiEnvResetRoute: ApiEnvResetRoute,

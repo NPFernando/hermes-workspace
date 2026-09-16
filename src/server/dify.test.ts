@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { difyConfig, getDifyStatus } from './dify'
+import { difyConfig, getDifyIntegration, getDifyStatus, runDifyWorkflow, validateDifyPublicInputs } from './dify'
+import { mkdtemp, readFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 describe('Dify workbench status', () => {
   afterEach(() => { vi.unstubAllEnvs() })
@@ -48,5 +51,40 @@ describe('difyConfig', () => {
     vi.stubEnv('DIFY_WORKBENCH_URL', 'https://dify.example.test')
     vi.stubEnv('DIFY_HEALTHCHECK_URL', 'http://127.0.0.1:5200')
     expect(difyConfig()).toEqual({ enabled: true, url: 'https://dify.example.test', healthUrl: 'http://127.0.0.1:5200' })
+  })
+})
+
+describe('Dify public workflow adapter', () => {
+  afterEach(() => { vi.unstubAllEnvs() })
+
+  function configure() {
+    vi.stubEnv('DIFY_WORKBENCH_ENABLED', 'true')
+    vi.stubEnv('DIFY_API_ENABLED', 'true')
+    vi.stubEnv('DIFY_API_BASE_URL', 'http://127.0.0.1:5200')
+    vi.stubEnv('DIFY_API_KEY', 'server-only-key')
+    vi.stubEnv('DIFY_WORKFLOWS_JSON', JSON.stringify([{ id: 'public-faq', name: 'Public FAQ', provider: 'Dify Cloud' }]))
+  }
+
+  it('rejects sensitive fields before making an outbound request', () => {
+    expect(() => validateDifyPublicInputs({ birthDate: '2000-01-01' })).toThrow(/not allowed/)
+    expect(() => validateDifyPublicInputs({ prompt: 'My home address is 12 Example Road.' })).toThrow(/private data/)
+  })
+
+  it('runs only an allowlisted workflow and stores metadata without inputs', async () => {
+    configure()
+    const directory = await mkdtemp(join(tmpdir(), 'dify-adapter-'))
+    const historyFile = join(directory, 'history.json')
+    const fetchImpl = vi.fn(() => Promise.resolve(new Response(JSON.stringify({ data: { id: 'run-123', outputs: { answer: 'public result' } } }), { status: 200 })))
+    const result = await runDifyWorkflow('public-faq', { prompt: 'Summarize a public release note.' }, fetchImpl, historyFile)
+    expect(result.execution.status).toBe('succeeded')
+    expect(result.execution.runId).toBe('run-123')
+    expect(result.outputs).toEqual({ answer: 'public result' })
+    expect(fetchImpl).toHaveBeenCalledWith('http://127.0.0.1:5200/workflows/run', expect.objectContaining({
+      headers: expect.objectContaining({ authorization: 'Bearer server-only-key' }),
+    }))
+    const history = await readFile(historyFile, 'utf8')
+    expect(history).toContain('public-faq')
+    expect(history).not.toContain('Summarize a public release note.')
+    expect(getDifyIntegration()).toMatchObject({ enabled: true, configured: true, workflows: [{ id: 'public-faq' }] })
   })
 })
