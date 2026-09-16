@@ -12,6 +12,7 @@ import { numberField, stringField } from '../field-helpers'
 import type { PersonalFinancePayload } from '../types'
 
 type Kind = 'income' | 'expense'
+type Recurrence = 'none' | 'weekly' | 'monthly' | 'yearly'
 
 type Draft = {
   dueDate: string
@@ -21,6 +22,7 @@ type Draft = {
   amount: string
   accountId: string
   notes: string
+  recurrence: Recurrence
 }
 
 function todayIso(): string {
@@ -53,6 +55,7 @@ export function ScheduledTransactionsPanel({
   const [amount, setAmount] = useState('')
   const [accountId, setAccountId] = useState('')
   const [notes, setNotes] = useState('')
+  const [recurrence, setRecurrence] = useState<Recurrence>('none')
 
   const [editOpenId, setEditOpenId] = useState<string | null>(null)
   const [editDrafts, setEditDrafts] = useState<Record<string, Draft>>({})
@@ -92,6 +95,7 @@ export function ScheduledTransactionsPanel({
           amount: Number(amount),
           accountId: accountId || undefined,
           notes: notes.trim() || undefined,
+          recurrence,
         },
       },
       'add',
@@ -101,6 +105,7 @@ export function ScheduledTransactionsPanel({
       setCategory('')
       setAmount('')
       setNotes('')
+      setRecurrence('none')
       setDueDate(todayIso())
     }
   }
@@ -117,6 +122,9 @@ export function ScheduledTransactionsPanel({
         amount: String(numberField(row, 'amount')),
         accountId: stringField(row, 'accountId'),
         notes: stringField(row, 'notes'),
+        recurrence: (['weekly', 'monthly', 'yearly'].includes(stringField(row, 'recurrence'))
+          ? stringField(row, 'recurrence')
+          : 'none') as Recurrence,
       },
     }))
     setEditOpenId(id)
@@ -141,6 +149,7 @@ export function ScheduledTransactionsPanel({
           amount: Number(d.amount),
           accountId: d.accountId || undefined,
           notes: d.notes.trim() || undefined,
+          recurrence: d.recurrence,
         },
       },
       `edit-${id}`,
@@ -259,6 +268,17 @@ export function ScheduledTransactionsPanel({
           onChange={(e) => setNotes(e.target.value)}
           className={inputClass}
         />
+        <select
+          value={recurrence}
+          onChange={(e) => setRecurrence(e.target.value as Recurrence)}
+          className={inputClass}
+          aria-label="Repeat schedule"
+        >
+          <option value="none">One time</option>
+          <option value="weekly">Repeat weekly</option>
+          <option value="monthly">Repeat monthly</option>
+          <option value="yearly">Repeat yearly</option>
+        </select>
         <button
           type="button"
           disabled={busy === 'add'}
@@ -350,6 +370,22 @@ export function ScheduledTransactionsPanel({
                     }
                     className={`${inputClass} w-28`}
                   />
+                  <select
+                    value={editDrafts[id].recurrence}
+                    onChange={(e) =>
+                      setEditDrafts((p) => ({
+                        ...p,
+                        [id]: { ...p[id], recurrence: e.target.value as Recurrence },
+                      }))
+                    }
+                    className={inputClass}
+                    aria-label="Repeat schedule"
+                  >
+                    <option value="none">One time</option>
+                    <option value="weekly">Repeat weekly</option>
+                    <option value="monthly">Repeat monthly</option>
+                    <option value="yearly">Repeat yearly</option>
+                  </select>
                   <input
                     type="text"
                     placeholder="Notes"
@@ -393,6 +429,8 @@ export function ScheduledTransactionsPanel({
                       · {stringField(row, 'category')} ·{' '}
                       {formatLkr(numberField(row, 'amount'), 'LKR')} · due{' '}
                       {stringField(row, 'dueDate')}
+                      {stringField(row, 'recurrence') && stringField(row, 'recurrence') !== 'none' &&
+                        ` · repeats ${stringField(row, 'recurrence')}`}
                       {status !== 'pending' && ` · ${status}`}
                     </span>
                   </div>
