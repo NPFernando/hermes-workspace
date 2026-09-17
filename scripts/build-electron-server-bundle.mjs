@@ -27,6 +27,13 @@ let bundle = readFileSync(outputPath, 'utf8')
 // this checked-in Electron artifact depend on the CI checkout directory.
 bundle = bundle.replaceAll(`${root}/src/routes/`, '/workspace/hermes-workspace/src/routes/')
 
+// The asset label also includes a content hash of the same path-sensitive
+// manifest. It is only an internal esbuild module label in this bundle.
+bundle = bundle.replace(
+  /tanstack-start-manifest_v-[A-Za-z0-9_-]+/g,
+  'hermes-route-manifest',
+)
+
 // esbuild derives the internal module identifier from the path-sensitive
 // manifest content. Keep the identifier stable after normalizing the paths.
 bundle = bundle.replace(
