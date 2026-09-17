@@ -33,6 +33,10 @@ import {
   getLocalProviderDef,
 } from '../../server/local-provider-discovery'
 import { openaiChat } from '../../server/openai-compat-api'
+import {
+  getUsageBudgetDecision,
+  isUsageBudgetEnforced,
+} from '../../server/usage-budget-guard'
 import { streamResponses } from '../../server/responses-api'
 import { selectPortableConversationHistory } from '../../server/portable-history'
 import {
@@ -391,6 +395,22 @@ export const Route = createFileRoute('/api/send-stream')({
               chatMode = 'portable'
               localBaseUrl = providerDef.baseUrl
             }
+          }
+        }
+        if (
+          isUsageBudgetEnforced() &&
+          (chatMode !== 'portable' || !localBaseUrl)
+        ) {
+          const budget = await getUsageBudgetDecision()
+          if (!budget.allowed) {
+            return new Response(
+              JSON.stringify({
+                ok: false,
+                error: budget.message,
+                budget: { blockedPeriod: budget.blockedPeriod },
+              }),
+              { status: 429, headers: { 'Content-Type': 'application/json' } },
+            )
           }
         }
         if (chatMode === 'portable' && sessionKey === 'new') {

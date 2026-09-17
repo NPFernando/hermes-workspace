@@ -13,6 +13,10 @@ import {
   sendChat,
 } from '../../../server/claude-api'
 import { resolveSessionKey } from '../../../server/session-utils'
+import {
+  getUsageBudgetDecision,
+  isUsageBudgetEnforced,
+} from '../../../server/usage-budget-guard'
 
 export const Route = createFileRoute('/api/sessions/send')({
   server: {
@@ -53,6 +57,20 @@ export const Route = createFileRoute('/api/sessions/send')({
               { ok: false, error: 'message required' },
               { status: 400 },
             )
+          }
+
+          if (isUsageBudgetEnforced()) {
+            const budget = await getUsageBudgetDecision()
+            if (!budget.allowed) {
+              return json(
+                {
+                  ok: false,
+                  error: budget.message,
+                  budget: { blockedPeriod: budget.blockedPeriod },
+                },
+                { status: 429 },
+              )
+            }
           }
 
           const { sessionKey } = await resolveSessionKey({
