@@ -1,0 +1,7 @@
+# The Electron server bundle is a checked-in generated/minified artifact. Its
+# dependency property names and compressed symbol text trigger generic-api-key
+# heuristics, but it is not an authored credential source. Source files remain
+# covered by the default Gitleaks rules and the explicit pattern scan in CI.
+[allowlist]
+description = "Generated Electron bundle is scanned through its source inputs"
+paths = ['''^electron/server-bundle\.cjs$''']
