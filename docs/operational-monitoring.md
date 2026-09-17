@@ -36,3 +36,18 @@ code, changes git state, or sends data outside the host. A critical finding
 gives the oneshot a non-zero exit status so it is visible through
 `systemctl status` and the journal; warning findings remain visible in the
 JSON report without causing a false deployment failure.
+
+## Optional operator alerts
+
+Set `HERMES_OPS_ALERT_WEBHOOK_URL` in `/home/ubuntu/.hermes/ops-monitor.env` to
+enable notifications for stale builds, OOM events, failed services, and
+sustained memory growth. The URL must use HTTP or HTTPS. The monitor sends
+issue metadata only, times out after five seconds, and never fails the health
+check because delivery failed. Each issue type is sent at most once per hour
+by default; set `HERMES_OPS_ALERT_COOLDOWN_SECONDS` to change that interval.
+
+The last-delivery state is stored in
+`.runtime/ops-monitor-alerts.json` with mode `0600`. The environment file is
+optional and is intentionally not committed because it can contain a private
+webhook URL. After changing the environment file, restart the timer service
+or wait for its next run.
