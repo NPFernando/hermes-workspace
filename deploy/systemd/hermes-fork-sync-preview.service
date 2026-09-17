@@ -14,4 +14,6 @@ PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=read-only
 ReadWritePaths=/home/ubuntu/.hermes/fork-sync-previews
-
+# The preview fetches only the selected upstream ref. Permit Git to update
+# remote-tracking metadata while keeping the working tree read-only.
+ReadWritePaths=/home/ubuntu/workspace/projects/hermes-agent/.git
