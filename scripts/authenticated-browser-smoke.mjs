@@ -87,7 +87,19 @@ async function bodyMatches(pattern, message, timeout = 15_000, retries = 0) {
     .locator('body')
     .innerText()
     .catch(() => '')
-  check(pattern.test(text), message)
+  const fallbackCount = await page
+    .getByText(/Loading cost & routing|Loading ops data/i)
+    .count()
+    .catch(() => 0)
+  const headingCount = await page
+    .getByRole('heading', { name: /Cost & Routing Observability/i })
+    .count()
+    .catch(() => 0)
+  check(
+    pattern.test(text),
+    `${message} (url=${page.url()} title=${await page.title().catch(() => '')} ` +
+      `fallback=${fallbackCount} observabilityHeading=${headingCount})`,
+  )
   return false
 }
 
