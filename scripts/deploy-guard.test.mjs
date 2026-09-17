@@ -3,6 +3,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import {
   chmodSync,
   cpSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -84,6 +85,21 @@ afterEach(() => {
 })
 
 describe('deploy local-ahead guard', () => {
+  it('previews a release without changing the artifact or restarting the service', () => {
+    const f = fixture()
+    const before = readFileSync(join(f.root, 'dist/server/server.js'), 'utf8')
+    const result = run(f, '--preview')
+    assert.equal(result.status, 0, result.stderr)
+    const preview = JSON.parse(result.stdout.trim())
+    assert.equal(preview.preview, true)
+    assert.equal(preview.action, 'deploy-target')
+    assert.equal(preview.worktreeDirty, false)
+    assert.equal(preview.changedFiles, 2)
+    assert.equal(readFileSync(join(f.root, 'dist/server/server.js'), 'utf8'), before)
+    assert.equal(readFileSync(join(f.root, 'pid.state'), 'utf8'), '123\n')
+    assert.equal(existsSync(join(f.root, '.runtime/build-commit')), false)
+  })
+
   it('rejects local-ahead releases without explicit approval', () => {
     const result = run(fixture())
     assert.equal(result.status, 1)
