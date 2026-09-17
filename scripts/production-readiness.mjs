@@ -103,36 +103,54 @@ async function securityCheck() {
   const remote = await command('git', ['remote', 'get-url', 'origin'])
   const slug = repositorySlug(remote.stdout)
   if (!slug) return result('unavailable', 'A GitHub repository could not be derived from origin.')
-  const [codeql, dependabot] = await Promise.all([
+  const head = await command('git', ['rev-parse', 'HEAD'])
+  const [codeql, dependabot, codeqlRuns] = await Promise.all([
     command('gh', ['api', `repos/${slug}/code-scanning/alerts?state=open&per_page=100`, '--jq', 'length'], { timeout: 15_000 }),
     command('gh', ['api', `repos/${slug}/dependabot/alerts?state=open&per_page=100`, '--jq', 'length'], { timeout: 15_000 }),
+    command('gh', ['run', 'list', '--workflow', 'codeql.yml', '--commit', head.stdout, '--limit', '10', '--json', 'status,conclusion,headSha,databaseId'], { timeout: 15_000 }),
   ])
   const parseCount = (value) => /^\d+$/.test(value) ? Number(value) : null
   const codeqlOpen = parseCount(codeql.stdout)
   const dependabotOpen = parseCount(dependabot.stdout)
   const dependabotDisabled = /Dependabot alerts are disabled/i.test(dependabot.stderr)
+  let codeqlRun = null
+  try {
+    const runs = JSON.parse(codeqlRuns.stdout)
+    codeqlRun = runs.find((run) => run.headSha === head.stdout && run.status === 'completed' && run.conclusion === 'success') ?? null
+  } catch {
+    codeqlRun = null
+  }
+  const codeqlRunEvidence = codeqlRun
+    ? { status: 'pass', databaseId: codeqlRun.databaseId ?? null, headSha: head.stdout || null }
+    : { status: 'fail', databaseId: null, headSha: head.stdout || null }
   if (codeqlOpen == null) {
     return result('unavailable', 'GitHub CodeQL alert API was not available.', {
       codeqlOpen,
       dependabotOpen,
       dependabotStatus: dependabotDisabled ? 'disabled' : 'unavailable',
+      codeqlRun: codeqlRunEvidence,
     })
   }
   if (dependabotDisabled) {
-    return result(
-      codeqlOpen === 0 ? 'pass' : 'fail',
-      `${codeqlOpen} CodeQL alerts open; Dependabot alerts are disabled for this repository.`,
-      { codeqlOpen, dependabotOpen: null, dependabotStatus: 'disabled' },
-    )
+    const pass = codeqlOpen === 0 && codeqlRunEvidence.status === 'pass'
+    return result(pass ? 'pass' : 'fail', pass
+      ? 'CodeQL alerts are clear and the exact HEAD has a successful CodeQL run; Dependabot alerts are disabled for this repository.'
+      : `${codeqlOpen} CodeQL alerts open or the exact HEAD has no successful CodeQL run; Dependabot alerts are disabled for this repository.`,
+    { codeqlOpen, dependabotOpen: null, dependabotStatus: 'disabled', codeqlRun: codeqlRunEvidence })
   }
   if (dependabotOpen == null) {
     return result('unavailable', 'GitHub Dependabot alert API was not available.', {
       codeqlOpen,
       dependabotOpen,
       dependabotStatus: 'unavailable',
+      codeqlRun: codeqlRunEvidence,
     })
   }
-  return result(codeqlOpen === 0 && dependabotOpen === 0 ? 'pass' : 'fail', `${codeqlOpen} CodeQL and ${dependabotOpen} Dependabot alerts open.`, { codeqlOpen, dependabotOpen, dependabotStatus: 'enabled' })
+  const pass = codeqlOpen === 0 && dependabotOpen === 0 && codeqlRunEvidence.status === 'pass'
+  return result(pass ? 'pass' : 'fail', pass
+    ? 'CodeQL and Dependabot alerts are clear and the exact HEAD has a successful CodeQL run.'
+    : `${codeqlOpen} CodeQL and ${dependabotOpen} Dependabot alerts open, or the exact HEAD has no successful CodeQL run.`,
+  { codeqlOpen, dependabotOpen, dependabotStatus: 'enabled', codeqlRun: codeqlRunEvidence })
 }
 
 async function migrationCheck() {
