@@ -2,7 +2,7 @@
 
 `pnpm run release:check` is a read-only, fail-closed validation of a release:
 
-1. PWA manifest, icons, service-worker offline shell, and cache privacy rules.
+1. PWA manifest, icons, service-worker offline shell, cache privacy rules, and browser-level offline navigation.
 2. Built SSR/client asset integrity.
 3. JavaScript/CSS bundle-size budgets.
 4. The configured systemd workspace service is active.
