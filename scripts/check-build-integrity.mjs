@@ -5,7 +5,8 @@
  * dist/client/assets.
  */
 import { spawn } from 'node:child_process'
-import { runAssetIntegrity } from './asset-integrity.mjs'
+import { join } from 'node:path'
+import { runLocalAssetIntegrity } from './asset-integrity.mjs'
 
 const port = Number(process.env.BUILD_INTEGRITY_PORT || 4317)
 const baseUrl = `http://127.0.0.1:${port}`
@@ -38,7 +39,10 @@ async function waitForServer() {
 
 try {
   const rootResponse = await waitForServer()
-  const result = await runAssetIntegrity(baseUrl, fetch, rootResponse)
+  const result = await runLocalAssetIntegrity(
+    await rootResponse.text(),
+    join(process.cwd(), 'dist', 'client'),
+  )
   console.log(`build asset integrity passed: ${result.assetCount} local assets`)
 } catch (error) {
   console.error(`build asset integrity failed: ${error instanceof Error ? error.message : String(error)}`)

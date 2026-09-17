@@ -4,6 +4,48 @@
  * coherent release. This is intentionally independent of authentication so it
  * can run immediately after a deployment restart.
  */
+import { stat } from 'node:fs/promises'
+import { resolve } from 'node:path'
+
+function assetReferencesFromHtml(html) {
+  return [...html.matchAll(/(?:src|href)=["']([^"']+)["']/gi)]
+    .map((match) => match[1])
+    .filter((reference) =>
+      reference.startsWith('/') &&
+      (reference.startsWith('/assets/') || reference.startsWith('/_next/static/')) &&
+      !reference.includes('#'),
+    )
+}
+
+export async function runLocalAssetIntegrity(html, clientRoot) {
+  const references = [...new Set(assetReferencesFromHtml(html))]
+  if (references.length === 0) {
+    throw new Error('asset integrity: HTML shell contains no local JS/CSS assets')
+  }
+
+  const failures = []
+  const root = resolve(clientRoot)
+  for (const reference of references) {
+    const pathname = decodeURIComponent(new URL(reference, 'http://localhost').pathname)
+    const filePath = resolve(root, `.${pathname}`)
+    if (!filePath.startsWith(`${root}/`)) {
+      failures.push(`${reference} (unsafe path)`)
+      continue
+    }
+    try {
+      const file = await stat(filePath)
+      if (!file.isFile()) failures.push(`${reference} (not a file)`)
+    } catch {
+      failures.push(`${reference} (missing)`)
+    }
+  }
+
+  if (failures.length > 0) {
+    throw new Error(`asset integrity: missing local assets: ${failures.join(', ')}`)
+  }
+  return { assetCount: references.length }
+}
+
 export async function runAssetIntegrity(baseUrl, fetchImpl = fetch, initialRoot = null) {
   const rootUrl = new URL('/', `${baseUrl.replace(/\/$/, '')}/`)
   async function fetchWithRetry(url, options) {
@@ -27,13 +69,7 @@ export async function runAssetIntegrity(baseUrl, fetchImpl = fetch, initialRoot 
   if (!root.ok) throw new Error(`asset integrity: HTML shell returned HTTP ${root.status}`)
 
   const html = await root.text()
-  const references = [...html.matchAll(/(?:src|href)=["']([^"']+)["']/gi)]
-    .map((match) => match[1])
-    .filter((reference) =>
-      reference.startsWith('/') &&
-      (reference.startsWith('/assets/') || reference.startsWith('/_next/static/')) &&
-      !reference.includes('#'),
-    )
+  const references = assetReferencesFromHtml(html)
 
   const uniqueReferences = [...new Set(references)]
   if (uniqueReferences.length === 0) {
