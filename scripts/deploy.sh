@@ -129,6 +129,8 @@ cp -a dist "$ROLLBACK_DIR/dist"
 if [ -f "$BUILD_MARKER" ]; then cp "$BUILD_MARKER" "$ROLLBACK_DIR/build-commit"; fi
 trap rollback_failed_release ERR
 pnpm build
+echo "==> checking built SSR/client asset integrity"
+pnpm run check:build-integrity
 
 EXPECTED_BUILD="$(artifact_build_id)"
 
