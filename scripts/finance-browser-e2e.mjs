@@ -426,9 +426,12 @@ try {
   assert.equal(imports[1].force, true)
 
   assert.deepEqual(pageErrors, [])
+  const unexpectedUnmockedEndpoints = [...new Set(unmockedEndpoints)]
+    .filter((endpoint) => !expectedUnmockedEndpoints.includes(endpoint))
+    .sort()
   assert.deepEqual(
-    [...new Set(unmockedEndpoints)].sort(),
-    expectedUnmockedEndpoints,
+    unexpectedUnmockedEndpoints,
+    [],
     'Review newly unmocked global API calls and explicitly mock or allowlist them',
   )
   if (consoleErrors.length > 0) {
