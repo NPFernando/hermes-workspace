@@ -242,12 +242,19 @@ try {
   // non-chat mobile page header. Exercise the same touch-first command path
   // through its stable open event instead of a route-specific button that may
   // not exist on this screen.
-  await page.evaluate(() => {
-    window.dispatchEvent(new CustomEvent('workspace:open-command-palette'))
-  })
   const commandInput = page.getByPlaceholder(
     'Search screens, sessions, and commands',
   )
+  // A full reload can finish DOMContentLoaded before the shared palette has
+  // mounted its event listener. Retry the idempotent open request instead of
+  // treating that hydration race as an authenticated smoke failure.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.evaluate(() => {
+      window.dispatchEvent(new CustomEvent('workspace:open-command-palette'))
+    })
+    if (await commandInput.isVisible().catch(() => false)) break
+    await commandInput.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {})
+  }
   await commandInput.fill('Settings')
   await page.getByText('Settings', { exact: true }).last().click()
   await page.waitForURL(/\/settings(?:[/?]|$)/)
