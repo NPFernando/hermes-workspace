@@ -40,6 +40,7 @@
     "secrets:status": "node scripts/secrets-status.mjs",
     "secrets:rotation": "node scripts/secrets-rotation.mjs",
     "check:accessibility": "node scripts/check-theme-contrast.mjs",
+    "check:pwa": "node scripts/check-pwa.mjs",
     "ops:monitor": "node scripts/ops-monitor.mjs",
     "playground:ws": "node scripts/playground-ws.mjs",
     "lint": "eslint",
