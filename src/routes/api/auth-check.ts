@@ -10,6 +10,16 @@ export const Route = createFileRoute('/api/auth-check')({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        // Authentication is independent from gateway availability. A slow or
+        // unreachable gateway must not turn a valid workspace session into a
+        // false logout while the root shell is bootstrapping.
+        const authRequired = isPasswordProtectionEnabled()
+        const authenticated = isAuthenticated(request)
+
+        if (authRequired && !authenticated) {
+          return json({ authenticated: false, authRequired })
+        }
+
         try {
           // Use ensureGatewayProbed() which handles auto-detection across
           // multiple ports (8642, 8643) instead of checking a single
@@ -22,29 +32,26 @@ export const Route = createFileRoute('/api/auth-check')({
           if (!reachable) {
             return json(
               {
-                authenticated: false,
-                authRequired: true,
+                authenticated,
+                authRequired,
                 error: 'claude_agent_unreachable',
               },
-              { status: 503 },
+              { status: authenticated ? 200 : 503 },
             )
           }
         } catch (error) {
           return json(
             {
-              authenticated: false,
-              authRequired: true,
+              authenticated,
+              authRequired,
               error:
                 error instanceof DOMException && error.name === 'AbortError'
                   ? 'claude_agent_timeout'
                   : 'claude_agent_unreachable',
             },
-            { status: 503 },
+            { status: authenticated ? 200 : 503 },
           )
         }
-
-        const authRequired = isPasswordProtectionEnabled()
-        const authenticated = isAuthenticated(request)
 
         return json({
           authenticated,
