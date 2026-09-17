@@ -60,6 +60,8 @@ jobs:
             echo "❌ No dist folder found"
             exit 1
           fi
+      - name: Check SSR/client asset integrity
+        run: pnpm run check:build-integrity
       - name: Check bundle budgets
         run: pnpm run check:bundle
 
