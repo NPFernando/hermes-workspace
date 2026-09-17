@@ -364,44 +364,52 @@ function RootLayout() {
   useEffect(() => {
     if (typeof window === 'undefined') return undefined
     let cancelled = false
-    fetchClaudeAuthStatus()
-      .then((status) => {
-        if (cancelled) return
-        setAuthStatus(status)
-        if (status.authenticated || !status.authRequired) {
-          void fetch('/api/connection-status')
-            .then((res) => (res.ok ? res.json() : null))
-            .then(
-              (
-                connectionStatus: {
-                  ok?: boolean
-                  chatReady?: boolean
-                  modelConfigured?: boolean
-                } | null,
-              ) => {
-                if (
-                  !cancelled &&
-                  (connectionStatus?.ok ||
-                    (connectionStatus?.chatReady &&
-                      connectionStatus.modelConfigured))
-                ) {
-                  localStorage.setItem(ONBOARDING_KEY, 'true')
-                  setOnboardingComplete(true)
-                }
-              },
-            )
-            .catch(() => undefined)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setAuthStatus(
-            (prev) => prev ?? { authenticated: false, authRequired: true },
-          )
-        }
-      })
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
+
+    const checkAuth = () => {
+      fetchClaudeAuthStatus()
+        .then((status) => {
+          if (cancelled) return
+          setAuthStatus(status)
+          if (status.authenticated || !status.authRequired) {
+            void fetch('/api/connection-status')
+              .then((res) => (res.ok ? res.json() : null))
+              .then(
+                (
+                  connectionStatus: {
+                    ok?: boolean
+                    chatReady?: boolean
+                    modelConfigured?: boolean
+                  } | null,
+                ) => {
+                  if (
+                    !cancelled &&
+                    (connectionStatus?.ok ||
+                      (connectionStatus?.chatReady &&
+                        connectionStatus.modelConfigured))
+                  ) {
+                    localStorage.setItem(ONBOARDING_KEY, 'true')
+                    setOnboardingComplete(true)
+                  }
+                },
+              )
+              .catch(() => undefined)
+          }
+        })
+        .catch(() => {
+          // A slow lazy route or a transient network/server timeout means the
+          // auth state is unknown, not that the session is invalid. Keep the
+          // protected shell gated and retry so heavy surfaces cannot flash a
+          // false login screen. A real unauthenticated response is returned
+          // as JSON by /api/auth-check and never enters this branch.
+          if (!cancelled) retryTimer = setTimeout(checkAuth, 1_000)
+        })
+    }
+
+    checkAuth()
     return () => {
       cancelled = true
+      if (retryTimer) clearTimeout(retryTimer)
     }
   }, [])
 
