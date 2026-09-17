@@ -4,7 +4,6 @@ import {
   isAuthenticated,
   isPasswordProtectionEnabled,
 } from '../../server/auth-middleware'
-import { ensureGatewayProbed } from '../../server/gateway-capabilities'
 
 export const Route = createFileRoute('/api/auth-check')({
   server: {
@@ -20,12 +19,11 @@ export const Route = createFileRoute('/api/auth-check')({
           return json({ authenticated: false, authRequired })
         }
 
-        // Do not make session validity depend on the gateway probe. The probe
-        // can take several seconds while the gateway is restarting or under
-        // load; blocking this endpoint would make the browser treat a valid
-        // session as logged out after its short client-side timeout. Gateway
-        // health is reported by its dedicated status surfaces instead.
-        void ensureGatewayProbed().catch(() => undefined)
+        // This endpoint is intentionally limited to session state. Gateway
+        // probing can do synchronous setup before its first await and may take
+        // several seconds while the gateway is restarting or under load. It
+        // must not delay this short client-side auth request or make a valid
+        // session look logged out. Gateway health has dedicated endpoints.
         return json({
           authenticated,
           authRequired,
