@@ -570,6 +570,12 @@ const RACE_REASON = 'a trading cycle is already in progress'
 const AUTO_CYCLE_INTERVAL_MS = 20 * 60_000
 const AUTO_CYCLE_STALE_AFTER_MS = AUTO_CYCLE_INTERVAL_MS + 60_000
 const AUTO_CYCLE_RECOVERY_COOLDOWN_MS = 5 * 60_000
+
+function validationAutomationDisabled(): boolean {
+  return /^(0|false|no|off)$/i.test(
+    process.env.HERMES_VALIDATION_AUTOMATION?.trim() ?? '',
+  )
+}
 let validationAutomationTimer: ReturnType<typeof setInterval> | null = null
 let validationAutomationTickInProgress = false
 let validationAutomationLastTickAt = 0
@@ -605,6 +611,7 @@ async function runAutomaticValidationTick(source: 'startup' | 'interval' | 'reco
  * so a mode switch or safety halt cannot be bypassed by automation.
  */
 export function ensureValidationRunAutomation(): void {
+  if (validationAutomationDisabled()) return
   if (validationAutomationTimer) return
   appendAuditLog('validation_run_automation_started', {
     cadenceMs: AUTO_CYCLE_INTERVAL_MS,

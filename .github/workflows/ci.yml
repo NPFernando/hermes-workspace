@@ -73,7 +73,7 @@ jobs:
         run: pnpm run check:pwa
       - name: Check browser accessibility and keyboard smoke
         run: |
-          HOST=127.0.0.1 PORT=4300 pnpm start > /tmp/hermes-accessibility-server.log 2>&1 &
+          HERMES_VALIDATION_AUTOMATION=0 HOST=127.0.0.1 PORT=4300 pnpm start > /tmp/hermes-accessibility-server.log 2>&1 &
           SERVER_PID=$!
           trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
           for attempt in $(seq 1 30); do
