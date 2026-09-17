@@ -73,15 +73,15 @@ jobs:
         run: pnpm run check:pwa
       - name: Check browser accessibility and keyboard smoke
         run: |
-          pnpm start > /tmp/hermes-accessibility-server.log 2>&1 &
+          PORT=4300 pnpm start > /tmp/hermes-accessibility-server.log 2>&1 &
           SERVER_PID=$!
           trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
           for attempt in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:3000/ >/dev/null; then break; fi
+            if curl -fsS http://127.0.0.1:4300/ >/dev/null; then break; fi
             sleep 1
           done
-          curl -fsS http://127.0.0.1:3000/ >/dev/null
-          pnpm run check:accessibility:browser
+          curl -fsS http://127.0.0.1:4300/ >/dev/null
+          ACCESSIBILITY_BASE_URL=http://127.0.0.1:4300 pnpm run check:accessibility:browser
 
       - name: Verify Electron server bundle
         run: |
