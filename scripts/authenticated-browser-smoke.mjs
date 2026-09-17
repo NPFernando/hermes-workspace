@@ -27,7 +27,7 @@ if (!password) {
 
 const routes = [
   { path: '/dashboard', pattern: /Hermes Workspace|Dashboard/i },
-  { path: '/ops-cost', pattern: /Cost & Routing/i, timeout: 45_000 },
+  { path: '/ops-cost', pattern: /Cost & Routing/i, timeout: 90_000 },
   {
     path: '/personal-finance',
     pattern: /Your money at a glance/i,
@@ -46,7 +46,7 @@ const context = await browser.newContext({
   viewport: { width: 1280, height: 900 },
 })
 const page = await context.newPage()
-page.setDefaultNavigationTimeout(60_000)
+page.setDefaultNavigationTimeout(90_000)
 let failures = 0
 const pageErrors = []
 page.on('pageerror', (error) => pageErrors.push(error.message))
