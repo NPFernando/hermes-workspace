@@ -27,7 +27,7 @@ if (!password) {
 
 const routes = [
   { path: '/dashboard', pattern: /Hermes Workspace|Dashboard/i },
-  { path: '/ops-cost', pattern: /Cost & Routing/i },
+  { path: '/ops-cost', pattern: /Cost & Routing/i, timeout: 45_000 },
   {
     path: '/personal-finance',
     pattern: /Your money at a glance/i,
