@@ -35,6 +35,7 @@
     "smoke:managed": "node scripts/managed-companion-smoke.mjs",
     "smoke:auth:browser": "node scripts/authenticated-browser-smoke.mjs",
     "smoke:release": "node scripts/release-smoke.mjs",
+    "release:check": "node scripts/release-checklist.mjs",
     "check:bundle": "node scripts/check-bundle-budget.mjs",
     "check:build-integrity": "node scripts/check-build-integrity.mjs",
     "secrets:status": "node scripts/secrets-status.mjs",

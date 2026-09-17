@@ -59,7 +59,7 @@ rollback_failed_release() {
   if sudo systemctl restart hermes-workspace && curl -sf -o /dev/null http://127.0.0.1:3000/; then
     local rollback_build
     rollback_build="$(artifact_build_id)"
-    if RELEASE_SMOKE_EXPECTED_BUILD="$rollback_build" node scripts/release-smoke.mjs http://127.0.0.1:3000; then
+    if RELEASE_SMOKE_EXPECTED_BUILD="$rollback_build" node scripts/release-checklist.mjs http://127.0.0.1:3000; then
       if [[ -n "${AUTH_E2E_PASSWORD:-}" && -n "${AUTH_E2E_BASE_URL:-}" ]]; then
         if AUTH_E2E_EXPECTED_BUILD="$rollback_build" node scripts/authenticated-browser-smoke.mjs; then
           echo "==> rollback recovered the previous release and passed authenticated browser smoke" >&2
@@ -97,7 +97,7 @@ if [ "$CURRENT" = "$TARGET" ]; then
       exit 0
     fi
     echo "==> already up to date at $CURRENT"
-    RELEASE_SMOKE_EXPECTED_BUILD="$EXPECTED_BUILD" node scripts/release-smoke.mjs http://127.0.0.1:3000
+    RELEASE_SMOKE_EXPECTED_BUILD="$EXPECTED_BUILD" node scripts/release-checklist.mjs http://127.0.0.1:3000
     exit 0
   fi
   echo "==> build marker missing or mismatched; rebuilding $CURRENT"
