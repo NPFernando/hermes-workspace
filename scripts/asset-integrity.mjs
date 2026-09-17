@@ -50,20 +50,12 @@ export async function runAssetIntegrity(baseUrl, fetchImpl = fetch, initialRoot 
     while (pending.length > 0) {
       const reference = pending.shift()
       const response = await fetchWithRetry(new URL(reference, rootUrl), {
-        method: 'GET',
+        method: 'HEAD',
         cache: 'no-store',
       }).catch(() => ({ ok: false, status: 0 }))
       if (!response.ok) {
         failures.push(`${reference} (HTTP ${response.status})`)
       } else {
-        // Release the body stream so undici can reuse the connection without
-        // buffering large assets. Leaving successful bodies unread can exhaust
-        // the small connection pool on CI runners.
-        try {
-          await response.body?.cancel()
-        } catch {
-          failures.push(`${reference} (body release failed)`)
-        }
       }
     }
   }))
