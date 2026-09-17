@@ -6,7 +6,20 @@
  */
 export async function runAssetIntegrity(baseUrl, fetchImpl = fetch) {
   const rootUrl = new URL('/', `${baseUrl.replace(/\/$/, '')}/`)
-  const root = await fetchImpl(rootUrl, { cache: 'no-store' })
+  async function fetchWithRetry(url, options) {
+    let lastError
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await fetchImpl(url, options)
+      } catch (error) {
+        lastError = error
+        if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 150 * (attempt + 1)))
+      }
+    }
+    throw lastError
+  }
+
+  const root = await fetchWithRetry(rootUrl, { cache: 'no-store' })
   if (!root.ok) throw new Error(`asset integrity: HTML shell returned HTTP ${root.status}`)
 
   const html = await root.text()
@@ -25,10 +38,10 @@ export async function runAssetIntegrity(baseUrl, fetchImpl = fetch) {
 
   const failures = []
   await Promise.all(uniqueReferences.map(async (reference) => {
-    const response = await fetchImpl(new URL(reference, rootUrl), {
+    const response = await fetchWithRetry(new URL(reference, rootUrl), {
       method: 'GET',
       cache: 'no-store',
-    }).catch((error) => ({ ok: false, status: 0, error }))
+    }).catch(() => ({ ok: false, status: 0 }))
     if (!response.ok) failures.push(`${reference} (HTTP ${response.status})`)
   }))
 
