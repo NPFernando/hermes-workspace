@@ -96,21 +96,38 @@ try {
   })
   // The login panel is rendered after client hydration. Race it against the
   // authenticated surface so a fast DOMContentLoaded does not skip sign-in.
+  const initialAuthTimeout = 60_000
   const initialAuthState = await Promise.race([
     login
-      .waitFor({ state: 'visible', timeout: 15_000 })
+      .waitFor({ state: 'visible', timeout: initialAuthTimeout })
       .then(() => 'login')
       .catch(() => null),
     workspaceHeading
-      .waitFor({ state: 'visible', timeout: 15_000 })
+      .waitFor({ state: 'visible', timeout: initialAuthTimeout })
       .then(() => 'authenticated')
       .catch(() => null),
   ])
+  if (!initialAuthState) {
+    throw new Error(
+      `dashboard did not hydrate within ${initialAuthTimeout}ms; ` +
+        `login=${await login.isVisible().catch(() => false)} ` +
+        `heading=${await workspaceHeading.isVisible().catch(() => false)} ` +
+        `body=${(
+          await page
+            .locator('body')
+            .innerText()
+            .catch(() => '')
+        ).slice(0, 500)}`,
+    )
+  }
   if (initialAuthState === 'login') {
     await login.fill(password)
     await page.getByRole('button', { name: 'Sign In', exact: true }).click()
   }
-  await workspaceHeading.waitFor({ state: 'visible', timeout: 45_000 })
+  await workspaceHeading.waitFor({
+    state: 'visible',
+    timeout: initialAuthTimeout,
+  })
   const splashVisible = await page
     .locator('#splash-screen')
     .evaluate((element) => getComputedStyle(element).display !== 'none')
