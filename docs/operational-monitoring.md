@@ -51,3 +51,15 @@ The last-delivery state is stored in
 optional and is intentionally not committed because it can contain a private
 webhook URL. After changing the environment file, restart the timer service
 or wait for its next run.
+
+The existing Hermes Telegram relay can be used instead of a generic webhook:
+
+```dotenv
+HERMES_OPS_ALERT_TELEGRAM=1
+HERMES_OPS_ALERT_TELEGRAM_CHAT_ID=2130622225
+```
+
+With this opt-in configuration, the monitor reads `TELEGRAM_BOT_TOKEN` and
+`TELEGRAM_RELAY_BASE` from the existing mode-0600 `~/.hermes/.env` at runtime.
+It never copies either secret into the monitor environment, repository, or
+alert state. A generic webhook takes precedence when both transports are set.
