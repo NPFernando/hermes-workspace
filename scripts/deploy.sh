@@ -7,22 +7,26 @@
 # service ran directly out of a dev tree that could be arbitrarily dirty,
 # so merged main was never guaranteed to be live.
 #
-# Usage: ./scripts/deploy.sh [--quiet-if-unchanged] [--allow-local-ahead]
+# Usage: ./scripts/deploy.sh [--quiet-if-unchanged] [--allow-local-ahead] [--preview]
 #   --quiet-if-unchanged   Verify the unchanged live artifact and exit quietly.
 #   --allow-local-ahead    Explicitly allow a local HEAD ahead of origin/main.
 #                           Used by hermes-workspace-deploy.timer for polling
 #                           auto-deploy — polling (not a GitHub webhook) is
 #                           deliberate: it needs no inbound trigger surface
 #                           from GitHub Actions into this VM to secure.
+#   --preview               Fetch and report the proposed release without
+#                           merging, building, restarting, or writing a marker.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 QUIET_IF_UNCHANGED=0
 ALLOW_LOCAL_AHEAD=0
+PREVIEW=0
 for arg in "$@"; do
   case "$arg" in
     --quiet-if-unchanged) QUIET_IF_UNCHANGED=1 ;;
     --allow-local-ahead) ALLOW_LOCAL_AHEAD=1 ;;
+    --preview) PREVIEW=1 ;;
     *) echo "error: unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -78,7 +82,8 @@ rollback_failed_release() {
   exit "$exit_code"
 }
 
-if [ -n "$(git status --porcelain)" ]; then
+WORKTREE_STATUS="$(git status --porcelain)"
+if [ "$PREVIEW" = "0" ] && [ -n "$WORKTREE_STATUS" ]; then
   echo "error: deploy directory has uncommitted changes — refusing deployment." >&2
   git status --short >&2
   exit 1
@@ -88,6 +93,18 @@ git fetch origin main --quiet
 
 CURRENT=$(git rev-parse HEAD)
 TARGET=$(git rev-parse origin/main)
+if [ "$PREVIEW" = "1" ]; then
+  changed_files=0
+  worktree_dirty=false
+  [ -n "$WORKTREE_STATUS" ] && worktree_dirty=true
+  action=deploy-target
+  [ "$CURRENT" = "$TARGET" ] && action=verify-live
+  if [ "$CURRENT" != "$TARGET" ]; then
+    changed_files="$(git diff --name-only "$CURRENT" "$TARGET" | wc -l | tr -d ' ')"
+  fi
+  printf '%s\n' "{\"preview\":true,\"current\":\"$CURRENT\",\"target\":\"$TARGET\",\"worktreeDirty\":$worktree_dirty,\"changedFiles\":$changed_files,\"action\":\"$action\"}"
+  exit 0
+fi
 if [ "$CURRENT" = "$TARGET" ]; then
   [ -f dist/server/server.js ] || { echo "error: build artifact is missing" >&2; exit 1; }
   EXPECTED_BUILD="$(artifact_build_id)"
