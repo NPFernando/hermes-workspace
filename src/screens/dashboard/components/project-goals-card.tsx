@@ -12,6 +12,13 @@ type Goal = {
   nextAction: string
 }
 
+type LiveReadiness = {
+  overall: string
+  generatedAt: string
+  blockers: string[]
+  warnings: string[]
+}
+
 // Deliberately declarative: this is the operator-facing cross-project
 // checklist. Runtime health and usage remain sourced from the dashboard API;
 // these records capture the human acceptance state that APIs cannot infer.
@@ -197,6 +204,9 @@ const STATE_LABEL: Record<GoalState, string> = {
 
 export function ProjectGoalsCard() {
   const [filter, setFilter] = useState<GoalState | 'all'>('all')
+  const [liveReadiness, setLiveReadiness] = useState<LiveReadiness | null>(null)
+  const [readinessLoading, setReadinessLoading] = useState(false)
+  const [readinessError, setReadinessError] = useState<string | null>(null)
   const counts = useMemo(
     () =>
       GOALS.reduce<Record<GoalState, number>>(
@@ -207,6 +217,29 @@ export function ProjectGoalsCard() {
   )
   const visible =
     filter === 'all' ? GOALS : GOALS.filter((goal) => goal.state === filter)
+
+  const refreshReadiness = async () => {
+    setReadinessLoading(true)
+    setReadinessError(null)
+    try {
+      const response = await fetch('/api/production-readiness?skipTests=1', {
+        headers: { Accept: 'application/json' },
+      })
+      const data = (await response.json()) as {
+        ok?: boolean
+        error?: string
+        report?: LiveReadiness
+      }
+      if (!response.ok || !data.ok || !data.report) {
+        throw new Error(data.error || `Readiness request failed (${response.status})`)
+      }
+      setLiveReadiness(data.report)
+    } catch (error) {
+      setReadinessError(error instanceof Error ? error.message : 'Readiness request failed.')
+    } finally {
+      setReadinessLoading(false)
+    }
+  }
 
   return (
     <section
@@ -258,6 +291,55 @@ export function ProjectGoalsCard() {
             </button>
           )
         })}
+      </div>
+      <div className="mt-4 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card2)] p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--theme-text)]">
+              Live evidence
+            </h3>
+            <p className="mt-1 text-xs text-muted">
+              Readiness, deployment blockers, backup gates, and release status.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void refreshReadiness()}
+            disabled={readinessLoading}
+            className="min-h-9 rounded-lg border border-[var(--theme-accent)] px-3 py-1.5 text-xs font-semibold text-[var(--theme-text)] disabled:opacity-50"
+          >
+            {readinessLoading ? 'Checking…' : 'Refresh evidence'}
+          </button>
+        </div>
+        {readinessError && (
+          <p className="mt-2 text-xs text-[var(--theme-danger)]" role="alert">
+            {readinessError}
+          </p>
+        )}
+        {liveReadiness && (
+          <div className="mt-3 space-y-2 text-xs">
+            <div className={cn(
+              'rounded-md border px-2 py-1.5 font-semibold',
+              liveReadiness.overall === 'ready'
+                ? 'border-[var(--theme-success)]/40 text-[var(--theme-success)]'
+                : liveReadiness.overall === 'blocked'
+                  ? 'border-[var(--theme-danger)]/40 text-[var(--theme-danger)]'
+                  : 'border-[var(--theme-warning)]/40 text-[var(--theme-warning)]',
+            )}>
+              Overall: {liveReadiness.overall} · {new Date(liveReadiness.generatedAt).toLocaleString()}
+            </div>
+            {liveReadiness.blockers.length > 0 && (
+              <p className="text-[var(--theme-danger)]">
+                <span className="font-semibold">Blockers:</span> {liveReadiness.blockers.join(' · ')}
+              </p>
+            )}
+            {liveReadiness.warnings.length > 0 && (
+              <p className="text-[var(--theme-warning)]">
+                <span className="font-semibold">Warnings:</span> {liveReadiness.warnings.join(' · ')}
+              </p>
+            )}
+          </div>
+        )}
       </div>
       <ul
         id="project-goals-list"
