@@ -148,7 +148,10 @@ for i in $(seq 1 15); do
       exit 1
     fi
     node scripts/canary-smoke.mjs http://127.0.0.1:3000
-    RELEASE_SMOKE_EXPECTED_BUILD="$EXPECTED_BUILD" node scripts/release-smoke.mjs http://127.0.0.1:3000
+    # The checklist includes the live release smoke and the artifact/service
+    # gates. Keep it as the final success criterion so a deployment cannot
+    # advance its marker after only the lightweight canary passes.
+    RELEASE_SMOKE_EXPECTED_BUILD="$EXPECTED_BUILD" node scripts/release-checklist.mjs http://127.0.0.1:3000
     printf '%s\n' "$(git rev-parse HEAD)" > "$BUILD_MARKER"
     rm -rf "$ROLLBACK_DIR"
     ROLLBACK_DIR=""

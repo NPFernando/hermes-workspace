@@ -59,7 +59,10 @@ exit 0
 `)
   writeFileSync(join(bin, 'curl'), '#!/bin/sh\nexit 0\n')
   writeFileSync(join(bin, 'node'), `#!/bin/sh
-if [ "${'${DEPLOY_TEST_FAIL_SMOKE:-0}'}" = "1" ] && [ "$1" = "scripts/release-smoke.mjs" ] && [ ! -f "${join(root, 'smoke.failed')}" ]; then
+if [ "$1" = "scripts/release-checklist.mjs" ]; then
+  touch "${join(root, 'release-checklist.ran')}"
+fi
+if [ "${'${DEPLOY_TEST_FAIL_SMOKE:-0}'}" = "1" ] && { [ "$1" = "scripts/release-smoke.mjs" ] || [ "$1" = "scripts/release-checklist.mjs" ]; } && [ ! -f "${join(root, 'smoke.failed')}" ]; then
   touch "${join(root, 'smoke.failed')}"
   exit 1
 fi
@@ -88,10 +91,12 @@ describe('deploy local-ahead guard', () => {
   })
 
   it('deploys an explicitly approved local-ahead release', () => {
-    const result = run(fixture(), '--allow-local-ahead')
+    const f = fixture()
+    const result = run(f, '--allow-local-ahead')
     assert.equal(result.status, 0, result.stderr)
     assert.match(result.stdout, /retaining explicitly approved local-ahead release/)
     assert.match(result.stdout, /service healthy \(pid=456\)/)
+    assert.equal(readFileSync(join(f.root, 'release-checklist.ran'), 'utf8'), '')
   })
 
   it('restores the previous artifact when release validation fails', () => {
