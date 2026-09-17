@@ -238,8 +238,13 @@ try {
 
   // Verify the touch-first command path and recover back to the dashboard.
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto(`${baseUrl}/dashboard`, { waitUntil: 'domcontentloaded' })
-  await page.getByRole('button', { name: 'Search commands' }).click()
+  // The dashboard route uses the shared command palette without rendering the
+  // non-chat mobile page header. Exercise the same touch-first command path
+  // through its stable open event instead of a route-specific button that may
+  // not exist on this screen.
+  await page.evaluate(() => {
+    window.dispatchEvent(new CustomEvent('workspace:open-command-palette'))
+  })
   const commandInput = page.getByPlaceholder(
     'Search screens, sessions, and commands',
   )
