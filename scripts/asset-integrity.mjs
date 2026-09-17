@@ -41,7 +41,7 @@ export async function runAssetIntegrity(baseUrl, fetchImpl = fetch, initialRoot 
   // connection per asset. The unbounded burst is fragile on small CI runners
   // and can make an otherwise healthy local server drop every request.
   const pending = [...uniqueReferences]
-  const workerCount = Math.min(4, pending.length)
+  const workerCount = 1
   await Promise.all(Array.from({ length: workerCount }, async () => {
     while (pending.length > 0) {
       const reference = pending.shift()
