@@ -638,7 +638,7 @@ function loadScores(rows: Array<SRRow>): Map<string, StrategyScore> {
       map.set(r.strategyId, {
         ...emptyScore(r.strategyId),
         ...(r as object),
-      } as StrategyScore)
+      })
     }
   }
   for (const s of STRATEGIES)
@@ -2890,7 +2890,7 @@ function computeEngineSnapshot(monitor?: LiveMonitor): EngineSnapshot {
   const db = readFinanceStore()
   const rows = db.strategy_results as Array<SRRow>
   const currentExecutionMode: BinanceExecutionEnvironment =
-    executionModeForTradingMode(db.settings.tradingMode as string) ?? 'testnet'
+    executionModeForTradingMode(db.settings.tradingMode) ?? 'testnet'
   const allTrades = loadOfKind<TradeLogEntry>(rows, SR_KIND_TRADE).filter(
     (trade) => !isShadow(trade),
   )
@@ -3411,12 +3411,9 @@ function restoreStepForOverride(existing: StrategyOverride): {
 } | null {
   if (existing.mode === 'disabled')
     return { overrideAction: 'reduce_size', multiplier: 0.5 }
-  if (existing.mode === 'reduce_size') {
-    if (existing.multiplier < 0.75)
-      return { overrideAction: 'reduce_size', multiplier: 0.75 }
-    return { overrideAction: 'clear', multiplier: null }
-  }
-  return null
+  if (existing.multiplier < 0.75)
+    return { overrideAction: 'reduce_size', multiplier: 0.75 }
+  return { overrideAction: 'clear', multiplier: null }
 }
 
 function readStrategyRestoreProgress(
@@ -4323,7 +4320,7 @@ export function learningReport(): LearningReport {
     trades,
     config.quotePerTrade,
   )
-  const candidates = loadLearningCandidates(db.strategy_results as Array<SRRow>)
+  const candidates = loadLearningCandidates(db.strategy_results)
   return {
     checkedAt: new Date().toISOString(),
     policy,
@@ -4340,7 +4337,7 @@ export function applyLearningCandidate(candidateId: string): {
 } {
   const db = readFinanceStore()
   const settings = db.settings as Record<string, unknown>
-  const candidates = loadLearningCandidates(db.strategy_results as Array<SRRow>)
+  const candidates = loadLearningCandidates(db.strategy_results)
   const candidate = candidates.find((item) => item.id === candidateId) ?? null
   if (!candidate) {
     return {
@@ -4388,7 +4385,7 @@ export function applyLearningCandidate(candidateId: string): {
     ...(dt.learning &&
     typeof dt.learning === 'object' &&
     !Array.isArray(dt.learning)
-      ? (dt.learning as Record<string, unknown>)
+      ? (dt.learning)
       : {}),
     baseQuotePerTrade: baseQuote,
     lastAppliedCandidateId: candidate.id,
@@ -4399,12 +4396,34 @@ export function applyLearningCandidate(candidateId: string): {
   db.updatedAt = new Date().toISOString()
   writeFinanceStore(db)
 
+  const skippedOverrides: Array<{ strategyId: string; reason: string }> = []
   for (const override of candidate.strategyOverrides) {
+    // Some council members (e.g. long_short_sentiment) are special-cased
+    // additions gated by their own settings flag rather than entries in
+    // the STRATEGIES registry — setStrategyOverride only understands
+    // registry strategies. Historical trade evidence can still name them
+    // in decision-quality data, so a candidate can propose an override
+    // for one. Skip and log rather than throwing: this used to abort the
+    // whole apply (config patch already written above) on every learning
+    // cycle that proposed such an override, silently for over a month.
+    if (!getStrategy(override.strategyId)) {
+      skippedOverrides.push({
+        strategyId: override.strategyId,
+        reason: 'not a registered strategy; override requires manual handling',
+      })
+      continue
+    }
     setStrategyOverride({
       strategyId: override.strategyId,
       overrideAction: override.overrideAction,
       multiplier: override.multiplier ?? undefined,
       reason: `Learning candidate ${candidate.id}: ${override.reason}`,
+    })
+  }
+  if (skippedOverrides.length > 0) {
+    appendAuditLog('learning_candidate_override_skipped', {
+      id: candidate.id,
+      skippedOverrides,
     })
   }
 
@@ -4448,7 +4467,7 @@ export function runLearningCycle(): LearningCycleResult {
     config.quotePerTrade,
   )
   const existingCandidates = loadLearningCandidates(
-    db.strategy_results as Array<SRRow>,
+    db.strategy_results,
   )
   let generatedCandidate: LearningCandidate | null = null
   let appliedCandidate: LearningCandidate | null = null
@@ -4489,7 +4508,7 @@ export function runLearningCycle(): LearningCycleResult {
   }
 
   const candidates = loadLearningCandidates(
-    readFinanceStore().strategy_results as Array<SRRow>,
+    readFinanceStore().strategy_results,
   )
   return {
     checkedAt: new Date().toISOString(),
@@ -5752,7 +5771,7 @@ export function reviewSandboxExperiments(): SandboxExperimentState {
   const db = readFinanceStore()
   const rows = db.strategy_results as Array<SRRow>
   const currentExecutionMode: BinanceExecutionEnvironment =
-    executionModeForTradingMode(db.settings.tradingMode as string) ?? 'testnet'
+    executionModeForTradingMode(db.settings.tradingMode) ?? 'testnet'
   const allTrades = loadOfKind<TradeLogEntry>(rows, SR_KIND_TRADE).filter(
     (trade) => !isShadow(trade),
   )
@@ -5945,11 +5964,17 @@ export function applyStrategyOverrideRecommendations(): {
         strategyRecoveryEligible(strategy)
       if (!eligible) {
         // In the hysteresis band or still flagged — reset the streak, hold.
-        if (nextProgress[strategy.strategyId])
-          delete nextProgress[strategy.strategyId]
+        // (delete on an absent key is a no-op, so this doesn't need a guard)
+        delete nextProgress[strategy.strategyId]
         continue
       }
+      // Record<string, T> indexed access is typed as always-defined by TS
+      // here (no noUncheckedIndexedAccess), which is unsound: this key is
+      // genuinely absent on a strategy's first healthy run after recovery
+      // tracking starts. Keep the optional chain — removing it would throw
+      // on that first run instead of defaulting to 0.
       const healthyRuns =
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         (progress[strategy.strategyId]?.healthyRuns ?? 0) + 1
       if (healthyRuns < STRATEGY_RESTORE_HEALTHY_RUNS) {
         nextProgress[strategy.strategyId] = {
@@ -6474,7 +6499,7 @@ export function getStrategyEligibilityAudit(): StrategyEligibilityAudit {
   const settings = db.settings as Record<string, unknown>
   const config = resolveEngineConfig(settings.demoTrading)
   const mode = executionModeForTradingMode(db.settings.tradingMode) ?? 'paper'
-  const scores = loadScores(db.strategy_results as Array<SRRow>)
+  const scores = loadScores(db.strategy_results)
   const overrides = readStrategyOverrideState(settings.demoTrading).active
   const symbolsKey = config.symbols.join(',')
   const snapshot = liveMarketSnapshotCache
