@@ -9,7 +9,7 @@ import { ensureGatewayProbed } from '../../server/gateway-capabilities'
 export const Route = createFileRoute('/api/auth-check')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
+      GET: ({ request }) => {
         // Authentication is independent from gateway availability. A slow or
         // unreachable gateway must not turn a valid workspace session into a
         // false logout while the root shell is bootstrapping.

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { Route } from './auth-check'
+
 const state = vi.hoisted(() => ({ authenticated: false }))
 const probe = vi.hoisted(() => vi.fn())
 
@@ -10,8 +12,6 @@ vi.mock('../../server/auth-middleware', () => ({
 vi.mock('../../server/gateway-capabilities', () => ({
   ensureGatewayProbed: probe,
 }))
-
-import { Route } from './auth-check'
 
 type RouteHandlers = {
   GET: (ctx: { request: Request }) => Promise<Response>
