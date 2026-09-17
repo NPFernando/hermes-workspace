@@ -46,6 +46,7 @@ const context = await browser.newContext({
   viewport: { width: 1280, height: 900 },
 })
 const page = await context.newPage()
+page.setDefaultNavigationTimeout(60_000)
 let failures = 0
 const pageErrors = []
 page.on('pageerror', (error) => pageErrors.push(error.message))
@@ -253,7 +254,9 @@ try {
       window.dispatchEvent(new CustomEvent('workspace:open-command-palette'))
     })
     if (await commandInput.isVisible().catch(() => false)) break
-    await commandInput.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {})
+    await commandInput
+      .waitFor({ state: 'visible', timeout: 10_000 })
+      .catch(() => {})
   }
   await commandInput.fill('Settings')
   await page.getByText('Settings', { exact: true }).last().click()
