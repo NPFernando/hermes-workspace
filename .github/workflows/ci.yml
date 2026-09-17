@@ -40,7 +40,7 @@ jobs:
       - name: Lint changed source files
         run: |
           BASE_SHA="${{ github.event.pull_request.base.sha || github.event.before }}"
-          FILES="$(git diff --name-only --diff-filter=d "$BASE_SHA" "$GITHUB_SHA" -- '*.js' '*.mjs' '*.cjs' '*.ts' '*.tsx')"
+          FILES="$(git diff --name-only --diff-filter=d "$BASE_SHA" "$GITHUB_SHA" -- '*.js' '*.mjs' '*.cjs' '*.ts' '*.tsx' | sed '/^electron\/server-bundle\.cjs$/d')"
           if [ -n "$FILES" ]; then
             pnpm exec eslint $FILES --no-ignore
           else
