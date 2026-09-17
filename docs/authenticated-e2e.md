@@ -26,6 +26,14 @@ Secrets and variables → Actions**:
 - `AUTH_E2E_PASSWORD`: the test account password, stored only as a secret.
 - `AUTH_E2E_BASE_URL`: the HTTPS base URL of the deployed test workspace.
 
+The workspace accepts `HERMES_E2E_PASSWORD` as a separate server-side
+credential. Sessions created with it are read-only: non-GET API requests are
+rejected, so the browser journey cannot start agents, write memory, change
+settings, or mutate Finance data. It must differ from the high-privilege
+`HERMES_PASSWORD`. Configure the same value as the write-only
+`AUTH_E2E_PASSWORD` Actions secret; the value is never stored in this
+repository.
+
 Then run the **CI** workflow with **Run workflow**. Pull requests without these
 secrets receive an explicit skipped notice; the workflow never prints or
 attempts to discover a password from the runner filesystem.

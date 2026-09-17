@@ -15,7 +15,9 @@ beforeEach(() => {
   delete process.env.NODE_ENV
   delete process.env.TRUST_PROXY
   delete process.env.HERMES_PASSWORD
+  delete process.env.HERMES_E2E_PASSWORD
   delete process.env.CLAUDE_PASSWORD
+  delete process.env.HERMES_E2E_PASSWORD
 })
 
 afterEach(() => {
@@ -98,5 +100,37 @@ describe('getRequestIp (#125)', () => {
     const { getRequestIp } = await import('./auth-middleware')
     const ip = getRequestIp(makeRequest({ 'x-real-ip': '198.51.100.5' }))
     expect(ip).toBe('198.51.100.5')
+  })
+})
+
+describe('dedicated read-only E2E authentication', () => {
+  it('does not grant the E2E credential access to mutating requests', async () => {
+    process.env.HERMES_PASSWORD = 'high-privilege-workspace-secret'
+    process.env.HERMES_E2E_PASSWORD = 'separate-readonly-e2e-secret'
+    const {
+      generateSessionToken,
+      isAuthenticated,
+      passwordRole,
+      storeSessionToken,
+    } = await import('./auth-middleware')
+
+    expect(passwordRole(process.env.HERMES_E2E_PASSWORD)).toBe('e2e-readonly')
+    expect(passwordRole(process.env.HERMES_PASSWORD)).toBe('full')
+    expect(passwordRole('wrong-secret')).toBeNull()
+
+    const token = generateSessionToken()
+    storeSessionToken(token, false, 'e2e-readonly')
+    expect(
+      isAuthenticated(new Request('http://localhost/api/auth-check', {
+        method: 'GET',
+        headers: { cookie: `claude-auth=${token}` },
+      })),
+    ).toBe(true)
+    expect(
+      isAuthenticated(new Request('http://localhost/api/send', {
+        method: 'POST',
+        headers: { cookie: `claude-auth=${token}` },
+      })),
+    ).toBe(false)
   })
 })

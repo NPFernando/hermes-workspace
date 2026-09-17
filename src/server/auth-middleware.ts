@@ -19,8 +19,17 @@ import { dirname, join } from 'node:path'
  *
  * File location: ~/.hermes/workspace-sessions.json
  */
+export type SessionRole = 'full' | 'e2e-readonly'
+
+interface SessionRecord {
+  expiry: number
+  role: SessionRole
+}
+
 interface SessionStore {
-  tokens: Record<string, number> // token -> expiry unix-ms
+  // Numeric values are accepted for backward compatibility with the original
+  // token store format; new sessions are persisted as role-aware records.
+  tokens: Record<string, number | SessionRecord>
 }
 
 const STORE_FILE = join(
@@ -40,9 +49,10 @@ function loadStore(): SessionStore {
       const parsed = JSON.parse(raw) as SessionStore
       // Expire any stale tokens on load
       const now = Date.now()
-      const valid: Record<string, number> = {}
-      for (const [token, expiry] of Object.entries(parsed.tokens)) {
-        if (expiry > now) valid[token] = expiry
+      const valid: Record<string, number | SessionRecord> = {}
+      for (const [token, record] of Object.entries(parsed.tokens)) {
+        const expiry = typeof record === 'number' ? record : record.expiry
+        if (typeof expiry === 'number' && expiry > now) valid[token] = record
       }
       return { tokens: valid }
     }
@@ -77,11 +87,18 @@ function saveStore(store: SessionStore): void {
 
 // In-memory working copy
 const _tokens: Map<string, number> = new Map()
+const _roles: Map<string, SessionRole> = new Map()
 
 // Hydrate from disk on module load
 const initial = loadStore()
-for (const [token, expiry] of Object.entries(initial.tokens)) {
-  _tokens.set(token, expiry)
+for (const [token, record] of Object.entries(initial.tokens)) {
+  if (typeof record === 'number') {
+    _tokens.set(token, record)
+    _roles.set(token, 'full')
+  } else if (typeof record.expiry === 'number') {
+    _tokens.set(token, record.expiry)
+    _roles.set(token, record.role === 'e2e-readonly' ? 'e2e-readonly' : 'full')
+  }
 }
 
 /**
@@ -93,6 +110,7 @@ function _prune(): void {
   for (const [token, expiry] of _tokens) {
     if (expiry <= now) {
       _tokens.delete(token)
+      _roles.delete(token)
       changed = true
     }
   }
@@ -100,7 +118,11 @@ function _prune(): void {
 }
 
 function _persist(): void {
-  const store: SessionStore = { tokens: Object.fromEntries(_tokens) }
+  const tokens: Record<string, SessionRecord> = {}
+  for (const [token, expiry] of _tokens) {
+    tokens[token] = { expiry, role: _roles.get(token) ?? 'full' }
+  }
+  const store: SessionStore = { tokens }
   saveStore(store)
 }
 
@@ -118,7 +140,11 @@ export function generateSessionToken(): string {
  * Store a session token.
  * rememberMe=true → 1-year TTL; rememberMe=false → 24-hour TTL; undefined → 30-day legacy default.
  */
-export function storeSessionToken(token: string, rememberMe?: boolean): void {
+export function storeSessionToken(
+  token: string,
+  rememberMe?: boolean,
+  role: SessionRole = 'full',
+): void {
   const ttl =
     rememberMe === true
       ? TOKEN_TTL_LONG
@@ -126,6 +152,7 @@ export function storeSessionToken(token: string, rememberMe?: boolean): void {
         ? TOKEN_TTL_SHORT
         : TOKEN_TTL_MS
   _tokens.set(token, Date.now() + ttl)
+  _roles.set(token, role)
   _persist()
 }
 
@@ -137,6 +164,7 @@ export function isValidSessionToken(token: string): boolean {
   if (expiry === undefined) return false
   if (expiry <= Date.now()) {
     _tokens.delete(token)
+    _roles.delete(token)
     _persist()
     return false
   }
@@ -148,6 +176,7 @@ export function isValidSessionToken(token: string): boolean {
  */
 export function revokeSessionToken(token: string): void {
   _tokens.delete(token)
+  _roles.delete(token)
   _persist()
 }
 
@@ -169,32 +198,41 @@ function getConfiguredPassword(): string {
  * Check if password protection is enabled.
  */
 export function isPasswordProtectionEnabled(): boolean {
-  return getConfiguredPassword().length > 0
+  return getConfiguredPassword().length > 0 || Boolean(process.env.HERMES_E2E_PASSWORD)
+}
+
+function timingSafePasswordMatch(password: string, configured: string): boolean {
+  if (!configured) return false
+  const passwordBuf = Buffer.from(password, 'utf8')
+  const configuredBuf = Buffer.from(configured, 'utf8')
+  if (passwordBuf.length !== configuredBuf.length) return false
+  try {
+    return timingSafeEqual(passwordBuf, configuredBuf)
+  } catch {
+    return false
+  }
+}
+
+/** Resolve a password to its least-privileged session role. */
+export function passwordRole(password: string): SessionRole | null {
+  const workspacePassword = getConfiguredPassword()
+  if (timingSafePasswordMatch(password, workspacePassword)) return 'full'
+  const e2ePassword = (process.env.HERMES_E2E_PASSWORD || '').trim()
+  if (
+    e2ePassword &&
+    e2ePassword !== workspacePassword &&
+    timingSafePasswordMatch(password, e2ePassword)
+  ) {
+    return 'e2e-readonly'
+  }
+  return null
 }
 
 /**
  * Verify password using timing-safe comparison.
  */
 export function verifyPassword(password: string): boolean {
-  const configured = getConfiguredPassword()
-  if (!configured || configured.length === 0) {
-    return false
-  }
-
-  // Timing-safe comparison
-  const passwordBuf = Buffer.from(password, 'utf8')
-  const configuredBuf = Buffer.from(configured, 'utf8')
-
-  // If lengths differ, still do a comparison to avoid timing leak
-  if (passwordBuf.length !== configuredBuf.length) {
-    return false
-  }
-
-  try {
-    return timingSafeEqual(passwordBuf, configuredBuf)
-  } catch {
-    return false
-  }
+  return passwordRole(password) !== null
 }
 
 /**
@@ -279,7 +317,15 @@ export function isAuthenticated(request: Request): boolean {
     return false
   }
 
-  return isValidSessionToken(token)
+  if (!isValidSessionToken(token)) return false
+  const role = _roles.get(token) ?? 'full'
+  if (
+    role === 'e2e-readonly' &&
+    !['GET', 'HEAD', 'OPTIONS'].includes(request.method.toUpperCase())
+  ) {
+    return false
+  }
+  return true
 }
 
 export function requireLocalOrAuth(request: Request): boolean {
