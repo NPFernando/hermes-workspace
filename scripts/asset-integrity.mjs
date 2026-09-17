@@ -37,12 +37,20 @@ export async function runAssetIntegrity(baseUrl, fetchImpl = fetch, initialRoot 
   }
 
   const failures = []
-  await Promise.all(uniqueReferences.map(async (reference) => {
-    const response = await fetchWithRetry(new URL(reference, rootUrl), {
-      method: 'GET',
-      cache: 'no-store',
-    }).catch(() => ({ ok: false, status: 0 }))
-    if (!response.ok) failures.push(`${reference} (HTTP ${response.status})`)
+  // Keep the check representative of browser loading instead of opening one
+  // connection per asset. The unbounded burst is fragile on small CI runners
+  // and can make an otherwise healthy local server drop every request.
+  const pending = [...uniqueReferences]
+  const workerCount = Math.min(4, pending.length)
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (pending.length > 0) {
+      const reference = pending.shift()
+      const response = await fetchWithRetry(new URL(reference, rootUrl), {
+        method: 'GET',
+        cache: 'no-store',
+      }).catch(() => ({ ok: false, status: 0 }))
+      if (!response.ok) failures.push(`${reference} (HTTP ${response.status})`)
+    }
   }))
 
   if (failures.length > 0) {
