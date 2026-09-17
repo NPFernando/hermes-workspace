@@ -144,14 +144,55 @@ async function migrationCheck() {
   return result(complete ? 'degraded' : 'fail', complete ? 'Migration artifacts exist; live migration state requires operator/database evidence.' : 'Required finance persistence artifacts are missing.', { schema, store, postgres, migrationDocs, evidence: 'filesystem-only' })
 }
 
+function configuredKey(key) {
+  if (process.env[key]) return true
+  const files = [join(rootDir, '.env'), join(process.env.HERMES_HOME || '/home/ubuntu/.hermes', '.env')]
+  return files.some((file) => {
+    try {
+      return new RegExp(`^\\s*${key.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\s*=`, 'm').test(readFileSync(file, 'utf8'))
+    } catch {
+      return false
+    }
+  })
+}
+
+async function backupCheck() {
+  const script = existsSync(join(rootDir, 'scripts/finance-offsite-backup.ts'))
+  const unit = existsSync(join(rootDir, 'deploy/systemd/hermes-finance-offsite-backup.service'))
+  const timer = existsSync(join(rootDir, 'deploy/systemd/hermes-finance-offsite-backup.timer'))
+  const passphrase = configuredKey('HERMES_FINANCE_BACKUP_PASSPHRASE')
+  const remote = configuredKey('HERMES_FINANCE_BACKUP_RCLONE_REMOTE')
+  const rclone = await command('rclone', ['version'], { timeout: 5_000 })
+  const enabled = await command('systemctl', ['is-enabled', 'hermes-finance-offsite-backup.timer'], { timeout: 5_000 })
+  const active = await command('systemctl', ['is-active', 'hermes-finance-offsite-backup.timer'], { timeout: 5_000 })
+  const evidence = await command('journalctl', ['-u', 'hermes-finance-offsite-backup.service', '--since', '30 days ago', '--no-pager', '-g', 'roundTripVerified|"ok": true'], { timeout: 10_000 })
+  const complete = script && unit && timer && passphrase && remote && rclone.ok && enabled.stdout === 'enabled' && active.stdout === 'active' && Boolean(evidence.stdout)
+  const missing = [
+    !script && 'backup script', !unit && 'backup service unit', !timer && 'backup timer unit',
+    !passphrase && 'backup passphrase', !remote && 'rclone remote', !rclone.ok && 'rclone binary',
+    enabled.stdout !== 'enabled' && 'enabled timer', active.stdout !== 'active' && 'active timer',
+    !evidence.stdout && 'recent round-trip evidence',
+  ].filter(Boolean)
+  return result(complete ? 'pass' : 'fail', complete ? 'Encrypted off-site backup is configured, scheduled, and has recent round-trip evidence.' : `Encrypted off-site backup is not ready: missing ${missing.join(', ')}.`, {
+    encrypted: passphrase,
+    remoteConfigured: remote,
+    rcloneAvailable: rclone.ok,
+    timerEnabled: enabled.stdout === 'enabled',
+    timerActive: active.stdout === 'active',
+    roundTripEvidence: Boolean(evidence.stdout),
+    evidence: 'configuration, systemd, binary, and journal checks; secret values excluded',
+  })
+}
+
 export async function buildReadinessReport({ skipTests = false, fetchImpl = fetch } = {}) {
   const originalFetch = globalThis.fetch
   if (fetchImpl !== originalFetch) globalThis.fetch = fetchImpl
   try {
-    const [tests, security, migrations, service, identity] = await Promise.all([
+    const [tests, security, migrations, backups, service, identity] = await Promise.all([
       testCheck(skipTests),
       securityCheck(),
       migrationCheck(),
+      backupCheck(),
       serviceCheck(),
       deploymentIdentity(),
     ])
@@ -165,7 +206,7 @@ export async function buildReadinessReport({ skipTests = false, fetchImpl = fetc
       const smokeReport = await runReleaseSmoke(baseUrl, fetchImpl)
       release = result('pass', 'Release smoke passed.', smokeReport)
     } catch (error) { release = result('fail', error instanceof Error ? error.message : String(error)) }
-    const checks = { tests, security, migrations, service, assets, release, deploymentIdentity: identity }
+    const checks = { tests, security, migrations, backups, service, assets, release, deploymentIdentity: identity }
     const blockers = Object.entries(checks).filter(([, check]) => check.status === 'fail').map(([name, check]) => `${name}: ${check.detail}`)
     const warnings = Object.entries(checks).filter(([, check]) => ['degraded', 'unavailable', 'not-run'].includes(check.status)).map(([name, check]) => `${name}: ${check.detail}`)
     return { generatedAt: new Date().toISOString(), overall: blockers.length ? 'blocked' : warnings.length ? 'degraded' : 'ready', blockers, warnings, checks }
