@@ -93,6 +93,18 @@
 /* Tailwind v4 — enable dark: variant on .dark class (set by __root.tsx) */
 @variant dark (&:where(.dark, .dark *));
 
+/* Accessibility baseline: component-specific focus styles can enhance this,
+   but every keyboard-operable native control must remain visibly identifiable. */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role='button']:focus-visible {
+  outline: 2px solid var(--theme-focus, var(--theme-accent, currentColor));
+  outline-offset: 2px;
+}
+
 :root {
   --tabbar-h: 80px;
   /* Chat content max-width — controlled by Settings > Chat Display (see #89).
@@ -2000,8 +2012,8 @@ kbd {
   --theme-shadow-2: 0 8px 24px rgba(31, 24, 18, 0.1);
   --theme-shadow-3: 0 18px 40px rgba(31, 24, 18, 0.14);
   --theme-glass: rgba(245, 242, 237, 0.84);
-  --theme-focus: #b98a44;
-  --theme-accent: #b98a44;
+  --theme-focus: #8e6428;
+  --theme-accent: #8e6428;
   --theme-accent-secondary: #d3a45a;
   --theme-accent-subtle: rgba(185, 138, 68, 0.12);
   --theme-accent-border: rgba(185, 138, 68, 0.28);

@@ -106,4 +106,23 @@ describe('deploy local-ahead guard', () => {
     assert.match(failed.stderr, /rollback recovered the previous release/)
     assert.equal(readFileSync(join(f.root, 'dist/server/server.js'), 'utf8'), 'fixture build\n')
   })
+
+  it('runs authenticated browser smoke after rollback when credentials are configured', () => {
+    const f = fixture()
+    const failed = spawnSync('bash', [f.script, '--allow-local-ahead'], {
+      cwd: f.root,
+      encoding: 'utf8',
+      env: {
+        ...f.env,
+        DEPLOY_TEST_FAIL_SMOKE: '1',
+        AUTH_E2E_PASSWORD: 'fixture-only-secret',
+        AUTH_E2E_BASE_URL: 'http://fixture.invalid',
+      },
+    })
+    assert.equal(failed.status, 1)
+    assert.match(
+      failed.stderr,
+      /rollback recovered the previous release and passed authenticated browser smoke/,
+    )
+  })
 })

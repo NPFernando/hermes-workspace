@@ -3,6 +3,7 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { Pool } from 'pg'
+import { publishSwarmActionPrompt } from './swarm-notifications'
 import type { PoolClient, PoolConfig } from 'pg'
 
 const TABLE = 'public.swarm_dispatch_queue_jobs'
@@ -129,6 +130,63 @@ export type QueueProcessor = (
   payload: Record<string, unknown>,
   context: QueueWorkerContext,
 ) => Promise<unknown>
+
+export type SwarmDispatchQueueNotification = {
+  sessionKey: string
+  title: string
+  text: string
+  details: {
+    source: 'swarm-dispatch-queue'
+    queueId: string
+    status: 'failed' | 'interrupted'
+    error: string | null
+  }
+}
+
+export function buildSwarmDispatchQueueNotification(input: {
+  id: string
+  status: SwarmDispatchQueueStatus
+  error: string | null
+  sessionKey?: unknown
+}): SwarmDispatchQueueNotification | null {
+  if (input.status !== 'failed' && input.status !== 'interrupted') return null
+  const sessionKey =
+    typeof input.sessionKey === 'string' && input.sessionKey.trim()
+      ? input.sessionKey.trim()
+      : 'main'
+  const outcome = input.status === 'interrupted' ? 'interrupted' : 'failed'
+  return {
+    sessionKey,
+    title: `Serial dispatch ${outcome}`,
+    text: `Queue job ${input.id} became a dead letter. Inspect agent state before retrying.${input.error ? ` ${input.error}` : ''}`,
+    details: {
+      source: 'swarm-dispatch-queue',
+      queueId: input.id,
+      status: input.status,
+      error: input.error,
+    },
+  }
+}
+
+function publishQueueTerminalNotification(input: {
+  id: string
+  status: SwarmDispatchQueueStatus
+  error: string | null
+  payload: Record<string, unknown>
+}): void {
+  const notification = buildSwarmDispatchQueueNotification({
+    id: input.id,
+    status: input.status,
+    error: input.error,
+    sessionKey: input.payload.notifySessionKey,
+  })
+  if (!notification) return
+  try {
+    publishSwarmActionPrompt(notification)
+  } catch {
+    // Notification delivery must never change the durable queue outcome.
+  }
+}
 
 let pool: Pool | null = null
 let schemaChecked = false
@@ -683,9 +741,9 @@ async function finishJob(
   status: 'succeeded' | 'failed' | 'cancelled' | 'interrupted',
   result: unknown,
   error: string | null,
-): Promise<void> {
+): Promise<SwarmDispatchQueueStatus | null> {
   const pg = await ensureSchema()
-  await pg.query(
+  const updateResult = await pg.query<{ status: SwarmDispatchQueueStatus }>(
     `UPDATE ${TABLE}
      SET status = CASE WHEN cancel_requested_at IS NOT NULL THEN 'cancelled' ELSE $2 END,
          result = $3::jsonb, error = $4,
@@ -695,9 +753,10 @@ async function finishJob(
            ELSE NULL
          END,
          lease_token = NULL, lease_expires_at = NULL,
-         finished_at = clock_timestamp(), updated_at = clock_timestamp()
+       finished_at = clock_timestamp(), updated_at = clock_timestamp()
      WHERE id = $1::uuid AND status = 'running' AND lease_token = $5::uuid
-       AND lease_expires_at > clock_timestamp()`,
+       AND lease_expires_at > clock_timestamp()
+     RETURNING status`,
     [
       id,
       status,
@@ -706,6 +765,7 @@ async function finishJob(
       leaseToken,
     ],
   )
+  return updateResult.rows[0]?.status ?? null
 }
 
 async function recoverInterruptedJobs(client: PoolClient): Promise<void> {
@@ -831,7 +891,21 @@ async function processQueue(processor: QueueProcessor): Promise<void> {
       } finally {
         clearInterval(heartbeat)
       }
-      await finishJob(job.id, leaseToken, status, result, errorMessage)
+      const terminalized = await finishJob(
+        job.id,
+        leaseToken,
+        status,
+        result,
+        errorMessage,
+      )
+      if (terminalized) {
+        publishQueueTerminalNotification({
+          id: job.id,
+          status: terminalized,
+          error: errorMessage,
+          payload: job.payload,
+        })
+      }
     }
   } finally {
     if (ownsLock) {

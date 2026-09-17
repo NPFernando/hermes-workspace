@@ -20,6 +20,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { getStateDir } from './workspace-state-dir'
+import { normalizeMcpList } from './mcp-normalize'
 
 type WorkspaceOverrides = {
   claudeApiUrl?: string
@@ -488,7 +489,6 @@ async function probeChatCompletions(): Promise<boolean> {
  * malformed body, capability is `false`.
  */
 async function probeMcp(): Promise<boolean> {
-  const { normalizeMcpList } = await import('./mcp-normalize')
   const validate = async (res: Response): Promise<boolean> => {
     if (!res.ok) return false
     const body = (await res.json().catch(() => null)) as unknown

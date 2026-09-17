@@ -60,4 +60,6 @@ HERMES_PG_USER=hermes_queue_test_app \
 HERMES_PG_PASSWORD="$APP_PASSWORD" \
 SWARM_QUEUE_PG_DATABASE=hermes_swarm_queue_test \
 RUN_SWARM_QUEUE_PG_INTEGRATION=1 \
-  pnpm exec vitest run src/server/swarm-dispatch-queue.test.ts src/routes/api/-swarm-dispatch-isolated.integration.test.ts
+  pnpm exec vitest run --no-file-parallelism \
+    src/server/swarm-dispatch-queue.test.ts \
+    src/routes/api/-swarm-dispatch-isolated.integration.test.ts

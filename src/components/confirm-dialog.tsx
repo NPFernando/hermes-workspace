@@ -4,7 +4,9 @@
  * (destructive red by default). Extracted from the repeated inline
  * markup in tasks-screen.tsx (UI/UX audit §9.1).
  */
+import { useId, useRef } from 'react'
 import type { ReactNode } from 'react'
+import { useModalFocus } from '@/hooks/use-modal-focus'
 
 type ConfirmDialogProps = {
   title: ReactNode
@@ -29,6 +31,14 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const titleId = useId()
+  const bodyId = useId()
+  const cancelRef = useRef<HTMLButtonElement>(null)
+  const { dialogRef, onKeyDown } = useModalFocus<HTMLDivElement>(
+    onCancel,
+    cancelRef,
+  )
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
@@ -38,17 +48,28 @@ export function ConfirmDialog({
       <div
         role="alertdialog"
         aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={body ? bodyId : undefined}
+        ref={dialogRef}
+        tabIndex={-1}
+        onKeyDown={onKeyDown}
         className="relative z-10 w-full max-w-xs bg-[var(--theme-card)] border border-[var(--theme-border)] rounded-xl shadow-2xl p-5 flex flex-col gap-4"
       >
-        <p className="text-sm font-semibold text-[var(--theme-text)]">
+        <p
+          id={titleId}
+          className="text-sm font-semibold text-[var(--theme-text)]"
+        >
           {title}
         </p>
         {body ? (
-          <p className="text-[11px] text-[var(--theme-muted)]">{body}</p>
+          <p id={bodyId} className="text-[11px] text-[var(--theme-muted)]">
+            {body}
+          </p>
         ) : null}
         <div className="flex gap-2">
           <button
             type="button"
+            ref={cancelRef}
             onClick={onCancel}
             className="flex-1 text-xs rounded-lg border border-[var(--theme-border)] px-3 py-2 text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] transition-colors"
           >

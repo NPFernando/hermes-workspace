@@ -1,12 +1,33 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { Suspense, lazy } from 'react'
 import { usePageTitle } from '@/hooks/use-page-title'
-import { Swarm2Screen } from '@/screens/swarm2/swarm2-screen'
+
+const Swarm2Screen = lazy(() =>
+  import('@/screens/swarm2/swarm2-screen').then((module) => ({
+    default: module.Swarm2Screen,
+  })),
+)
+
+function SwarmPending() {
+  return (
+    <div className="flex items-center justify-center h-full">
+      <div className="text-center">
+        <div className="spinner-accent spinner-xl mb-3" />
+        <p className="text-sm text-[var(--theme-muted)]">Loading swarm...</p>
+      </div>
+    </div>
+  )
+}
 
 export const Route = createFileRoute('/swarm')({
   ssr: false,
   component: function SwarmRoute() {
     usePageTitle('Swarm')
-    return <Swarm2Screen />
+    return (
+      <Suspense fallback={<SwarmPending />}>
+        <Swarm2Screen />
+      </Suspense>
+    )
   },
   errorComponent: function SwarmError({ error }) {
     return (
@@ -28,14 +49,5 @@ export const Route = createFileRoute('/swarm')({
       </div>
     )
   },
-  pendingComponent: function SwarmPending() {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="spinner-accent spinner-xl mb-3" />
-          <p className="text-sm text-[var(--theme-muted)]">Loading swarm...</p>
-        </div>
-      </div>
-    )
-  },
+  pendingComponent: SwarmPending,
 })

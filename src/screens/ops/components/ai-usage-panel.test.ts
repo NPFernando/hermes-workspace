@@ -1,14 +1,16 @@
 // @vitest-environment jsdom
 import React, { act } from 'react'
-import {  createRoot } from 'react-dom/client'
+import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { codexCreditsUsageLine } from '../../../server/provider-usage'
 import {
   AiUsagePanel,
   lastSevenUtcDays,
-  providerFreshness, quotaAlert
+  lastThirtyOneUtcDays,
+  providerFreshness,
+  quotaAlert,
 } from './ai-usage-panel'
-import type {Root} from 'react-dom/client';
+import type { Root } from 'react-dom/client'
 
 const { queryState } = vi.hoisted(() => ({
   queryState: {
@@ -151,6 +153,15 @@ describe('lastSevenUtcDays', () => {
   })
 })
 
+describe('lastThirtyOneUtcDays', () => {
+  it('returns a complete 31-day UTC history window', () => {
+    const days = lastThirtyOneUtcDays(Date.UTC(2026, 0, 31, 1))
+    expect(days).toHaveLength(31)
+    expect(days[0]).toBe('2026-01-01')
+    expect(days.at(-1)).toBe('2026-01-31')
+  })
+})
+
 describe('AiUsagePanel rendered provider dashboard', () => {
   it('shows a non-blocking warning when provider readings are degraded', async () => {
     queryState.data = {
@@ -163,8 +174,12 @@ describe('AiUsagePanel rendered provider dashboard', () => {
     }
 
     await renderPanel()
-    expect(document.body.textContent).toContain('Provider readings are temporarily unavailable')
-    expect(document.body.textContent).toContain('Usage limits are not treated as zero')
+    expect(document.body.textContent).toContain(
+      'Provider readings are temporarily unavailable',
+    )
+    expect(document.body.textContent).toContain(
+      'Usage limits are not treated as zero',
+    )
     expect(document.body.textContent).toContain('Retry')
   })
 
@@ -181,7 +196,12 @@ describe('AiUsagePanel rendered provider dashboard', () => {
           source: 'Undocumented account endpoint',
           sourceKind: 'provider_api',
           lines: [
-            { type: 'text', label: 'Credits balance', value: '1000', measure: 'balance' },
+            {
+              type: 'text',
+              label: 'Credits balance',
+              value: '1000',
+              measure: 'balance',
+            },
           ],
           updatedAt: Date.now(),
         },
@@ -222,8 +242,18 @@ describe('AiUsagePanel rendered provider dashboard', () => {
       expect(text).toContain('Hermes gateway sessions')
       expect(text).toContain('actual where available; otherwise estimated')
       expect(text).toContain('Codex · Weekly session usage snapshot')
-      expect(text).toContain('Missing days mean no source data was observed, not zero usage.')
-      expect(text).toContain('Provider limits are separate and are not a combined budget')
+      expect(text).toContain(
+        'Missing days mean no source data was observed, not zero usage.',
+      )
+      expect(text).toContain(
+        'Provider limits are separate and are not a combined budget',
+      )
+      const thirtyOneDayButton = Array.from(
+        document.querySelectorAll('button'),
+      ).find((button) => button.textContent === '31d') as HTMLButtonElement
+      expect(thirtyOneDayButton).toBeDefined()
+      await act(async () => thirtyOneDayButton.click())
+      expect(document.body.textContent).toContain('Daily trends · last 31 days')
     } finally {
       await cleanupPanel()
     }

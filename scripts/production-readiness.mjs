@@ -103,36 +103,54 @@ async function securityCheck() {
   const remote = await command('git', ['remote', 'get-url', 'origin'])
   const slug = repositorySlug(remote.stdout)
   if (!slug) return result('unavailable', 'A GitHub repository could not be derived from origin.')
-  const [codeql, dependabot] = await Promise.all([
+  const head = await command('git', ['rev-parse', 'HEAD'])
+  const [codeql, dependabot, codeqlRuns] = await Promise.all([
     command('gh', ['api', `repos/${slug}/code-scanning/alerts?state=open&per_page=100`, '--jq', 'length'], { timeout: 15_000 }),
     command('gh', ['api', `repos/${slug}/dependabot/alerts?state=open&per_page=100`, '--jq', 'length'], { timeout: 15_000 }),
+    command('gh', ['run', 'list', '--workflow', 'codeql.yml', '--commit', head.stdout, '--limit', '10', '--json', 'status,conclusion,headSha,databaseId'], { timeout: 15_000 }),
   ])
   const parseCount = (value) => /^\d+$/.test(value) ? Number(value) : null
   const codeqlOpen = parseCount(codeql.stdout)
   const dependabotOpen = parseCount(dependabot.stdout)
   const dependabotDisabled = /Dependabot alerts are disabled/i.test(dependabot.stderr)
+  let codeqlRun = null
+  try {
+    const runs = JSON.parse(codeqlRuns.stdout)
+    codeqlRun = runs.find((run) => run.headSha === head.stdout && run.status === 'completed' && run.conclusion === 'success') ?? null
+  } catch {
+    codeqlRun = null
+  }
+  const codeqlRunEvidence = codeqlRun
+    ? { status: 'pass', databaseId: codeqlRun.databaseId ?? null, headSha: head.stdout || null }
+    : { status: 'fail', databaseId: null, headSha: head.stdout || null }
   if (codeqlOpen == null) {
     return result('unavailable', 'GitHub CodeQL alert API was not available.', {
       codeqlOpen,
       dependabotOpen,
       dependabotStatus: dependabotDisabled ? 'disabled' : 'unavailable',
+      codeqlRun: codeqlRunEvidence,
     })
   }
   if (dependabotDisabled) {
-    return result(
-      codeqlOpen === 0 ? 'pass' : 'fail',
-      `${codeqlOpen} CodeQL alerts open; Dependabot alerts are disabled for this repository.`,
-      { codeqlOpen, dependabotOpen: null, dependabotStatus: 'disabled' },
-    )
+    const pass = codeqlOpen === 0 && codeqlRunEvidence.status === 'pass'
+    return result(pass ? 'pass' : 'fail', pass
+      ? 'CodeQL alerts are clear and the exact HEAD has a successful CodeQL run; Dependabot alerts are disabled for this repository.'
+      : `${codeqlOpen} CodeQL alerts open or the exact HEAD has no successful CodeQL run; Dependabot alerts are disabled for this repository.`,
+    { codeqlOpen, dependabotOpen: null, dependabotStatus: 'disabled', codeqlRun: codeqlRunEvidence })
   }
   if (dependabotOpen == null) {
     return result('unavailable', 'GitHub Dependabot alert API was not available.', {
       codeqlOpen,
       dependabotOpen,
       dependabotStatus: 'unavailable',
+      codeqlRun: codeqlRunEvidence,
     })
   }
-  return result(codeqlOpen === 0 && dependabotOpen === 0 ? 'pass' : 'fail', `${codeqlOpen} CodeQL and ${dependabotOpen} Dependabot alerts open.`, { codeqlOpen, dependabotOpen, dependabotStatus: 'enabled' })
+  const pass = codeqlOpen === 0 && dependabotOpen === 0 && codeqlRunEvidence.status === 'pass'
+  return result(pass ? 'pass' : 'fail', pass
+    ? 'CodeQL and Dependabot alerts are clear and the exact HEAD has a successful CodeQL run.'
+    : `${codeqlOpen} CodeQL and ${dependabotOpen} Dependabot alerts open, or the exact HEAD has no successful CodeQL run.`,
+  { codeqlOpen, dependabotOpen, dependabotStatus: 'enabled', codeqlRun: codeqlRunEvidence })
 }
 
 async function migrationCheck() {
@@ -144,14 +162,77 @@ async function migrationCheck() {
   return result(complete ? 'degraded' : 'fail', complete ? 'Migration artifacts exist; live migration state requires operator/database evidence.' : 'Required finance persistence artifacts are missing.', { schema, store, postgres, migrationDocs, evidence: 'filesystem-only' })
 }
 
+function configuredKey(key) {
+  if (process.env[key]) return true
+  const files = [join(rootDir, '.env'), join(process.env.HERMES_HOME || '/home/ubuntu/.hermes', '.env')]
+  return files.some((file) => {
+    try {
+      return new RegExp(`^\\s*${key.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\s*=`, 'm').test(readFileSync(file, 'utf8'))
+    } catch {
+      return false
+    }
+  })
+}
+
+async function backupCheck() {
+  const script = existsSync(join(rootDir, 'scripts/finance-offsite-backup.ts'))
+  const unit = existsSync(join(rootDir, 'deploy/systemd/hermes-finance-offsite-backup.service'))
+  const timer = existsSync(join(rootDir, 'deploy/systemd/hermes-finance-offsite-backup.timer'))
+  const passphrase = configuredKey('HERMES_FINANCE_BACKUP_PASSPHRASE')
+  const remote = configuredKey('HERMES_FINANCE_BACKUP_RCLONE_REMOTE')
+  const rclone = await command('rclone', ['version'], { timeout: 5_000 })
+  const enabled = await command('systemctl', ['is-enabled', 'hermes-finance-offsite-backup.timer'], { timeout: 5_000 })
+  const active = await command('systemctl', ['is-active', 'hermes-finance-offsite-backup.timer'], { timeout: 5_000 })
+  const evidence = await command('journalctl', ['-u', 'hermes-finance-offsite-backup.service', '--since', '30 days ago', '--no-pager', '-g', 'roundTripVerified|"ok": true'], { timeout: 10_000 })
+  const complete = script && unit && timer && passphrase && remote && rclone.ok && enabled.stdout === 'enabled' && active.stdout === 'active' && Boolean(evidence.stdout)
+  const missing = [
+    !script && 'backup script', !unit && 'backup service unit', !timer && 'backup timer unit',
+    !passphrase && 'backup passphrase', !remote && 'rclone remote', !rclone.ok && 'rclone binary',
+    enabled.stdout !== 'enabled' && 'enabled timer', active.stdout !== 'active' && 'active timer',
+    !evidence.stdout && 'recent round-trip evidence',
+  ].filter(Boolean)
+  return result(complete ? 'pass' : 'fail', complete ? 'Encrypted off-site backup is configured, scheduled, and has recent round-trip evidence.' : `Encrypted off-site backup is not ready: missing ${missing.join(', ')}.`, {
+    encrypted: passphrase,
+    remoteConfigured: remote,
+    rcloneAvailable: rclone.ok,
+    timerEnabled: enabled.stdout === 'enabled',
+    timerActive: active.stdout === 'active',
+    roundTripEvidence: Boolean(evidence.stdout),
+    evidence: 'configuration, systemd, binary, and journal checks; secret values excluded',
+  })
+}
+
+async function forkSyncCheck() {
+  const remote = await command('git', ['remote', 'get-url', 'origin'])
+  const slug = repositorySlug(remote.stdout)
+  if (!slug) return result('unavailable', 'A GitHub repository could not be derived for fork-sync readiness.')
+  const metadata = await command('gh', ['repo', 'view', slug, '--json', 'isFork,parent'], { timeout: 10_000 })
+  if (!metadata.ok) return result('unavailable', 'GitHub fork metadata was not available.')
+  let parsed
+  try { parsed = JSON.parse(metadata.stdout) } catch { return result('unavailable', 'GitHub returned invalid fork metadata.') }
+  if (!parsed.isFork) return result('pass', 'Fork synchronization is not applicable because this repository is not a fork.', { isFork: false, applicable: false })
+
+  const configPath = process.env.HERMES_FORK_SYNC_CONFIG || '/home/ubuntu/.hermes/fork-sync-preview.env'
+  const config = existsSync(configPath)
+  const timerEnabled = await command('systemctl', ['is-enabled', 'hermes-fork-sync-preview.timer'], { timeout: 5_000 })
+  const timerActive = await command('systemctl', ['is-active', 'hermes-fork-sync-preview.timer'], { timeout: 5_000 })
+  const applicable = config && timerEnabled.stdout === 'enabled' && timerActive.stdout === 'active'
+  return result(applicable ? 'pass' : 'fail', applicable
+    ? 'Fork synchronization preview is configured and its timer is active.'
+    : 'Fork synchronization is applicable but its preview config/timer is not ready.',
+  { isFork: true, applicable: true, config, timerEnabled: timerEnabled.stdout === 'enabled', timerActive: timerActive.stdout === 'active', parent: parsed.parent?.fullName ?? null })
+}
+
 export async function buildReadinessReport({ skipTests = false, fetchImpl = fetch } = {}) {
   const originalFetch = globalThis.fetch
   if (fetchImpl !== originalFetch) globalThis.fetch = fetchImpl
   try {
-    const [tests, security, migrations, service, identity] = await Promise.all([
+    const [tests, security, migrations, backups, forkSync, service, identity] = await Promise.all([
       testCheck(skipTests),
       securityCheck(),
       migrationCheck(),
+      backupCheck(),
+      forkSyncCheck(),
       serviceCheck(),
       deploymentIdentity(),
     ])
@@ -165,7 +246,7 @@ export async function buildReadinessReport({ skipTests = false, fetchImpl = fetc
       const smokeReport = await runReleaseSmoke(baseUrl, fetchImpl)
       release = result('pass', 'Release smoke passed.', smokeReport)
     } catch (error) { release = result('fail', error instanceof Error ? error.message : String(error)) }
-    const checks = { tests, security, migrations, service, assets, release, deploymentIdentity: identity }
+    const checks = { tests, security, migrations, backups, forkSync, service, assets, release, deploymentIdentity: identity }
     const blockers = Object.entries(checks).filter(([, check]) => check.status === 'fail').map(([name, check]) => `${name}: ${check.detail}`)
     const warnings = Object.entries(checks).filter(([, check]) => ['degraded', 'unavailable', 'not-run'].includes(check.status)).map(([name, check]) => `${name}: ${check.detail}`)
     return { generatedAt: new Date().toISOString(), overall: blockers.length ? 'blocked' : warnings.length ? 'degraded' : 'ready', blockers, warnings, checks }

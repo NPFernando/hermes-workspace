@@ -5,8 +5,7 @@
 import { randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
 import { homedir } from 'node:os'
 import EventEmitter from 'node:events'
 import type { ChildProcess } from 'node:child_process'
@@ -46,12 +45,16 @@ const DETACH_TTL_MS = (() => {
 
 const sessions = new Map<string, TerminalSession>()
 
-// Resolve path to pty-helper.py relative to this file
-const __dirname_resolved =
-  typeof __dirname !== 'undefined'
-    ? __dirname
-    : dirname(fileURLToPath(import.meta.url))
-const PTY_HELPER = resolve(__dirname_resolved, 'pty-helper.py')
+// The server runs from the workspace root in development and production. Keep
+// explicit fallbacks for the unbundled source and the Vite server asset so the
+// Electron CommonJS bundle does not need import.meta path rewriting.
+const PTY_HELPER =
+  [
+    resolve(process.cwd(), 'dist/server/assets/pty-helper.py'),
+    resolve(process.cwd(), 'src/server/pty-helper.py'),
+    resolve(process.cwd(), 'pty-helper.py'),
+  ].find((candidate) => existsSync(candidate)) ??
+  resolve(process.cwd(), 'pty-helper.py')
 
 export function createTerminalSession(params: {
   command?: Array<string>

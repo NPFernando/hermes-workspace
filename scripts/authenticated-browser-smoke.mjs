@@ -5,6 +5,9 @@
  *
  * AUTH_E2E_PASSWORD='...' AUTH_E2E_BASE_URL=https://... \
  *   node scripts/authenticated-browser-smoke.mjs
+ *
+ * Set AUTH_E2E_EXPECTED_BUILD to the build header captured before a rollback
+ * to prove the authenticated browser is served by the restored artifact.
  */
 import { chromium } from 'playwright'
 
@@ -14,6 +17,7 @@ const baseUrl = (
   'http://127.0.0.1:3000'
 ).replace(/\/$/, '')
 const password = process.env.AUTH_E2E_PASSWORD
+const expectedBuild = process.env.AUTH_E2E_EXPECTED_BUILD?.trim() || null
 if (!password) {
   console.error(
     'Set AUTH_E2E_PASSWORD explicitly; no credential files are read.',
@@ -24,7 +28,11 @@ if (!password) {
 const routes = [
   { path: '/dashboard', pattern: /Hermes Workspace|Dashboard/i },
   { path: '/ops-cost', pattern: /Cost & Routing/i },
-  { path: '/personal-finance', pattern: /Your money at a glance/i, timeout: 45_000 },
+  {
+    path: '/personal-finance',
+    pattern: /Your money at a glance/i,
+    timeout: 45_000,
+  },
   { path: '/dify', pattern: /Dify Workbench/i },
 ]
 // Allow hosts with a system Chromium but no Playwright browser download.
@@ -74,6 +82,12 @@ try {
     Boolean(initial && initial.status() < 500),
     'dashboard responds without a server error',
   )
+  if (expectedBuild) {
+    check(
+      initial?.headers()['x-workspace-build'] === expectedBuild,
+      `authenticated browser is served by expected build ${expectedBuild}`,
+    )
+  }
   const login = page.locator('#lp-pw')
   const workspaceHeading = page.getByRole('heading', {
     name: /Hermes Workspace/i,
@@ -101,10 +115,15 @@ try {
     .evaluate((element) => getComputedStyle(element).display !== 'none')
   check(!splashVisible, 'pre-hydration splash is hidden after app mount')
   check(
-    (await page.locator('[data-testid="connection-startup-screen"]:visible').count()) === 0,
+    (await page
+      .locator('[data-testid="connection-startup-screen"]:visible')
+      .count()) === 0,
     'connection startup overlay is not duplicated over the authenticated workspace',
   )
-  check(pageErrors.length === 0, `dashboard has no uncaught browser errors${pageErrors.length ? `: ${pageErrors.join('; ')}` : ''}`)
+  check(
+    pageErrors.length === 0,
+    `dashboard has no uncaught browser errors${pageErrors.length ? `: ${pageErrors.join('; ')}` : ''}`,
+  )
   const auth = await page.evaluate(async () =>
     (await fetch('/api/auth-check', { cache: 'no-store' })).json(),
   )
@@ -134,6 +153,36 @@ try {
     }
   }
 
+  const authenticatedApiChecks = [
+    {
+      path: '/api/finance/summary',
+      valid: (body) => body?.ok === true && body?.summary,
+      label: 'Finance summary API returns an authenticated payload',
+    },
+    {
+      path: '/api/dify-status',
+      valid: (body) =>
+        body?.ok === true && typeof body?.available === 'boolean',
+      label: 'Dify status API returns an authenticated provider result',
+    },
+    {
+      path: '/api/swarm-dispatch',
+      valid: (body) =>
+        Array.isArray(body?.waiting) && Array.isArray(body?.recent),
+      label: 'queue API returns an authenticated recovery snapshot',
+    },
+  ]
+  for (const api of authenticatedApiChecks) {
+    const result = await page.evaluate(async (path) => {
+      const response = await fetch(path, { cache: 'no-store' })
+      return {
+        status: response.status,
+        body: await response.json().catch(() => null),
+      }
+    }, api.path)
+    check(result.status === 200 && api.valid(result.body), api.label)
+  }
+
   // Keep the smoke test side-effect free: exercise `/queue` parsing/UI while
   // preventing a real prompt from reaching an agent backend.
   await page.route('**/api/send-stream', (route) =>
@@ -141,8 +190,7 @@ try {
   )
   await page.goto(`${baseUrl}/chat/main`, { waitUntil: 'domcontentloaded' })
   const promptInput = page.locator('textarea:visible').last()
-  await promptInput
-    .waitFor({ state: 'visible', timeout: 30_000 })
+  await promptInput.waitFor({ state: 'visible', timeout: 30_000 })
   await promptInput.fill('/queue browser smoke')
   await page.getByRole('button', { name: 'Send message', exact: true }).click()
   await page.waitForFunction(
@@ -151,7 +199,10 @@ try {
         if (!key.startsWith('claude.chat-queue.v1.')) return false
         try {
           const prompts = JSON.parse(value)
-          return Array.isArray(prompts) && prompts.some((prompt) => prompt?.text === 'browser smoke')
+          return (
+            Array.isArray(prompts) &&
+            prompts.some((prompt) => prompt?.text === 'browser smoke')
+          )
         } catch {
           return false
         }
@@ -159,7 +210,10 @@ try {
     undefined,
     { timeout: 15_000 },
   )
-  check(true, '/queue command is accepted and persisted in the authenticated chat')
+  check(
+    true,
+    '/queue command is accepted and persisted in the authenticated chat',
+  )
   await page.unroute('**/api/send-stream')
 
   await page.reload({ waitUntil: 'domcontentloaded' })
@@ -169,7 +223,10 @@ try {
         if (!key.startsWith('claude.chat-queue.v1.')) return false
         try {
           const prompts = JSON.parse(value)
-          return Array.isArray(prompts) && prompts.some((prompt) => prompt?.text === 'browser smoke')
+          return (
+            Array.isArray(prompts) &&
+            prompts.some((prompt) => prompt?.text === 'browser smoke')
+          )
         } catch {
           return false
         }
@@ -181,8 +238,13 @@ try {
 
   // Verify the touch-first command path and recover back to the dashboard.
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto(`${baseUrl}/dashboard`, { waitUntil: 'domcontentloaded' })
-  await page.getByRole('button', { name: 'Search commands' }).click()
+  // The dashboard route uses the shared command palette without rendering the
+  // non-chat mobile page header. Exercise the same touch-first command path
+  // through its stable open event instead of a route-specific button that may
+  // not exist on this screen.
+  await page.evaluate(() => {
+    window.dispatchEvent(new CustomEvent('workspace:open-command-palette'))
+  })
   const commandInput = page.getByPlaceholder(
     'Search screens, sessions, and commands',
   )

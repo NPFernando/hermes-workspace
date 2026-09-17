@@ -18,7 +18,7 @@ import {
   UserGroupIcon,
   UserMultipleIcon,
 } from '@hugeicons/core-free-icons'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { hapticTap } from '@/lib/haptics'
 import { getTheme, getThemeVariant, isDarkTheme, setTheme } from '@/lib/theme'
@@ -27,6 +27,7 @@ import {
   useChatSettingsStore,
 } from '@/hooks/use-chat-settings'
 import { useSettingsStore } from '@/hooks/use-settings'
+import { useModalFocus } from '@/hooks/use-modal-focus'
 
 export const MOBILE_HAMBURGER_NAV_ITEMS = [
   {
@@ -192,6 +193,12 @@ export function HamburgerTrigger({ className }: { className?: string }) {
 /** Mount once in WorkspaceShell — renders the drawer + backdrop */
 export function MobileHamburgerMenu() {
   const [open, setOpen] = useState(false)
+  const closeRef = useRef<HTMLButtonElement>(null)
+  const { dialogRef, onKeyDown } = useModalFocus<HTMLDivElement>(
+    () => setOpen(false),
+    closeRef,
+    open,
+  )
   _setOpen = setOpen
 
   // Add/remove body class to push main content
@@ -219,15 +226,6 @@ export function MobileHamburgerMenu() {
     void navigate({ to, search: {} })
     setOpen(false)
   }
-
-  useEffect(() => {
-    if (!open) return
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [open])
 
   return (
     <>
@@ -259,6 +257,10 @@ export function MobileHamburgerMenu() {
         role="dialog"
         aria-modal="true"
         aria-label="Navigation menu"
+        aria-hidden={!open}
+        ref={dialogRef}
+        tabIndex={-1}
+        onKeyDown={onKeyDown}
         className={cn(
           'fixed top-0 left-0 bottom-0 z-[96] w-72 md:hidden',
           'shadow-2xl bg-[var(--theme-panel)]',
@@ -287,6 +289,7 @@ export function MobileHamburgerMenu() {
           <button
             type="button"
             aria-label="Close menu"
+            ref={closeRef}
             onClick={() => setOpen(false)}
             className="flex items-center justify-center size-8 rounded-full active:scale-90 transition-all text-[var(--theme-muted)]"
           >
@@ -295,7 +298,10 @@ export function MobileHamburgerMenu() {
         </div>
 
         {/* Nav items */}
-        <nav className="flex flex-col gap-1 px-3 pt-4 flex-1">
+        <nav
+          className="flex flex-col gap-1 px-3 pt-4 flex-1"
+          aria-label="Primary navigation"
+        >
           {visibleNavItems.map((item) => {
             const isActive = item.match(pathname)
             return (

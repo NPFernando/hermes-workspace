@@ -318,8 +318,9 @@ function ProductionReadinessPanel() {
     <Panel title="Production readiness report">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-2xl text-sm text-[var(--theme-muted)]">
-          Runs tests, security-alert checks, migration evidence, service health,
-          asset integrity, release smoke, and deployment-identity verification.
+          Runs tests, security-alert checks, migration and encrypted-backup
+          evidence, service health, asset integrity, release smoke, and
+          deployment-identity verification.
           Missing external evidence is shown as a warning, never as a pass.
         </p>
         <button

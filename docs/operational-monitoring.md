@@ -6,7 +6,9 @@ workspace. It reports:
 - service state, exit result, and MainPID changes;
 - a missing or stale `dist/server/server.js` artifact;
 - failed deployment state from systemd; and
-- parked git stashes that need an owner.
+- parked git stashes that need an owner;
+- the deployed commit and the exact pending runtime files; and
+- sustained resident-memory growth between checks.
 
 Run it manually:
 
@@ -25,7 +27,12 @@ systemctl list-timers hermes-workspace-monitor.timer
 ```
 
 The monitor persists only its last observed PID and timestamp under
-`.runtime/ops-monitor-state.json` (mode `0600`). It never restarts services,
-deploys code, changes git state, or sends data outside the host. A critical
-finding gives the oneshot a non-zero exit status so it is visible through
-`systemctl status` and the journal.
+`.runtime/ops-monitor-state.json` (mode `0600`), including the last resident
+memory sample. A memory-growth warning requires both a 64 MiB increase and a
+25% increase by default; tune those thresholds with
+`HERMES_OPS_MEMORY_GROWTH_MIN_KB` and
+`HERMES_OPS_MEMORY_GROWTH_WARN_PERCENT`. It never restarts services, deploys
+code, changes git state, or sends data outside the host. A critical finding
+gives the oneshot a non-zero exit status so it is visible through
+`systemctl status` and the journal; warning findings remain visible in the
+JSON report without causing a false deployment failure.

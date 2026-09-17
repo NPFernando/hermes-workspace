@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { Cancel01Icon, HelpCircleIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { cn } from '@/lib/utils'
+import { useModalFocus } from '@/hooks/use-modal-focus'
 
 type HelpSection = {
   title: string
@@ -22,6 +23,13 @@ export function WorkflowHelpModal({
   compact?: boolean
 }) {
   const [open, setOpen] = useState(false)
+  const titleId = useId()
+  const closeRef = useRef<HTMLButtonElement>(null)
+  const { dialogRef, onKeyDown } = useModalFocus<HTMLDivElement>(
+    () => setOpen(false),
+    closeRef,
+    open,
+  )
 
   return (
     <>
@@ -45,7 +53,15 @@ export function WorkflowHelpModal({
 
       {open ? (
         <div className="fixed inset-0 z-[12000] flex items-center justify-center bg-black/45 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] shadow-2xl">
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            tabIndex={-1}
+            onKeyDown={onKeyDown}
+            className="w-full max-w-2xl overflow-hidden rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card)] text-[var(--theme-text)] shadow-2xl"
+          >
             <div className="flex items-start justify-between gap-4 border-b border-[var(--theme-border)] px-5 py-4">
               <div className="min-w-0">
                 {eyebrow ? (
@@ -53,10 +69,13 @@ export function WorkflowHelpModal({
                     {eyebrow}
                   </p>
                 ) : null}
-                <h2 className="text-lg font-semibold">{title}</h2>
+                <h2 id={titleId} className="text-lg font-semibold">
+                  {title}
+                </h2>
               </div>
               <button
                 type="button"
+                ref={closeRef}
                 onClick={() => setOpen(false)}
                 className="rounded-lg p-2 text-[var(--theme-muted)] transition-colors hover:bg-[var(--theme-card2)] hover:text-[var(--theme-text)]"
                 aria-label={`Close ${title}`}

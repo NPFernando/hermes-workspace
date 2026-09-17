@@ -5,6 +5,16 @@ import { join, resolve } from 'node:path'
 
 const DEFAULT_SERVICE = process.env.HERMES_SERVICE_NAME || 'hermes-workspace'
 
+// Files in these paths are consumed by the running Node/Vite application.
+// Operational/docs/test-only changes should not be mistaken for a stale
+// production artifact when the deployment marker is otherwise current.
+function isRuntimeFile(file) {
+  return /^(src\/|public\/|server-entry\.js$|index\.html$|vite\.config\.|package\.json$|pnpm-lock\.yaml$|electron\/)/.test(file)
+}
+
+const MEMORY_GROWTH_WARN_PERCENT = Number(process.env.HERMES_OPS_MEMORY_GROWTH_WARN_PERCENT || 25)
+const MEMORY_GROWTH_MIN_KB = Number(process.env.HERMES_OPS_MEMORY_GROWTH_MIN_KB || 64 * 1024)
+
 function command(file, args, cwd) {
   try { return execFileSync(file, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim() } catch { return '' }
 }
@@ -48,6 +58,12 @@ export async function collectOperationalStatus({
   const head = exec('git', ['rev-parse', 'HEAD'], repo)
   const commitSeconds = Number(exec('git', ['show', '-s', '--format=%ct', 'HEAD'], repo))
   const stashLines = exec('git', ['stash', 'list'], repo)
+  let deployedCommit = ''
+  try { deployedCommit = (await readFile(join(repo, '.runtime', 'build-commit'), 'utf8')).trim() } catch { /* first run */ }
+  const pendingFiles = deployedCommit && head && deployedCommit !== head
+    ? exec('git', ['diff', '--name-only', `${deployedCommit}..${head}`], repo).split(/\r?\n/).filter(Boolean)
+    : []
+  const pendingRuntimeFiles = pendingFiles.filter(isRuntimeFile)
   const buildPath = join(repo, 'dist', 'server', 'server.js')
   let buildMtimeMs = 0
   try { buildMtimeMs = (await stat(buildPath)).mtimeMs } catch { /* reported below */ }
@@ -57,6 +73,13 @@ export async function collectOperationalStatus({
   const memoryStatus = serviceShow.pid !== '0' ? exec('bash', ['-lc', `awk '/^VmRSS:/ { print $2 " " $3 }' /proc/${Number(serviceShow.pid)}/status`], repo) : ''
   const memoryMatch = memoryStatus.match(/^(\d+)\s*(\S+)?$/)
   const residentMemoryKb = memoryMatch ? Number(memoryMatch[1]) : null
+  const previousMemoryKb = Number(previous.residentMemoryKb)
+  const memoryGrowthKb = Number.isFinite(previousMemoryKb) && residentMemoryKb != null
+    ? residentMemoryKb - previousMemoryKb
+    : null
+  const memoryGrowthPercent = Number.isFinite(previousMemoryKb) && previousMemoryKb > 0 && memoryGrowthKb != null
+    ? (memoryGrowthKb / previousMemoryKb) * 100
+    : null
   const oomLog = journalText(exec('journalctl', ['-k', '--since', '24 hours ago', '--no-pager', '-g', 'oom|out of memory|killed process'], repo))
   const errorLog = journalText(exec('journalctl', ['-u', service, '--since', '24 hours ago', '-p', 'err..alert', '--no-pager'], repo))
   const deploymentLog = journalText(exec('journalctl', ['-u', 'hermes-workspace-deploy.service', '--since', '7 days ago', '--no-pager'], repo))
@@ -66,12 +89,21 @@ export async function collectOperationalStatus({
   // Commit timestamps can be ahead of the VM clock (for example, a CI commit
   // created in another timezone). Never call a build stale solely because a
   // future-dated commit compares newer than the artifact.
-  else if (commitSeconds && commitSeconds <= now / 1000 && buildMtimeMs < commitSeconds * 1000) issues.push({ level: 'critical', code: 'stale_build', detail: 'Build artifact predates the current git HEAD.' })
+  else if (commitSeconds && commitSeconds <= now / 1000 && buildMtimeMs < commitSeconds * 1000) {
+    if (pendingRuntimeFiles.length) {
+      issues.push({ level: 'critical', code: 'stale_build', detail: `Build artifact predates current HEAD; ${pendingRuntimeFiles.length} runtime file(s) are pending deployment.` })
+    } else {
+      issues.push({ level: 'warning', code: 'stale_build_metadata', detail: 'Build artifact predates HEAD, but no pending runtime files were detected.' })
+    }
+  }
   if (oomLog.trim()) {
     const serviceOom = oomLog.toLowerCase().includes(service.toLowerCase()) || oomLog.includes(serviceShow.pid)
     issues.push({ level: serviceOom ? 'critical' : 'warning', code: 'oom_event', detail: serviceOom ? 'Kernel journal contains a recent OOM event affecting this service.' : 'Kernel journal contains a recent OOM event affecting another workload.' })
   }
   if (errorLog.trim()) issues.push({ level: 'warning', code: 'service_errors', detail: `${errorLog.trim().split(/\r?\n/).length} recent service error log line(s) found.` })
+  if (memoryGrowthKb != null && memoryGrowthKb >= MEMORY_GROWTH_MIN_KB && memoryGrowthPercent >= MEMORY_GROWTH_WARN_PERCENT) {
+    issues.push({ level: 'warning', code: 'memory_growth', detail: `Resident memory grew by ${Math.round(memoryGrowthKb / 1024)} MiB (${Math.round(memoryGrowthPercent)}%) since the previous check.` })
+  }
   if (previous.pid && serviceShow.pid !== '0' && previous.pid !== serviceShow.pid) issues.push({ level: 'warning', code: 'pid_changed', detail: `Service PID changed from ${previous.pid} to ${serviceShow.pid}.` })
   const parkedStashes = stashLines ? stashLines.split(/\r?\n/).filter(Boolean).length : 0
   if (parkedStashes) issues.push({ level: 'warning', code: 'parked_stashes', detail: `${parkedStashes} parked git stash entr${parkedStashes === 1 ? 'y' : 'ies'} found.` })
@@ -79,11 +111,14 @@ export async function collectOperationalStatus({
   const activeSince = serviceShow.activeEnterTimestamp ? parseSystemdTimestamp(serviceShow.activeEnterTimestamp) : NaN
   const uptimeSeconds = Number.isFinite(activeSince) && activeSince <= now ? Math.floor((now - activeSince) / 1000) : null
   const deploymentHistory = deploymentLog.trim() ? deploymentLog.trim().split(/\r?\n/).slice(-20) : []
-  await writeFile(statePath, JSON.stringify({ checkedAt: now, head, pid: serviceShow.pid }, null, 2) + '\n', { mode: 0o600 })
+  await writeFile(statePath, JSON.stringify({ checkedAt: now, head, pid: serviceShow.pid, residentMemoryKb }, null, 2) + '\n', { mode: 0o600 })
   return {
     checkedAt: now,
     head,
-    service: { ...serviceShow, uptimeSeconds, residentMemoryKb, oomDetected: Boolean(oomLog.trim()) || serviceShow.oomKilled },
+    deployedCommit,
+    pendingFiles,
+    pendingRuntimeFiles,
+    service: { ...serviceShow, uptimeSeconds, residentMemoryKb, memoryGrowthKb, memoryGrowthPercent, oomDetected: Boolean(oomLog.trim()) || serviceShow.oomKilled },
     buildMtimeMs,
     deploymentHistory,
     recentErrorLines: errorLog.trim() ? errorLog.trim().split(/\r?\n/).slice(-20) : [],

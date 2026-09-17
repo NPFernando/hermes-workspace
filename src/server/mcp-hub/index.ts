@@ -33,10 +33,10 @@ const PER_SOURCE_TIMEOUT_MS = 8_000
 // Installed-name lookup
 // -----------------------------------------------------------------------
 
-/** Read installed mcp server names from config via server-side getConfig. */
+/** Read installed MCP server names from config via server-side getConfig. */
 async function getInstalledNames(): Promise<Set<string>> {
   try {
-    // Lazy import to avoid circular deps and keep server-only
+    // Lazy import avoids a gateway-capabilities ↔ dashboard-api cycle.
     const { getConfig } = await import('../claude-dashboard-api')
     const config = await getConfig()
 
@@ -55,7 +55,7 @@ async function getInstalledNames(): Promise<Set<string>> {
       return new Set()
     }
 
-    return new Set(Object.keys(mcp as Record<string, unknown>))
+    return new Set(Object.keys(mcp))
   } catch {
     return new Set()
   }
@@ -165,7 +165,7 @@ export async function unifiedSearch(
     const hubSources = await readHubSources()
     userSources = hubSources.sources
       .filter((s) => !s.builtin && s.enabled && s.format === 'generic-json')
-      .map((s) => ({ id: s.id, url: s.url, trust: s.trust as HubTrust }))
+      .map((s) => ({ id: s.id, url: s.url, trust: s.trust }))
   } catch {
     // Non-fatal — user sources unavailable, continue with built-ins
   }

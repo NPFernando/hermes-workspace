@@ -1,12 +1,35 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { Suspense, lazy } from 'react'
 import { usePageTitle } from '@/hooks/use-page-title'
-import { OpsCostScreen } from '@/screens/ops/ops-cost-screen'
+
+const OpsCostScreen = lazy(() =>
+  import('@/screens/ops/ops-cost-screen').then((module) => ({
+    default: module.OpsCostScreen,
+  })),
+)
+
+function OpsCostPending() {
+  return (
+    <div className="flex items-center justify-center h-full">
+      <div className="text-center">
+        <div className="spinner-accent spinner-xl mb-3" />
+        <p className="text-sm text-[var(--theme-muted)]">
+          Loading cost &amp; routing…
+        </p>
+      </div>
+    </div>
+  )
+}
 
 export const Route = createFileRoute('/ops-cost')({
   ssr: false,
   component: function OpsCostRoute() {
     usePageTitle('Cost & Routing')
-    return <OpsCostScreen />
+    return (
+      <Suspense fallback={<OpsCostPending />}>
+        <OpsCostScreen />
+      </Suspense>
+    )
   },
   errorComponent: function OpsCostError({ error }) {
     return (
@@ -28,16 +51,5 @@ export const Route = createFileRoute('/ops-cost')({
       </div>
     )
   },
-  pendingComponent: function OpsCostPending() {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="spinner-accent spinner-xl mb-3" />
-          <p className="text-sm text-[var(--theme-muted)]">
-            Loading cost &amp; routing…
-          </p>
-        </div>
-      </div>
-    )
-  },
+  pendingComponent: OpsCostPending,
 })
