@@ -86,6 +86,7 @@ jobs:
             exit 1
           fi
           ACCESSIBILITY_BASE_URL=http://127.0.0.1:4300 pnpm run check:accessibility:browser
+          PWA_BASE_URL=http://127.0.0.1:4300 pnpm run check:pwa:browser
 
       - name: Verify Electron server bundle
         run: |

@@ -44,6 +44,7 @@
     "check:accessibility": "node scripts/check-theme-contrast.mjs",
     "check:accessibility:browser": "node scripts/accessibility-browser-smoke.mjs",
     "check:pwa": "node scripts/check-pwa.mjs",
+    "check:pwa:browser": "node scripts/pwa-browser-smoke.mjs",
     "ops:monitor": "node scripts/ops-monitor.mjs",
     "playground:ws": "node scripts/playground-ws.mjs",
     "lint": "eslint",
