@@ -14,6 +14,7 @@ function isRuntimeFile(file) {
 
 const MEMORY_GROWTH_WARN_PERCENT = Number(process.env.HERMES_OPS_MEMORY_GROWTH_WARN_PERCENT || 25)
 const MEMORY_GROWTH_MIN_KB = Number(process.env.HERMES_OPS_MEMORY_GROWTH_MIN_KB || 64 * 1024)
+const ALERTABLE_ISSUE_CODES = new Set(['stale_build', 'oom_event', 'failed_deploy', 'memory_growth'])
 
 function command(file, args, cwd) {
   try { return execFileSync(file, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim() } catch { return '' }
@@ -127,8 +128,81 @@ export async function collectOperationalStatus({
   }
 }
 
+function alertFingerprint(issue) {
+  return `${issue.code}:${issue.level}`
+}
+
+function alertMessage(status, issue) {
+  return `[${issue.level.toUpperCase()}] Hermes Workspace ${issue.code}: ${issue.detail} (head=${status.head || 'unknown'}, deployed=${status.deployedCommit || 'unknown'})`
+}
+
+/**
+ * Send newly observed operational findings to an explicitly configured
+ * webhook. Delivery is deliberately opt-in and best-effort: monitoring must
+ * still work when no endpoint is configured or when the endpoint is down.
+ */
+export async function notifyOperationalAlerts(
+  status,
+  {
+    webhookUrl = process.env.HERMES_OPS_ALERT_WEBHOOK_URL,
+    statePath = join(process.cwd(), '.runtime', 'ops-monitor-alerts.json'),
+    now = Date.now(),
+    fetchImpl = globalThis.fetch,
+    cooldownMs = Number(process.env.HERMES_OPS_ALERT_COOLDOWN_SECONDS || 3600) * 1000,
+  } = {},
+) {
+  if (!webhookUrl || typeof fetchImpl !== 'function') return { configured: false, sent: 0, skipped: 0, failed: 0 }
+  let parsedUrl
+  try {
+    parsedUrl = new URL(webhookUrl)
+    if (!['https:', 'http:'].includes(parsedUrl.protocol)) throw new Error('unsupported protocol')
+  } catch {
+    return { configured: true, sent: 0, skipped: 0, failed: 0, error: 'invalid webhook URL' }
+  }
+
+  let state = {}
+  try { state = JSON.parse(await readFile(statePath, 'utf8')) } catch { /* first notification */ }
+  const sentAt = state.sentAt && typeof state.sentAt === 'object' ? state.sentAt : {}
+  const issues = status.issues.filter((issue) => ALERTABLE_ISSUE_CODES.has(issue.code))
+  let sent = 0
+  let skipped = 0
+  let failed = 0
+  for (const issue of issues) {
+    const fingerprint = alertFingerprint(issue)
+    if (Number(sentAt[fingerprint]) + cooldownMs > now) {
+      skipped += 1
+      continue
+    }
+    try {
+      const response = await fetchImpl(parsedUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          text: alertMessage(status, issue),
+          service: status.service?.name || process.env.HERMES_SERVICE_NAME || 'hermes-workspace',
+          issue,
+          head: status.head,
+          deployedCommit: status.deployedCommit,
+          observedAt: new Date(now).toISOString(),
+        }),
+        signal: AbortSignal.timeout(5000),
+      })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      sentAt[fingerprint] = now
+      sent += 1
+    } catch (error) {
+      failed += 1
+      console.error(`ops alert delivery failed for ${fingerprint}: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+  await mkdir(resolve(statePath, '..'), { recursive: true })
+  await writeFile(statePath, JSON.stringify({ updatedAt: now, sentAt }, null, 2) + '\n', { mode: 0o600 })
+  return { configured: true, sent, skipped, failed }
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const status = await collectOperationalStatus({ repo: process.argv[2] || process.cwd() })
+  status.notifications = await notifyOperationalAlerts(status)
   console.log(JSON.stringify(status, null, 2))
   if (status.issues.some((issue) => issue.level === 'critical')) process.exitCode = 1
 }

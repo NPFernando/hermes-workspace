@@ -6,4 +6,5 @@ After=hermes-workspace.service
 Type=oneshot
 User=ubuntu
 WorkingDirectory=/home/ubuntu/hermes-workspace-live
+EnvironmentFile=-/home/ubuntu/.hermes/ops-monitor.env
 ExecStart=/home/ubuntu/hermes-workspace-live/scripts/ops-monitor.mjs /home/ubuntu/hermes-workspace-live

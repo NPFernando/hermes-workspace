@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { mkdtemp, mkdir, readFile, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { collectOperationalStatus } from './ops-monitor.mjs'
+import { collectOperationalStatus, notifyOperationalAlerts } from './ops-monitor.mjs'
 
 describe('operational monitor', () => {
   it('detects stale builds, failed deployments, PID changes, and parked stashes', async () => {
@@ -90,5 +90,41 @@ describe('operational monitor', () => {
     const larger = await collectOperationalStatus({ repo: root, statePath, exec: (file, args) => file === 'bash' ? '200000 kB' : exec(file, args) })
     expect(larger.service.memoryGrowthPercent).toBe(100)
     expect(larger.issues).toContainEqual(expect.objectContaining({ code: 'memory_growth', level: 'warning' }))
+  })
+
+  it('delivers alertable findings once per cooldown window', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'hermes-ops-alerts-'))
+    const statePath = join(root, 'alerts.json')
+    const status = {
+      head: 'new-head',
+      deployedCommit: 'old-head',
+      service: { name: 'hermes-workspace' },
+      issues: [
+        { code: 'stale_build', level: 'critical', detail: 'runtime files pending' },
+        { code: 'parked_stashes', level: 'warning', detail: 'not externally alertable' },
+      ],
+    }
+    const requests = []
+    const fetchImpl = async (url, options) => {
+      requests.push({ url: String(url), options })
+      return { ok: true, status: 200 }
+    }
+    const first = await notifyOperationalAlerts(status, { webhookUrl: 'https://alerts.example.test/hook', statePath, now: 1000, fetchImpl })
+    const second = await notifyOperationalAlerts(status, { webhookUrl: 'https://alerts.example.test/hook', statePath, now: 2000, fetchImpl })
+    expect(first).toMatchObject({ configured: true, sent: 1, skipped: 0, failed: 0 })
+    expect(second).toMatchObject({ configured: true, sent: 0, skipped: 1, failed: 0 })
+    expect(requests).toHaveLength(1)
+    expect(JSON.parse(requests[0].options.body)).toMatchObject({
+      service: 'hermes-workspace',
+      issue: status.issues[0],
+      head: 'new-head',
+    })
+  })
+
+  it('fails closed for an invalid or missing webhook URL', async () => {
+    const status = { issues: [{ code: 'oom_event', level: 'critical', detail: 'oom' }] }
+    const fetchImpl = async () => { throw new Error('must not be called') }
+    await expect(notifyOperationalAlerts(status, { webhookUrl: 'file:///tmp/alerts', fetchImpl })).resolves.toMatchObject({ configured: true, sent: 0, failed: 0 })
+    await expect(notifyOperationalAlerts(status, { fetchImpl })).resolves.toMatchObject({ configured: false, sent: 0 })
   })
 })
