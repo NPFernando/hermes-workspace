@@ -5,8 +5,8 @@ import {
   createSessionCookie,
   generateSessionToken,
   isPasswordProtectionEnabled,
+  passwordRole,
   storeSessionToken,
-  verifyPassword,
 } from '../../server/auth-middleware'
 import {
   getClientIp,
@@ -54,10 +54,11 @@ export const Route = createFileRoute('/api/auth')({
 
           const { password, rememberMe } = parsed.data
 
-          // Verify password
-          const valid = verifyPassword(password)
+          // Resolve the least-privileged role without revealing which
+          // credential was accepted.
+          const role = passwordRole(password)
 
-          if (!valid) {
+          if (!role) {
             // Add small delay to prevent brute force
             await new Promise((resolve) => setTimeout(resolve, 1000))
             return json(
@@ -68,7 +69,7 @@ export const Route = createFileRoute('/api/auth')({
 
           // Generate session token
           const token = generateSessionToken()
-          storeSessionToken(token, rememberMe ?? true)
+          storeSessionToken(token, rememberMe ?? true, role)
 
           // Return success with Set-Cookie header
           return json(
