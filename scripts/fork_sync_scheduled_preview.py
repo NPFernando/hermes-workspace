@@ -26,7 +26,7 @@ def write_preview_report(
     remote: str,
     output_dir: Path,
     branch: str | None = None,
-    check_command: str | None = None,
+    check_commands: list[str] | None = None,
     cached: bool = False,
 ) -> Path:
     repo = repo.expanduser().resolve()
@@ -34,7 +34,7 @@ def write_preview_report(
     output_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     generated_at = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
     report_path = output_dir / f'{repo.name}-{generated_at}.json'
-    payload = preview(repo, remote, branch, check_command, cached)
+    payload = preview(repo, remote, branch, check_commands, cached)
     if not isinstance(payload, dict):
         raise RuntimeError('fork preview returned a non-object report')
     payload = {
@@ -57,7 +57,7 @@ def main() -> int:
     parser.add_argument('--repo', type=Path, default=None)
     parser.add_argument('--remote', default=None)
     parser.add_argument('--branch')
-    parser.add_argument('--check-command')
+    parser.add_argument('--check-command', action='append', dest='check_commands')
     parser.add_argument('--cached', action='store_true')
     parser.add_argument(
         '--output-dir',
@@ -75,7 +75,7 @@ def main() -> int:
             remote,
             args.output_dir,
             args.branch,
-            args.check_command,
+            args.check_commands,
             args.cached,
         )
     except Exception as error:  # noqa: BLE001 - CLI must return a concise failure
