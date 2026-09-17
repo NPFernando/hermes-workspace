@@ -15,7 +15,10 @@ const groups = [
   { name: 'workspace-auth', keys: ['HERMES_PASSWORD', 'CLAUDE_PASSWORD'] },
   {
     name: 'authenticated-e2e',
-    keys: ['AUTH_E2E_PASSWORD', 'AUTH_E2E_BASE_URL'],
+    // AUTH_E2E_PASSWORD is the client-side smoke-test variable. The running
+    // workspace accepts the corresponding read-only credential as
+    // HERMES_E2E_PASSWORD from its protected service environment.
+    keys: ['HERMES_E2E_PASSWORD', 'AUTH_E2E_PASSWORD', 'AUTH_E2E_BASE_URL'],
   },
   { name: 'database', keys: ['HERMES_PG_PASSWORD', 'RESEARCH_DATABASE_URL'] },
   {

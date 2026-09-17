@@ -10,6 +10,7 @@ import { dirname, resolve } from 'node:path'
 
 export const DEFAULT_KEYS = [
   'HERMES_PASSWORD',
+  'HERMES_E2E_PASSWORD',
   'AUTH_E2E_PASSWORD',
   'HERMES_PG_PASSWORD',
   'OPENAI_API_KEY',

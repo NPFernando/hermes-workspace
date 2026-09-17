@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { recordRotation, rotationStatus } from './secrets-rotation.mjs'
+import { DEFAULT_KEYS, recordRotation, rotationStatus } from './secrets-rotation.mjs'
 
 describe('secret rotation metadata', () => {
+  it('tracks the production read-only E2E credential separately from the client variable', () => {
+    expect(DEFAULT_KEYS).toContain('HERMES_E2E_PASSWORD')
+    expect(DEFAULT_KEYS).toContain('AUTH_E2E_PASSWORD')
+  })
   it('reports valid, expiring, and expired metadata without exposing values', () => {
     const metadata = { version: 1, secrets: {
       VALID_KEY: { owner: 'ops', source: 'env', rotatedAt: '2026-09-01T00:00:00.000Z', expiresAt: '2026-10-01T00:00:00.000Z' },
