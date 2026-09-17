@@ -202,15 +202,37 @@ async function backupCheck() {
   })
 }
 
+async function forkSyncCheck() {
+  const remote = await command('git', ['remote', 'get-url', 'origin'])
+  const slug = repositorySlug(remote.stdout)
+  if (!slug) return result('unavailable', 'A GitHub repository could not be derived for fork-sync readiness.')
+  const metadata = await command('gh', ['repo', 'view', slug, '--json', 'isFork,parent'], { timeout: 10_000 })
+  if (!metadata.ok) return result('unavailable', 'GitHub fork metadata was not available.')
+  let parsed
+  try { parsed = JSON.parse(metadata.stdout) } catch { return result('unavailable', 'GitHub returned invalid fork metadata.') }
+  if (!parsed.isFork) return result('pass', 'Fork synchronization is not applicable because this repository is not a fork.', { isFork: false, applicable: false })
+
+  const configPath = process.env.HERMES_FORK_SYNC_CONFIG || '/home/ubuntu/.hermes/fork-sync-preview.env'
+  const config = existsSync(configPath)
+  const timerEnabled = await command('systemctl', ['is-enabled', 'hermes-fork-sync-preview.timer'], { timeout: 5_000 })
+  const timerActive = await command('systemctl', ['is-active', 'hermes-fork-sync-preview.timer'], { timeout: 5_000 })
+  const applicable = config && timerEnabled.stdout === 'enabled' && timerActive.stdout === 'active'
+  return result(applicable ? 'pass' : 'fail', applicable
+    ? 'Fork synchronization preview is configured and its timer is active.'
+    : 'Fork synchronization is applicable but its preview config/timer is not ready.',
+  { isFork: true, applicable: true, config, timerEnabled: timerEnabled.stdout === 'enabled', timerActive: timerActive.stdout === 'active', parent: parsed.parent?.fullName ?? null })
+}
+
 export async function buildReadinessReport({ skipTests = false, fetchImpl = fetch } = {}) {
   const originalFetch = globalThis.fetch
   if (fetchImpl !== originalFetch) globalThis.fetch = fetchImpl
   try {
-    const [tests, security, migrations, backups, service, identity] = await Promise.all([
+    const [tests, security, migrations, backups, forkSync, service, identity] = await Promise.all([
       testCheck(skipTests),
       securityCheck(),
       migrationCheck(),
       backupCheck(),
+      forkSyncCheck(),
       serviceCheck(),
       deploymentIdentity(),
     ])
@@ -224,7 +246,7 @@ export async function buildReadinessReport({ skipTests = false, fetchImpl = fetc
       const smokeReport = await runReleaseSmoke(baseUrl, fetchImpl)
       release = result('pass', 'Release smoke passed.', smokeReport)
     } catch (error) { release = result('fail', error instanceof Error ? error.message : String(error)) }
-    const checks = { tests, security, migrations, backups, service, assets, release, deploymentIdentity: identity }
+    const checks = { tests, security, migrations, backups, forkSync, service, assets, release, deploymentIdentity: identity }
     const blockers = Object.entries(checks).filter(([, check]) => check.status === 'fail').map(([name, check]) => `${name}: ${check.detail}`)
     const warnings = Object.entries(checks).filter(([, check]) => ['degraded', 'unavailable', 'not-run'].includes(check.status)).map(([name, check]) => `${name}: ${check.detail}`)
     return { generatedAt: new Date().toISOString(), overall: blockers.length ? 'blocked' : warnings.length ? 'degraded' : 'ready', blockers, warnings, checks }
