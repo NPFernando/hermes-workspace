@@ -125,7 +125,7 @@ try {
   // The login panel is rendered after client hydration. Race it against the
   // authenticated surface so a fast DOMContentLoaded does not skip sign-in.
   const initialAuthTimeout = 60_000
-  const initialAuthState = await Promise.race([
+  const waitForInitialAuthState = () => Promise.race([
     login
       .waitFor({ state: 'visible', timeout: initialAuthTimeout })
       .then(() => 'login')
@@ -135,9 +135,19 @@ try {
       .then(() => 'authenticated')
       .catch(() => null),
   ])
+  let initialAuthState = await waitForInitialAuthState()
+  // A production navigation can return HTTP 200 before the browser receives
+  // the streamed document. Give one transient empty-document response a clean
+  // retry, while retaining the hard timeout for a genuinely broken surface.
+  if (!initialAuthState) {
+    await page
+      .reload({ waitUntil: 'domcontentloaded', timeout: initialAuthTimeout })
+      .catch(() => {})
+    initialAuthState = await waitForInitialAuthState()
+  }
   if (!initialAuthState) {
     throw new Error(
-      `dashboard did not hydrate within ${initialAuthTimeout}ms; ` +
+      `dashboard did not hydrate after initial navigation and one retry; ` +
         `login=${await login.isVisible().catch(() => false)} ` +
         `heading=${await workspaceHeading.isVisible().catch(() => false)} ` +
         `body=${(

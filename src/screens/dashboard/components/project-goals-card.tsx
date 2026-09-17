@@ -15,8 +15,8 @@ type Goal = {
 type LiveReadiness = {
   overall: string
   generatedAt: string
-  blockers: string[]
-  warnings: string[]
+  blockers: Array<string>
+  warnings: Array<string>
 }
 
 // Deliberately declarative: this is the operator-facing cross-project
@@ -34,10 +34,10 @@ const GOALS: Array<Goal> = [
   {
     id: 2,
     title: 'Authenticated production smoke',
-    state: 'blocked',
-    detail: 'Needs local AUTH_E2E_PASSWORD.',
-    evidence: 'Authenticated suite reports missing local secret.',
-    nextAction: 'Configure the secret locally and rerun the browser suite.',
+    state: 'deployed',
+    detail: 'Authenticated browser smoke passes against production.',
+    evidence: 'Live dashboard, finance, Dify, queue, API, and mobile checks.',
+    nextAction: 'Run after each production release.',
   },
   {
     id: 3,
@@ -66,10 +66,10 @@ const GOALS: Array<Goal> = [
   {
     id: 6,
     title: 'Vault recovery tests',
-    state: 'completed',
-    detail: 'Backup, migration, and rollback coverage present.',
+    state: 'active',
+    detail: 'Backup, migration, and rollback coverage is present.',
     evidence: 'Vault backup and recovery test suite.',
-    nextAction: 'Add a scheduled restore drill.',
+    nextAction: 'Add and verify a scheduled restore drill.',
   },
   {
     id: 7,
@@ -161,10 +161,10 @@ const GOALS: Array<Goal> = [
   {
     id: 17,
     title: 'Production observability',
-    state: 'deployed',
-    detail: 'Uptime, memory pressure, OOM, and error alerts.',
-    evidence: 'Service health and alerting checks.',
-    nextAction: 'Tune thresholds from observed production baselines.',
+    state: 'active',
+    detail: 'Health, memory pressure, OOM, and stale-build findings are monitored.',
+    evidence: 'Five-minute systemd monitor; webhook delivery is not configured.',
+    nextAction: 'Configure a secret-safe operator alert endpoint.',
   },
   {
     id: 18,

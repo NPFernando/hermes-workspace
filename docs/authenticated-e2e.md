@@ -34,6 +34,9 @@ settings, or mutate Finance data. It must differ from the high-privilege
 `AUTH_E2E_PASSWORD` Actions secret; the value is never stored in this
 repository.
 
-Then run the **CI** workflow with **Run workflow**. Pull requests without these
-secrets receive an explicit skipped notice; the workflow never prints or
-attempts to discover a password from the runner filesystem.
+Then run the **CI** workflow with **Run workflow** to execute the live journey.
+Pull requests deliberately skip this external-environment check and run the
+local/browser test suites instead; scheduled runs execute it as release
+evidence. This prevents a transient production response from blocking an
+unrelated source-only pull request. The workflow never prints or attempts to
+discover a password from the runner filesystem.

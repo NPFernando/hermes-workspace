@@ -138,9 +138,12 @@ jobs:
         run: pnpm run test:e2e:finance
 
       - name: Run authenticated workspace journey
-        if: ${{ github.event_name == 'schedule' || (env.AUTH_E2E_PASSWORD != '' && env.AUTH_E2E_BASE_URL != '') }}
+        # This talks to an already deployed external workspace. Keep it on the
+        # scheduled/manual release evidence path so a transient production
+        # response cannot make an unrelated pull request look unbuildable.
+        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && env.AUTH_E2E_PASSWORD != '' && env.AUTH_E2E_BASE_URL != '') }}
         run: pnpm run test:e2e:auth
 
       - name: Report authenticated journey skip
-        if: ${{ github.event_name != 'schedule' && (env.AUTH_E2E_PASSWORD == '' || env.AUTH_E2E_BASE_URL == '') }}
-        run: echo '::notice::Authenticated workspace journey skipped; configure AUTH_E2E_PASSWORD and AUTH_E2E_BASE_URL, then rerun workflow_dispatch.'
+        if: ${{ github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || env.AUTH_E2E_PASSWORD == '' || env.AUTH_E2E_BASE_URL == '') }}
+        run: echo '::notice::Authenticated workspace journey is reserved for scheduled/manual release evidence; use workflow_dispatch with AUTH_E2E_PASSWORD and AUTH_E2E_BASE_URL to run it.'
