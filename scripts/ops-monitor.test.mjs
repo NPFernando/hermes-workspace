@@ -127,4 +127,29 @@ describe('operational monitor', () => {
     await expect(notifyOperationalAlerts(status, { webhookUrl: 'file:///tmp/alerts', fetchImpl })).resolves.toMatchObject({ configured: true, sent: 0, failed: 0 })
     await expect(notifyOperationalAlerts(status, { fetchImpl })).resolves.toMatchObject({ configured: false, sent: 0 })
   })
+
+  it('delivers alertable findings through the opt-in Telegram relay', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'hermes-ops-telegram-'))
+    const requests = []
+    const status = {
+      head: 'new-head',
+      deployedCommit: 'old-head',
+      issues: [{ code: 'oom_event', level: 'critical', detail: 'service oom' }],
+    }
+    const fetchImpl = async (url, options) => {
+      requests.push({ url: String(url), options })
+      return { ok: true, status: 200, json: async () => ({ ok: true }) }
+    }
+    const result = await notifyOperationalAlerts(status, {
+      webhookUrl: '',
+      telegramConfig: { token: 'test-token', relayBase: 'https://relay.example.test', chatId: 12345 },
+      statePath: join(root, 'alerts.json'),
+      now: 1000,
+      fetchImpl,
+    })
+    expect(result).toMatchObject({ configured: true, sent: 1, failed: 0 })
+    expect(requests).toHaveLength(1)
+    expect(requests[0].url).toBe('https://relay.example.test/bottest-token/sendMessage')
+    expect(JSON.parse(requests[0].options.body)).toMatchObject({ chat_id: 12345, text: expect.stringContaining('oom_event') })
+  })
 })

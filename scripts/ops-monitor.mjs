@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process'
 import { readFile, stat, writeFile, mkdir } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 const DEFAULT_SERVICE = process.env.HERMES_SERVICE_NAME || 'hermes-workspace'
@@ -136,6 +137,23 @@ function alertMessage(status, issue) {
   return `[${issue.level.toUpperCase()}] Hermes Workspace ${issue.code}: ${issue.detail} (head=${status.head || 'unknown'}, deployed=${status.deployedCommit || 'unknown'})`
 }
 
+async function loadTelegramAlertConfig() {
+  if (process.env.HERMES_OPS_ALERT_TELEGRAM !== '1') return null
+  let token = process.env.TELEGRAM_BOT_TOKEN || ''
+  let relayBase = process.env.TELEGRAM_RELAY_BASE || ''
+  if (!token || !relayBase) {
+    try {
+      const env = await readFile(join(homedir(), '.hermes', '.env'), 'utf8')
+      const value = (name) => env.match(new RegExp(`^${name}=(.*)$`, 'm'))?.[1]?.trim().replace(/^"|"$/g, '') || ''
+      token ||= value('TELEGRAM_BOT_TOKEN')
+      relayBase ||= value('TELEGRAM_RELAY_BASE')
+    } catch { /* report incomplete configuration below */ }
+  }
+  const chatId = Number(process.env.HERMES_OPS_ALERT_TELEGRAM_CHAT_ID)
+  if (!token || !relayBase || !Number.isSafeInteger(chatId)) return { error: 'incomplete Telegram alert configuration' }
+  return { token, relayBase, chatId }
+}
+
 /**
  * Send newly observed operational findings to an explicitly configured
  * webhook. Delivery is deliberately opt-in and best-effort: monitoring must
@@ -145,19 +163,38 @@ export async function notifyOperationalAlerts(
   status,
   {
     webhookUrl = process.env.HERMES_OPS_ALERT_WEBHOOK_URL,
+    telegramConfig,
     statePath = join(process.cwd(), '.runtime', 'ops-monitor-alerts.json'),
     now = Date.now(),
     fetchImpl = globalThis.fetch,
     cooldownMs = Number(process.env.HERMES_OPS_ALERT_COOLDOWN_SECONDS || 3600) * 1000,
   } = {},
 ) {
-  if (!webhookUrl || typeof fetchImpl !== 'function') return { configured: false, sent: 0, skipped: 0, failed: 0 }
-  let parsedUrl
-  try {
-    parsedUrl = new URL(webhookUrl)
-    if (!['https:', 'http:'].includes(parsedUrl.protocol)) throw new Error('unsupported protocol')
-  } catch {
-    return { configured: true, sent: 0, skipped: 0, failed: 0, error: 'invalid webhook URL' }
+  if (typeof fetchImpl !== 'function') return { configured: false, sent: 0, skipped: 0, failed: 0 }
+  let transport
+  if (webhookUrl) {
+    try {
+      const url = new URL(webhookUrl)
+      if (!['https:', 'http:'].includes(url.protocol)) throw new Error('unsupported protocol')
+      transport = { kind: 'webhook', url }
+    } catch {
+      return { configured: true, sent: 0, skipped: 0, failed: 0, error: 'invalid webhook URL' }
+    }
+  } else {
+    const telegram = telegramConfig === undefined ? await loadTelegramAlertConfig() : telegramConfig
+    if (!telegram) return { configured: false, sent: 0, skipped: 0, failed: 0 }
+    if (telegram.error) return { configured: true, sent: 0, skipped: 0, failed: 0, error: telegram.error }
+    try {
+      const relay = new URL(telegram.relayBase)
+      if (!['https:', 'http:'].includes(relay.protocol)) throw new Error('unsupported protocol')
+      transport = {
+        kind: 'telegram',
+        url: new URL(`/bot${telegram.token}/sendMessage`, relay),
+        chatId: telegram.chatId,
+      }
+    } catch {
+      return { configured: true, sent: 0, skipped: 0, failed: 0, error: 'invalid Telegram relay URL' }
+    }
   }
 
   let state = {}
@@ -174,20 +211,28 @@ export async function notifyOperationalAlerts(
       continue
     }
     try {
-      const response = await fetchImpl(parsedUrl, {
+      const text = alertMessage(status, issue)
+      const body = transport.kind === 'telegram'
+        ? { chat_id: transport.chatId, text }
+        : {
+            text,
+            service: status.service?.name || process.env.HERMES_SERVICE_NAME || 'hermes-workspace',
+            issue,
+            head: status.head,
+            deployedCommit: status.deployedCommit,
+            observedAt: new Date(now).toISOString(),
+          }
+      const response = await fetchImpl(transport.url, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          text: alertMessage(status, issue),
-          service: status.service?.name || process.env.HERMES_SERVICE_NAME || 'hermes-workspace',
-          issue,
-          head: status.head,
-          deployedCommit: status.deployedCommit,
-          observedAt: new Date(now).toISOString(),
-        }),
+        body: JSON.stringify(body),
         signal: AbortSignal.timeout(5000),
       })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      if (transport.kind === 'telegram' && typeof response.json === 'function') {
+        const result = await response.json().catch(() => null)
+        if (result?.ok === false) throw new Error('Telegram rejected alert')
+      }
       sentAt[fingerprint] = now
       sent += 1
     } catch (error) {
