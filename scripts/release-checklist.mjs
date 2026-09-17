@@ -21,6 +21,9 @@ export async function runReleaseChecklist({ baseUrl = 'http://127.0.0.1:3000', s
   run('pnpm', ['run', 'check:build-integrity'])
   checks.push({ name: 'build-integrity', ok: true })
 
+  run('pnpm', ['run', 'check:bundle'])
+  checks.push({ name: 'bundle-budget', ok: true })
+
   const active = run('systemctl', ['is-active', service])
   if (active !== 'active') throw new Error(`${service} is ${active || 'unknown'}`)
   checks.push({ name: 'service-active', ok: true, service })
