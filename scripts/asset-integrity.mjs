@@ -49,7 +49,18 @@ export async function runAssetIntegrity(baseUrl, fetchImpl = fetch, initialRoot 
         method: 'GET',
         cache: 'no-store',
       }).catch(() => ({ ok: false, status: 0 }))
-      if (!response.ok) failures.push(`${reference} (HTTP ${response.status})`)
+      if (!response.ok) {
+        failures.push(`${reference} (HTTP ${response.status})`)
+      } else {
+        // Consume the body so undici can release/reuse the connection before
+        // the next asset check. Leaving successful bodies unread can exhaust
+        // the small connection pool on CI runners.
+        try {
+          await response.arrayBuffer()
+        } catch {
+          failures.push(`${reference} (body read failed)`)
+        }
+      }
     }
   }))
 
