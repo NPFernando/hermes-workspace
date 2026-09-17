@@ -8,12 +8,12 @@ export async function runAssetIntegrity(baseUrl, fetchImpl = fetch) {
   const rootUrl = new URL('/', `${baseUrl.replace(/\/$/, '')}/`)
   async function fetchWithRetry(url, options) {
     let lastError
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
         return await fetchImpl(url, options)
       } catch (error) {
         lastError = error
-        if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 150 * (attempt + 1)))
+        if (attempt < 4) await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)))
       }
     }
     throw lastError

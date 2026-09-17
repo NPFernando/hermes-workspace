@@ -25,7 +25,13 @@ async function waitForServer() {
   while (Date.now() < deadline) {
     try {
       const response = await fetch(`${baseUrl}/`, { cache: 'no-store' })
-      if (response.ok) return
+      if (response.ok) {
+        // Drain the readiness response before the integrity pass opens its
+        // own connection. This avoids leaving an undrained keep-alive socket
+        // behind on slower CI runners.
+        await response.arrayBuffer()
+        return
+      }
     } catch {
       // The server is still starting.
     }
