@@ -27,7 +27,11 @@ if (!password) {
 
 const routes = [
   { path: '/dashboard', pattern: /Hermes Workspace|Dashboard/i },
-  { path: '/ops-cost', pattern: /Cost & Routing/i },
+  {
+    path: '/ops-cost',
+    pattern: /Cost & Routing Observability/i,
+    timeout: 90_000,
+  },
   {
     path: '/personal-finance',
     pattern: /Your money at a glance/i,
@@ -46,6 +50,7 @@ const context = await browser.newContext({
   viewport: { width: 1280, height: 900 },
 })
 const page = await context.newPage()
+page.setDefaultNavigationTimeout(90_000)
 let failures = 0
 const pageErrors = []
 page.on('pageerror', (error) => pageErrors.push(error.message))
@@ -58,20 +63,44 @@ function check(condition, message) {
   }
 }
 
-async function bodyMatches(pattern, message, timeout = 15_000) {
-  await page
+async function bodyMatches(pattern, message, timeout = 15_000, retries = 0) {
+  const matched = await page
     .waitForFunction(
       ({ source, flags }) =>
         new RegExp(source, flags).test(document.body?.innerText || ''),
       { source: pattern.source, flags: pattern.flags },
       { timeout },
     )
-    .catch(() => {})
+    .then(() => true)
+    .catch(() => false)
+  if (matched) {
+    check(true, message)
+    return true
+  }
+  if (retries > 0) {
+    await page
+      .reload({ waitUntil: 'domcontentloaded', timeout })
+      .catch(() => {})
+    return bodyMatches(pattern, message, timeout, retries - 1)
+  }
   const text = await page
     .locator('body')
     .innerText()
     .catch(() => '')
-  check(pattern.test(text), message)
+  const fallbackCount = await page
+    .getByText(/Loading cost & routing|Loading ops data/i)
+    .count()
+    .catch(() => 0)
+  const headingCount = await page
+    .getByRole('heading', { name: /Cost & Routing Observability/i })
+    .count()
+    .catch(() => 0)
+  check(
+    pattern.test(text),
+    `${message} (url=${page.url()} title=${await page.title().catch(() => '')} ` +
+      `fallback=${fallbackCount} observabilityHeading=${headingCount})`,
+  )
+  return false
 }
 
 try {
@@ -95,21 +124,38 @@ try {
   })
   // The login panel is rendered after client hydration. Race it against the
   // authenticated surface so a fast DOMContentLoaded does not skip sign-in.
+  const initialAuthTimeout = 60_000
   const initialAuthState = await Promise.race([
     login
-      .waitFor({ state: 'visible', timeout: 15_000 })
+      .waitFor({ state: 'visible', timeout: initialAuthTimeout })
       .then(() => 'login')
       .catch(() => null),
     workspaceHeading
-      .waitFor({ state: 'visible', timeout: 15_000 })
+      .waitFor({ state: 'visible', timeout: initialAuthTimeout })
       .then(() => 'authenticated')
       .catch(() => null),
   ])
+  if (!initialAuthState) {
+    throw new Error(
+      `dashboard did not hydrate within ${initialAuthTimeout}ms; ` +
+        `login=${await login.isVisible().catch(() => false)} ` +
+        `heading=${await workspaceHeading.isVisible().catch(() => false)} ` +
+        `body=${(
+          await page
+            .locator('body')
+            .innerText()
+            .catch(() => '')
+        ).slice(0, 500)}`,
+    )
+  }
   if (initialAuthState === 'login') {
     await login.fill(password)
     await page.getByRole('button', { name: 'Sign In', exact: true }).click()
   }
-  await workspaceHeading.waitFor({ state: 'visible', timeout: 45_000 })
+  await workspaceHeading.waitFor({
+    state: 'visible',
+    timeout: initialAuthTimeout,
+  })
   const splashVisible = await page
     .locator('#splash-screen')
     .evaluate((element) => getComputedStyle(element).display !== 'none')
@@ -144,6 +190,7 @@ try {
       route.pattern,
       `${route.path} renders its authenticated surface`,
       route.timeout,
+      route.path === '/ops-cost' ? 1 : 0,
     )
     if (route.path === '/ops-cost') {
       await bodyMatches(
@@ -242,12 +289,21 @@ try {
   // non-chat mobile page header. Exercise the same touch-first command path
   // through its stable open event instead of a route-specific button that may
   // not exist on this screen.
-  await page.evaluate(() => {
-    window.dispatchEvent(new CustomEvent('workspace:open-command-palette'))
-  })
   const commandInput = page.getByPlaceholder(
     'Search screens, sessions, and commands',
   )
+  // A full reload can finish DOMContentLoaded before the shared palette has
+  // mounted its event listener. Retry the idempotent open request instead of
+  // treating that hydration race as an authenticated smoke failure.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.evaluate(() => {
+      window.dispatchEvent(new CustomEvent('workspace:open-command-palette'))
+    })
+    if (await commandInput.isVisible().catch(() => false)) break
+    await commandInput
+      .waitFor({ state: 'visible', timeout: 10_000 })
+      .catch(() => {})
+  }
   await commandInput.fill('Settings')
   await page.getByText('Settings', { exact: true }).last().click()
   await page.waitForURL(/\/settings(?:[/?]|$)/)

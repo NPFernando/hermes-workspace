@@ -113,7 +113,11 @@ interface SystemMetricsPayload {
     errorRatePercent: number
     averageLatencyMs: number | null
     p95LatencyMs: number | null
-    topRoutes: Array<{ path: string; requests: number; averageLatencyMs: number }>
+    topRoutes: Array<{
+      path: string
+      requests: number
+      averageLatencyMs: number
+    }>
   }
   jobs: {
     totalCronJobs: number | null
@@ -208,7 +212,11 @@ function formatUptime(seconds: number): string {
   const days = Math.floor(seconds / 86400)
   const hours = Math.floor((seconds % 86400) / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
-  return days > 0 ? `${days}d ${hours}h` : hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
+  return days > 0
+    ? `${days}d ${hours}h`
+    : hours > 0
+      ? `${hours}h ${minutes}m`
+      : `${minutes}m`
 }
 
 function OperationalHealthPanel() {
@@ -225,17 +233,32 @@ function OperationalHealthPanel() {
   return (
     <Panel title="Operational health">
       {query.isPending ? (
-        <p className="text-sm text-[var(--theme-muted)]">Loading live health…</p>
+        <p className="text-sm text-[var(--theme-muted)]">
+          Loading live health…
+        </p>
       ) : query.isError || !data ? (
-        <p className="text-sm text-[var(--theme-muted)]">Live health is unavailable.</p>
+        <p className="text-sm text-[var(--theme-muted)]">
+          Live health is unavailable.
+        </p>
       ) : (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-            <StatTile label="Uptime" value={formatUptime(data.process.uptimeSeconds)} />
+            <StatTile
+              label="Uptime"
+              value={formatUptime(data.process.uptimeSeconds)}
+            />
             <StatTile
               label={`API p95 · ${data.api.windowMinutes}m`}
-              value={data.api.p95LatencyMs == null ? '—' : `${data.api.p95LatencyMs}ms`}
-              hint={data.api.averageLatencyMs == null ? undefined : `avg ${data.api.averageLatencyMs}ms`}
+              value={
+                data.api.p95LatencyMs == null
+                  ? '—'
+                  : `${data.api.p95LatencyMs}ms`
+              }
+              hint={
+                data.api.averageLatencyMs == null
+                  ? undefined
+                  : `avg ${data.api.averageLatencyMs}ms`
+              }
             />
             <StatTile
               label="API errors"
@@ -244,23 +267,45 @@ function OperationalHealthPanel() {
             />
             <StatTile
               label="Queue depth"
-              value={data.jobs.queueDepth == null ? '—' : String(data.jobs.queueDepth)}
-              hint={data.jobs.queueRunning == null ? undefined : `${data.jobs.queueRunning} running`}
+              value={
+                data.jobs.queueDepth == null
+                  ? '—'
+                  : String(data.jobs.queueDepth)
+              }
+              hint={
+                data.jobs.queueRunning == null
+                  ? undefined
+                  : `${data.jobs.queueRunning} running`
+              }
             />
             <StatTile
               label="Failed jobs"
-              value={data.jobs.failedCronJobs == null ? '—' : String(data.jobs.failedCronJobs)}
-              hint={data.jobs.queueFailedRecent == null ? undefined : `${data.jobs.queueFailedRecent} queue failures recent`}
+              value={
+                data.jobs.failedCronJobs == null
+                  ? '—'
+                  : String(data.jobs.failedCronJobs)
+              }
+              hint={
+                data.jobs.queueFailedRecent == null
+                  ? undefined
+                  : `${data.jobs.queueFailedRecent} queue failures recent`
+              }
             />
           </div>
           {data.api.topRoutes.length > 0 && (
             <div>
-              <div className="mb-1 text-xs uppercase tracking-wide text-[var(--theme-muted)]">Busy API routes</div>
+              <div className="mb-1 text-xs uppercase tracking-wide text-[var(--theme-muted)]">
+                Busy API routes
+              </div>
               <div className="grid gap-1 text-xs text-[var(--theme-muted)] md:grid-cols-2">
                 {data.api.topRoutes.slice(0, 6).map((route) => (
                   <div key={route.path} className="flex justify-between gap-3">
-                    <code className="truncate text-[var(--theme-text)]">{route.path}</code>
-                    <span className="shrink-0 tabular-nums">{route.requests} · {route.averageLatencyMs}ms avg</span>
+                    <code className="truncate text-[var(--theme-text)]">
+                      {route.path}
+                    </code>
+                    <span className="shrink-0 tabular-nums">
+                      {route.requests} · {route.averageLatencyMs}ms avg
+                    </span>
                   </div>
                 ))}
               </div>
@@ -308,8 +353,13 @@ function ProductionReadinessPanel() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({}),
       })
-      const data = (await response.json()) as { ok?: boolean; error?: string; report?: ReadinessReport }
-      if (!response.ok || !data.ok || !data.report) throw new Error(data.error || `HTTP ${response.status}`)
+      const data = (await response.json()) as {
+        ok?: boolean
+        error?: string
+        report?: ReadinessReport
+      }
+      if (!response.ok || !data.ok || !data.report)
+        throw new Error(data.error || `HTTP ${response.status}`)
       return data.report
     },
   })
@@ -320,8 +370,8 @@ function ProductionReadinessPanel() {
         <p className="max-w-2xl text-sm text-[var(--theme-muted)]">
           Runs tests, security-alert checks, migration and encrypted-backup
           evidence, service health, asset integrity, release smoke, and
-          deployment-identity verification.
-          Missing external evidence is shown as a warning, never as a pass.
+          deployment-identity verification. Missing external evidence is shown
+          as a warning, never as a pass.
         </p>
         <button
           type="button"
@@ -332,22 +382,55 @@ function ProductionReadinessPanel() {
           {query.isFetching ? 'Running checks…' : 'Run readiness report'}
         </button>
       </div>
-      {query.error && <p className="mt-3 text-sm text-[var(--theme-danger)]">{query.error instanceof Error ? query.error.message : 'Readiness report failed.'}</p>}
+      {query.error && (
+        <p className="mt-3 text-sm text-[var(--theme-danger)]">
+          {query.error instanceof Error
+            ? query.error.message
+            : 'Readiness report failed.'}
+        </p>
+      )}
       {report && (
         <div className="mt-4 space-y-3">
-          <div className={`rounded-lg border p-3 text-sm font-semibold ${report.overall === 'ready' ? 'border-[var(--theme-success)]/40 text-[var(--theme-success)]' : report.overall === 'blocked' ? 'border-[var(--theme-danger)]/40 text-[var(--theme-danger)]' : 'border-[var(--theme-warning)]/40 text-[var(--theme-warning)]'}`}>
-            Overall: {report.overall} · {new Date(report.generatedAt).toLocaleString()}
+          <div
+            className={`rounded-lg border p-3 text-sm font-semibold ${report.overall === 'ready' ? 'border-[var(--theme-success)]/40 text-[var(--theme-success)]' : report.overall === 'blocked' ? 'border-[var(--theme-danger)]/40 text-[var(--theme-danger)]' : 'border-[var(--theme-warning)]/40 text-[var(--theme-warning)]'}`}
+          >
+            Overall: {report.overall} ·{' '}
+            {new Date(report.generatedAt).toLocaleString()}
           </div>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {Object.entries(report.checks).map(([name, check]) => (
-              <div key={name} className="rounded-lg border border-[var(--theme-border)] p-2 text-xs">
-                <div className="flex justify-between gap-2 font-semibold"><span>{name}</span><span className={check.status === 'pass' ? 'text-[var(--theme-success)]' : check.status === 'fail' ? 'text-[var(--theme-danger)]' : 'text-[var(--theme-warning)]'}>{check.status}</span></div>
+              <div
+                key={name}
+                className="rounded-lg border border-[var(--theme-border)] p-2 text-xs"
+              >
+                <div className="flex justify-between gap-2 font-semibold">
+                  <span>{name}</span>
+                  <span
+                    className={
+                      check.status === 'pass'
+                        ? 'text-[var(--theme-success)]'
+                        : check.status === 'fail'
+                          ? 'text-[var(--theme-danger)]'
+                          : 'text-[var(--theme-warning)]'
+                    }
+                  >
+                    {check.status}
+                  </span>
+                </div>
                 <p className="mt-1 text-[var(--theme-muted)]">{check.detail}</p>
               </div>
             ))}
           </div>
-          {report.blockers.length > 0 && <p className="text-xs text-[var(--theme-danger)]">Blockers: {report.blockers.join(' · ')}</p>}
-          {report.warnings.length > 0 && <p className="text-xs text-[var(--theme-warning)]">Warnings: {report.warnings.join(' · ')}</p>}
+          {report.blockers.length > 0 && (
+            <p className="text-xs text-[var(--theme-danger)]">
+              Blockers: {report.blockers.join(' · ')}
+            </p>
+          )}
+          {report.warnings.length > 0 && (
+            <p className="text-xs text-[var(--theme-warning)]">
+              Warnings: {report.warnings.join(' · ')}
+            </p>
+          )}
         </div>
       )}
     </Panel>
@@ -369,27 +452,51 @@ export function OpsCostScreen() {
 
   if (opsQuery.isPending) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-center">
-          <div className="spinner-accent spinner-xl mb-3" />
-          <p className="text-sm text-[var(--theme-muted)]">Loading ops data…</p>
+      <div className="mx-auto max-w-5xl space-y-4 overflow-y-auto p-4">
+        <header>
+          <h1 className="text-lg font-semibold text-[var(--theme-text)]">
+            Cost &amp; Routing Observability
+          </h1>
+          <p className="text-xs text-[var(--theme-muted)]">
+            Loading cost and routing metrics…
+          </p>
+        </header>
+        <div className="flex items-center justify-center py-8">
+          <div className="text-center">
+            <div className="spinner-accent spinner-xl mb-3" />
+            <p className="text-sm text-[var(--theme-muted)]">
+              Loading ops data…
+            </p>
+          </div>
         </div>
+        <AgentControlPlane />
       </div>
     )
   }
   if (opsQuery.isError || !opsQuery.data.ok) {
     return (
-      <div className="flex h-full flex-col items-center justify-center p-6 text-center">
-        <p className="text-sm text-[var(--theme-muted)]">
-          Failed to load ops data
-          {opsQuery.data?.error ? `: ${opsQuery.data.error}` : ''}
-        </p>
-        <button
-          onClick={() => void opsQuery.refetch()}
-          className="mt-3 rounded-lg bg-accent-500 px-4 py-2 text-white transition-colors hover:bg-accent-600"
-        >
-          Retry
-        </button>
+      <div className="mx-auto max-w-5xl space-y-4 overflow-y-auto p-4">
+        <header>
+          <h1 className="text-lg font-semibold text-[var(--theme-text)]">
+            Cost &amp; Routing Observability
+          </h1>
+          <p className="text-xs text-[var(--theme-muted)]">
+            Cost metrics are temporarily unavailable.
+          </p>
+        </header>
+        <div className="flex flex-col items-center justify-center p-6 text-center">
+          <p className="text-sm text-[var(--theme-muted)]">
+            Failed to load ops data
+            {opsQuery.data?.error ? `: ${opsQuery.data.error}` : ''}
+          </p>
+          <button
+            onClick={() => void opsQuery.refetch()}
+            className="mt-3 rounded-lg bg-accent-500 px-4 py-2 text-white transition-colors hover:bg-accent-600"
+          >
+            Retry
+          </button>
+        </div>
+        <AgentControlPlane />
       </div>
     )
   }

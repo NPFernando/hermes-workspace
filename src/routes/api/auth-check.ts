@@ -4,48 +4,26 @@ import {
   isAuthenticated,
   isPasswordProtectionEnabled,
 } from '../../server/auth-middleware'
-import { ensureGatewayProbed } from '../../server/gateway-capabilities'
 
 export const Route = createFileRoute('/api/auth-check')({
   server: {
     handlers: {
-      GET: async ({ request }) => {
-        try {
-          // Use ensureGatewayProbed() which handles auto-detection across
-          // multiple ports (8642, 8643) instead of checking a single
-          // hardcoded URL. This was previously a standalone
-          // isBackendReachable() that only tried port 8642 and never
-          // benefited from the gateway-capabilities auto-detection logic.
-          const caps = await ensureGatewayProbed()
-          const reachable = caps.health || caps.chatCompletions || caps.models
-
-          if (!reachable) {
-            return json(
-              {
-                authenticated: false,
-                authRequired: true,
-                error: 'claude_agent_unreachable',
-              },
-              { status: 503 },
-            )
-          }
-        } catch (error) {
-          return json(
-            {
-              authenticated: false,
-              authRequired: true,
-              error:
-                error instanceof DOMException && error.name === 'AbortError'
-                  ? 'claude_agent_timeout'
-                  : 'claude_agent_unreachable',
-            },
-            { status: 503 },
-          )
-        }
-
+      GET: ({ request }) => {
+        // Authentication is independent from gateway availability. A slow or
+        // unreachable gateway must not turn a valid workspace session into a
+        // false logout while the root shell is bootstrapping.
         const authRequired = isPasswordProtectionEnabled()
         const authenticated = isAuthenticated(request)
 
+        if (authRequired && !authenticated) {
+          return json({ authenticated: false, authRequired })
+        }
+
+        // This endpoint is intentionally limited to session state. Gateway
+        // probing can do synchronous setup before its first await and may take
+        // several seconds while the gateway is restarting or under load. It
+        // must not delay this short client-side auth request or make a valid
+        // session look logged out. Gateway health has dedicated endpoints.
         return json({
           authenticated,
           authRequired,
