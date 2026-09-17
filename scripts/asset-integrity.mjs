@@ -9,11 +9,15 @@ export async function runAssetIntegrity(baseUrl, fetchImpl = fetch, initialRoot 
   async function fetchWithRetry(url, options) {
     let lastError
     for (let attempt = 0; attempt < 5; attempt += 1) {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 3_000)
       try {
-        return await fetchImpl(url, options)
+        return await fetchImpl(url, { ...options, signal: controller.signal })
       } catch (error) {
         lastError = error
         if (attempt < 4) await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)))
+      } finally {
+        clearTimeout(timeout)
       }
     }
     throw lastError
