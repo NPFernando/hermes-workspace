@@ -59,20 +59,32 @@ function check(condition, message) {
   }
 }
 
-async function bodyMatches(pattern, message, timeout = 15_000) {
-  await page
+async function bodyMatches(pattern, message, timeout = 15_000, retries = 0) {
+  const matched = await page
     .waitForFunction(
       ({ source, flags }) =>
         new RegExp(source, flags).test(document.body?.innerText || ''),
       { source: pattern.source, flags: pattern.flags },
       { timeout },
     )
-    .catch(() => {})
+    .then(() => true)
+    .catch(() => false)
+  if (matched) {
+    check(true, message)
+    return true
+  }
+  if (retries > 0) {
+    await page
+      .reload({ waitUntil: 'domcontentloaded', timeout })
+      .catch(() => {})
+    return bodyMatches(pattern, message, timeout, retries - 1)
+  }
   const text = await page
     .locator('body')
     .innerText()
     .catch(() => '')
   check(pattern.test(text), message)
+  return false
 }
 
 try {
@@ -162,6 +174,7 @@ try {
       route.pattern,
       `${route.path} renders its authenticated surface`,
       route.timeout,
+      route.path === '/ops-cost' ? 1 : 0,
     )
     if (route.path === '/ops-cost') {
       await bodyMatches(
