@@ -9,6 +9,29 @@ pnpm secrets:status
 
 It never prints, hashes, or copies secret values.
 
+## Rotation metadata and expiry audit
+
+Record rotation metadata without changing the credential itself:
+
+```sh
+pnpm secrets:rotation record AUTH_E2E_PASSWORD \
+  --owner=ci --source=github-actions --expires-at=2026-12-17T00:00:00Z
+```
+
+Review tracked credentials and expiry state:
+
+```sh
+pnpm secrets:rotation status
+```
+
+Metadata is stored under `.runtime/secret-rotation.json` and append-only audit
+events under `.runtime/secret-rotation-audit.jsonl`, both mode `0600`. The tool
+does not load or print values, edit environment files, rotate credentials, or
+claim that a credential is configured merely because rotation metadata exists.
+Expired and soon-to-expire entries are intended to become deployment/readiness
+inputs; the actual credential change remains an explicit provider/GitHub/service
+operation.
+
 ## Credential policy
 
 - `HERMES_PASSWORD` is the live workspace password and grants broad control-plane

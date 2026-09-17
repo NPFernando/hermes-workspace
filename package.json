@@ -38,6 +38,7 @@
     "check:bundle": "node scripts/check-bundle-budget.mjs",
     "check:build-integrity": "node scripts/check-build-integrity.mjs",
     "secrets:status": "node scripts/secrets-status.mjs",
+    "secrets:rotation": "node scripts/secrets-rotation.mjs",
     "check:accessibility": "node scripts/check-theme-contrast.mjs",
     "ops:monitor": "node scripts/ops-monitor.mjs",
     "playground:ws": "node scripts/playground-ws.mjs",
