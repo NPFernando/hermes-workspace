@@ -4,7 +4,7 @@
  * coherent release. This is intentionally independent of authentication so it
  * can run immediately after a deployment restart.
  */
-export async function runAssetIntegrity(baseUrl, fetchImpl = fetch) {
+export async function runAssetIntegrity(baseUrl, fetchImpl = fetch, initialRoot = null) {
   const rootUrl = new URL('/', `${baseUrl.replace(/\/$/, '')}/`)
   async function fetchWithRetry(url, options) {
     let lastError
@@ -19,7 +19,7 @@ export async function runAssetIntegrity(baseUrl, fetchImpl = fetch) {
     throw lastError
   }
 
-  const root = await fetchWithRetry(rootUrl, { cache: 'no-store' })
+  const root = initialRoot || await fetchWithRetry(rootUrl, { cache: 'no-store' })
   if (!root.ok) throw new Error(`asset integrity: HTML shell returned HTTP ${root.status}`)
 
   const html = await root.text()

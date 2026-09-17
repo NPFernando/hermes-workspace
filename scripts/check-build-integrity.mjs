@@ -26,11 +26,7 @@ async function waitForServer() {
     try {
       const response = await fetch(`${baseUrl}/`, { cache: 'no-store' })
       if (response.ok) {
-        // Drain the readiness response before the integrity pass opens its
-        // own connection. This avoids leaving an undrained keep-alive socket
-        // behind on slower CI runners.
-        await response.arrayBuffer()
-        return
+        return response
       }
     } catch {
       // The server is still starting.
@@ -41,8 +37,8 @@ async function waitForServer() {
 }
 
 try {
-  await waitForServer()
-  const result = await runAssetIntegrity(baseUrl)
+  const rootResponse = await waitForServer()
+  const result = await runAssetIntegrity(baseUrl, fetch, rootResponse)
   console.log(`build asset integrity passed: ${result.assetCount} local assets`)
 } catch (error) {
   console.error(`build asset integrity failed: ${error instanceof Error ? error.message : String(error)}`)
