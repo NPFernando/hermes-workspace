@@ -16,6 +16,27 @@ function isRuntimeFile(file) {
 const MEMORY_GROWTH_WARN_PERCENT = Number(process.env.HERMES_OPS_MEMORY_GROWTH_WARN_PERCENT || 25)
 const MEMORY_GROWTH_MIN_KB = Number(process.env.HERMES_OPS_MEMORY_GROWTH_MIN_KB || 64 * 1024)
 const ALERTABLE_ISSUE_CODES = new Set(['stale_build', 'oom_event', 'failed_deploy', 'memory_growth'])
+const MONITOR_ENV_KEYS = new Set([
+  'HERMES_OPS_ALERT_TELEGRAM',
+  'HERMES_OPS_ALERT_TELEGRAM_CHAT_ID',
+  'HERMES_OPS_ALERT_WEBHOOK_URL',
+  'HERMES_OPS_ALERT_COOLDOWN_SECONDS',
+])
+
+async function loadMonitorEnvironment() {
+  const path = process.env.HERMES_OPS_ALERT_ENV_FILE || join(homedir(), '.hermes', 'ops-monitor.env')
+  try {
+    const text = await readFile(path, 'utf8')
+    for (const line of text.split(/\r?\n/)) {
+      const match = line.match(/^\s*([A-Z][A-Z0-9_]*)=(.*)\s*$/)
+      if (!match || !MONITOR_ENV_KEYS.has(match[1]) || process.env[match[1]]) continue
+      process.env[match[1]] = match[2].trim().replace(/^"|"$/g, '')
+    }
+  } catch {
+    // EnvironmentFile loading is handled by systemd; a missing file is a
+    // normal unconfigured state for standalone/read-only invocations.
+  }
+}
 
 function command(file, args, cwd) {
   try { return execFileSync(file, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim() } catch { return '' }
@@ -168,6 +189,7 @@ export async function notifyOperationalAlerts(
     now = Date.now(),
     fetchImpl = globalThis.fetch,
     cooldownMs = Number(process.env.HERMES_OPS_ALERT_COOLDOWN_SECONDS || 3600) * 1000,
+    dryRun = false,
   } = {},
 ) {
   if (typeof fetchImpl !== 'function') return { configured: false, sent: 0, skipped: 0, failed: 0 }
@@ -196,6 +218,10 @@ export async function notifyOperationalAlerts(
       return { configured: true, sent: 0, skipped: 0, failed: 0, error: 'invalid Telegram relay URL' }
     }
   }
+
+  // Test mode validates transport configuration without making a network
+  // request, consuming a notification, or mutating cooldown state.
+  if (dryRun) return { configured: true, sent: 0, skipped: 0, failed: 0, dryRun: true }
 
   let state = {}
   try { state = JSON.parse(await readFile(statePath, 'utf8')) } catch { /* first notification */ }
@@ -246,8 +272,29 @@ export async function notifyOperationalAlerts(
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
+  await loadMonitorEnvironment()
   const status = await collectOperationalStatus({ repo: process.argv[2] || process.cwd() })
-  status.notifications = await notifyOperationalAlerts(status)
+  const cliArgs = process.argv.slice(3)
+  if (cliArgs.includes('--test-alert')) {
+    const send = cliArgs.includes('--send')
+    if (send && process.env.HERMES_OPS_ALERT_TEST_CONFIRM !== '1') {
+      console.error('Refusing to send a test alert: set HERMES_OPS_ALERT_TEST_CONFIRM=1 explicitly.')
+      process.exitCode = 2
+    } else {
+      const testStatus = {
+        ...status,
+        issues: [{
+          level: 'warning',
+          code: 'memory_growth',
+          detail: 'synthetic alert-test finding; no production condition was observed',
+        }],
+      }
+      status.notifications = await notifyOperationalAlerts(testStatus, { dryRun: !send, cooldownMs: 0 })
+      status.alertTest = { mode: send ? 'send' : 'dry-run' }
+    }
+  } else {
+    status.notifications = await notifyOperationalAlerts(status)
+  }
   console.log(JSON.stringify(status, null, 2))
   if (status.issues.some((issue) => issue.level === 'critical')) process.exitCode = 1
 }
