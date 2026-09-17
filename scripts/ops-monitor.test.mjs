@@ -70,4 +70,25 @@ describe('operational monitor', () => {
     expect(status.pendingRuntimeFiles).toEqual(['src/server/example.ts'])
     expect(status.issues).toContainEqual(expect.objectContaining({ code: 'stale_build', level: 'critical' }))
   })
+
+  it('alerts on a sustained resident-memory increase', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'hermes-ops-monitor-'))
+    const statePath = join(root, 'state.json')
+    await writeFile(statePath, JSON.stringify({ residentMemoryKb: 100_000 }))
+    const exec = (file, args) => {
+      if (file === 'git' && args[0] === 'rev-parse') return 'abc'
+      if (file === 'git' && args[0] === 'show') return '100'
+      if (file === 'systemctl') return 'MainPID=22\nExecMainStatus=0\nResult=success\nActiveState=active'
+      if (file === 'bash') return '150000 kB'
+      return ''
+    }
+    const status = await collectOperationalStatus({ repo: root, statePath, exec })
+    expect(status.service.memoryGrowthKb).toBe(50_000)
+    expect(status.issues).not.toContainEqual(expect.objectContaining({ code: 'memory_growth' }))
+
+    await writeFile(statePath, JSON.stringify({ residentMemoryKb: 100_000 }))
+    const larger = await collectOperationalStatus({ repo: root, statePath, exec: (file, args) => file === 'bash' ? '200000 kB' : exec(file, args) })
+    expect(larger.service.memoryGrowthPercent).toBe(100)
+    expect(larger.issues).toContainEqual(expect.objectContaining({ code: 'memory_growth', level: 'warning' }))
+  })
 })
