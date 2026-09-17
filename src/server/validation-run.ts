@@ -169,10 +169,7 @@ function emptyState(): ValidationRunState {
 
 function loadState(): ValidationRunState {
   const db = readFinanceStore()
-  if (!db || !db.settings || typeof db.settings !== 'object') {
-    return emptyState()
-  }
-  const raw = (db.settings as Record<string, unknown>).validationRuns
+  const raw = db.settings.validationRuns
   if (!raw || typeof raw !== 'object') return emptyState()
   const state = raw as Partial<ValidationRunState>
   return {
@@ -400,7 +397,7 @@ export async function startValidationRun(
   const db = readFinanceStore()
   const settings = db.settings as Record<string, unknown>
   const resolvedMode = executionModeForTradingMode(
-    db.settings.tradingMode as string,
+    db.settings.tradingMode,
   )
   if (resolvedMode === 'live' || resolvedMode === null) {
     throw new Error(
@@ -669,7 +666,7 @@ export async function runValidationCycle(
 
   const db = readFinanceStore()
   const resolvedMode = executionModeForTradingMode(
-    db.settings.tradingMode as string,
+    db.settings.tradingMode,
   )
   if (resolvedMode !== run.executionMode) {
     return {
@@ -699,7 +696,7 @@ export async function runValidationCycle(
   const cycle = await runTradingCycle({
     force: options.force === true,
     client: options.client,
-    config: { enabledStrategies: run.strategies } as never,
+    config: { enabledStrategies: run.strategies },
   })
 
   if (cycle.diagnostics) {
