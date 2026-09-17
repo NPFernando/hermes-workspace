@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mkdtemp, readFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { collectOperationalStatus } from './ops-monitor.mjs'
@@ -46,5 +46,28 @@ describe('operational monitor', () => {
     expect(status.deploymentHistory).toEqual(['deploy succeeded at commit abc'])
     expect(status.issues).toContainEqual(expect.objectContaining({ code: 'oom_event', level: 'warning' }))
     expect(status.issues).toContainEqual(expect.objectContaining({ code: 'service_errors', level: 'warning' }))
+  })
+
+  it('reports the deployed commit and pending runtime files', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'hermes-ops-monitor-'))
+    const runtime = join(root, '.runtime')
+    await mkdir(runtime, { recursive: true })
+    await writeFile(join(runtime, 'build-commit'), 'old\n')
+    await mkdir(join(root, 'dist/server'), { recursive: true })
+    const buildPath = join(root, 'dist/server/server.js')
+    await writeFile(buildPath, 'built')
+    await utimes(buildPath, 1, 1)
+    const exec = (file, args) => {
+      if (file === 'git' && args[0] === 'rev-parse') return 'new'
+      if (file === 'git' && args[0] === 'show') return '100'
+      if (file === 'git' && args[0] === 'diff') return 'src/server/example.ts\ndocs/example.md'
+      if (file === 'systemctl') return 'MainPID=22\nExecMainStatus=0\nResult=success\nActiveState=active'
+      return ''
+    }
+    const status = await collectOperationalStatus({ repo: root, statePath: join(runtime, 'state.json'), now: Date.now(), exec })
+    expect(status.deployedCommit).toBe('old')
+    expect(status.pendingFiles).toEqual(['src/server/example.ts', 'docs/example.md'])
+    expect(status.pendingRuntimeFiles).toEqual(['src/server/example.ts'])
+    expect(status.issues).toContainEqual(expect.objectContaining({ code: 'stale_build', level: 'critical' }))
   })
 })

@@ -5,6 +5,13 @@ import { join, resolve } from 'node:path'
 
 const DEFAULT_SERVICE = process.env.HERMES_SERVICE_NAME || 'hermes-workspace'
 
+// Files in these paths are consumed by the running Node/Vite application.
+// Operational/docs/test-only changes should not be mistaken for a stale
+// production artifact when the deployment marker is otherwise current.
+function isRuntimeFile(file) {
+  return /^(src\/|public\/|server-entry\.js$|index\.html$|vite\.config\.|package\.json$|pnpm-lock\.yaml$|electron\/)/.test(file)
+}
+
 function command(file, args, cwd) {
   try { return execFileSync(file, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim() } catch { return '' }
 }
@@ -48,6 +55,12 @@ export async function collectOperationalStatus({
   const head = exec('git', ['rev-parse', 'HEAD'], repo)
   const commitSeconds = Number(exec('git', ['show', '-s', '--format=%ct', 'HEAD'], repo))
   const stashLines = exec('git', ['stash', 'list'], repo)
+  let deployedCommit = ''
+  try { deployedCommit = (await readFile(join(repo, '.runtime', 'build-commit'), 'utf8')).trim() } catch { /* first run */ }
+  const pendingFiles = deployedCommit && head && deployedCommit !== head
+    ? exec('git', ['diff', '--name-only', `${deployedCommit}..${head}`], repo).split(/\r?\n/).filter(Boolean)
+    : []
+  const pendingRuntimeFiles = pendingFiles.filter(isRuntimeFile)
   const buildPath = join(repo, 'dist', 'server', 'server.js')
   let buildMtimeMs = 0
   try { buildMtimeMs = (await stat(buildPath)).mtimeMs } catch { /* reported below */ }
@@ -66,7 +79,13 @@ export async function collectOperationalStatus({
   // Commit timestamps can be ahead of the VM clock (for example, a CI commit
   // created in another timezone). Never call a build stale solely because a
   // future-dated commit compares newer than the artifact.
-  else if (commitSeconds && commitSeconds <= now / 1000 && buildMtimeMs < commitSeconds * 1000) issues.push({ level: 'critical', code: 'stale_build', detail: 'Build artifact predates the current git HEAD.' })
+  else if (commitSeconds && commitSeconds <= now / 1000 && buildMtimeMs < commitSeconds * 1000) {
+    if (pendingRuntimeFiles.length) {
+      issues.push({ level: 'critical', code: 'stale_build', detail: `Build artifact predates current HEAD; ${pendingRuntimeFiles.length} runtime file(s) are pending deployment.` })
+    } else {
+      issues.push({ level: 'warning', code: 'stale_build_metadata', detail: 'Build artifact predates HEAD, but no pending runtime files were detected.' })
+    }
+  }
   if (oomLog.trim()) {
     const serviceOom = oomLog.toLowerCase().includes(service.toLowerCase()) || oomLog.includes(serviceShow.pid)
     issues.push({ level: serviceOom ? 'critical' : 'warning', code: 'oom_event', detail: serviceOom ? 'Kernel journal contains a recent OOM event affecting this service.' : 'Kernel journal contains a recent OOM event affecting another workload.' })
@@ -83,6 +102,9 @@ export async function collectOperationalStatus({
   return {
     checkedAt: now,
     head,
+    deployedCommit,
+    pendingFiles,
+    pendingRuntimeFiles,
     service: { ...serviceShow, uptimeSeconds, residentMemoryKb, oomDetected: Boolean(oomLog.trim()) || serviceShow.oomKilled },
     buildMtimeMs,
     deploymentHistory,
