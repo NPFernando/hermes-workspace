@@ -20,39 +20,12 @@ export const Route = createFileRoute('/api/auth-check')({
           return json({ authenticated: false, authRequired })
         }
 
-        try {
-          // Use ensureGatewayProbed() which handles auto-detection across
-          // multiple ports (8642, 8643) instead of checking a single
-          // hardcoded URL. This was previously a standalone
-          // isBackendReachable() that only tried port 8642 and never
-          // benefited from the gateway-capabilities auto-detection logic.
-          const caps = await ensureGatewayProbed()
-          const reachable = caps.health || caps.chatCompletions || caps.models
-
-          if (!reachable) {
-            return json(
-              {
-                authenticated,
-                authRequired,
-                error: 'claude_agent_unreachable',
-              },
-              { status: authenticated ? 200 : 503 },
-            )
-          }
-        } catch (error) {
-          return json(
-            {
-              authenticated,
-              authRequired,
-              error:
-                error instanceof DOMException && error.name === 'AbortError'
-                  ? 'claude_agent_timeout'
-                  : 'claude_agent_unreachable',
-            },
-            { status: authenticated ? 200 : 503 },
-          )
-        }
-
+        // Do not make session validity depend on the gateway probe. The probe
+        // can take several seconds while the gateway is restarting or under
+        // load; blocking this endpoint would make the browser treat a valid
+        // session as logged out after its short client-side timeout. Gateway
+        // health is reported by its dedicated status surfaces instead.
+        void ensureGatewayProbed().catch(() => undefined)
         return json({
           authenticated,
           authRequired,
