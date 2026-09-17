@@ -1,13 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as os from 'node:os'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type * as LongShortSentimentModule from './long-short-sentiment'
 
 // fetchTopTraderLongShortRatio makes a real network call — mock just that
 // export so tests never hit fapi.binance.com; longShortSentimentDecision
 // (pure, no network) stays real.
 vi.mock('./long-short-sentiment', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./long-short-sentiment')>()
+  const actual = await importOriginal<typeof LongShortSentimentModule>()
   return { ...actual, fetchTopTraderLongShortRatio: vi.fn() }
 })
 
@@ -106,7 +107,7 @@ async function setMode(mode: string) {
 async function armLiveMode() {
   const store = await import('./finance-store')
   const db = store.readFinanceStore()
-  db.settings.tradingMode = 'live_manual_approval' as never
+  db.settings.tradingMode = 'live_manual_approval'
   db.settings.executionAccount = 'binance_live'
   db.settings.liveTradingEnabled = true
   db.settings.liveBinanceApprovedAt = '2026-07-07T00:00:00.000Z'
@@ -171,7 +172,7 @@ async function seedLiveReadyEvidence() {
       closedAt: closedAt(index + 1),
       executionMode: 'shadow_paper',
     })),
-  ] as any
+  ]
   store.writeFinanceStore(db)
 }
 
@@ -350,7 +351,7 @@ describe('runTradingCycle gating', () => {
   it('halts when the kill switch is active', async () => {
     const store = await import('./finance-store')
     const db = store.readFinanceStore()
-    db.settings.tradingMode = 'testnet_execute' as never
+    db.settings.tradingMode = 'testnet_execute'
     db.settings.emergencyKillSwitch = true
     store.writeFinanceStore(db)
     const { runTradingCycle } = await import('./demo-trading-engine')
@@ -375,7 +376,7 @@ describe('runTradingCycle gating', () => {
   it('audits a bailed cycle instead of failing silently', async () => {
     const store = await import('./finance-store')
     const db = store.readFinanceStore()
-    db.settings.tradingMode = 'testnet_execute' as never
+    db.settings.tradingMode = 'testnet_execute'
     db.settings.emergencyKillSwitch = true
     store.writeFinanceStore(db)
     const { runTradingCycle } = await import('./demo-trading-engine')
@@ -581,7 +582,7 @@ describe('runTradingCycle open → close → score', () => {
     const pos = getEngineState().positions[0]
     expect(pos).toBeTruthy()
     // Base quotePerTrade defaults to 25; floored 0.25x multiplier -> ~6.25.
-    expect(pos!.entryQuote).toBeLessThan(10)
+    expect(pos.entryQuote).toBeLessThan(10)
   })
 
   it('leaves sizing unchanged when kellySizingEnabled is on but the strategy has no trade history yet', async () => {
@@ -596,7 +597,7 @@ describe('runTradingCycle open → close → score', () => {
       config: { symbols: ['BTCUSDT'], enabledStrategies: ['rsi_reversion'] },
     })
     expect(baseline.actions.some((a) => a.action === 'OPEN')).toBe(true)
-    const baselineEntryQuote = getEngineState().positions[0]!.entryQuote
+    const baselineEntryQuote = getEngineState().positions[0].entryQuote
 
     const withKelly = await runTradingCycle({
       client: fakeClient() as never,
@@ -1072,7 +1073,7 @@ describe('runTradingCycle open → close → score', () => {
       client: failingSellClient(),
       config: cfg,
     })
-    expect(r2.actions.some((a) => a.reason?.includes('close failed'))).toBe(
+    expect(r2.actions.some((a) => a.reason.includes('close failed'))).toBe(
       true,
     )
     expect(getEngineState().positions[0]?.closeFailureCount).toBe(1)
@@ -1339,7 +1340,7 @@ describe('runTradingCycle live Binance gates', () => {
   it('blocks live mode until app-level live approval is recorded', async () => {
     const store = await import('./finance-store')
     const db = store.readFinanceStore()
-    db.settings.tradingMode = 'live_manual_approval' as never
+    db.settings.tradingMode = 'live_manual_approval'
     db.settings.liveTradingEnabled = true
     db.settings.emergencyKillSwitch = false
     store.writeFinanceStore(db)
@@ -1493,7 +1494,7 @@ describe('runTradingCycle decision-quality safeguards', () => {
         lossStreak: 0,
         updatedAt: new Date().toISOString(),
       },
-    ] as any
+    ]
     store.writeFinanceStore(db)
     const placeOrder = vi.fn()
     const { runTradingCycle } = await import('./demo-trading-engine')
@@ -1655,7 +1656,7 @@ describe('strategy overrides', () => {
         ],
         history: [],
       },
-    } as never
+    }
     store.writeFinanceStore(db)
     const placeOrder = vi.fn(async (order: any) => ({
       symbol: order.symbol,
@@ -1765,7 +1766,7 @@ describe('strategy overrides', () => {
         lossStreak: 0,
         updatedAt,
       },
-    ] as any
+    ]
     store.writeFinanceStore(db)
     const { applyStrategyOverrideRecommendations } =
       await import('./demo-trading-engine')
@@ -1822,7 +1823,7 @@ describe('strategy overrides', () => {
         lossStreak: 0,
         updatedAt: new Date().toISOString(),
       },
-    ] as any
+    ]
     store.writeFinanceStore(db)
     const { applyStrategyOverrideRecommendations, setStrategyOverride } =
       await import('./demo-trading-engine')
@@ -2207,7 +2208,7 @@ describe('sandbox experiments', () => {
         closedAt: new Date(Date.parse(startedAt) + 2000).toISOString(),
         executionMode: 'testnet',
       },
-    ] as any
+    ]
     store.writeFinanceStore(db)
 
     const state = reviewSandboxExperiments()
@@ -2461,7 +2462,7 @@ describe('decisionQualityReport', () => {
         openedAt: closedAt(index),
         closedAt: closedAt(index + 1),
       })),
-    ] as any
+    ]
     store.writeFinanceStore(db)
     const { decisionQualityReport } = await import('./demo-trading-engine')
 
@@ -2511,7 +2512,7 @@ describe('decisionQualityReport', () => {
         openedAt: closedAt(index),
         closedAt: closedAt(index + 1),
       })),
-    ] as any
+    ]
     store.writeFinanceStore(db)
     const { decisionQualityReport } = await import('./demo-trading-engine')
 
@@ -2571,7 +2572,7 @@ describe('decisionQualityReport', () => {
         groupId: 'group-1',
         shadowOfGroupId: 'group-1',
       },
-    ] as any
+    ]
     store.writeFinanceStore(db)
     const { decisionQualityReport } = await import('./demo-trading-engine')
 
@@ -2690,7 +2691,7 @@ describe('learning cycle', () => {
         openedAt: closedAt(index),
         closedAt: closedAt(index + 1),
       })),
-    ] as any
+    ]
     store.writeFinanceStore(db)
     const { learningReport, runLearningCycle } =
       await import('./demo-trading-engine')
@@ -2711,6 +2712,65 @@ describe('learning cycle', () => {
         }),
       ]),
     )
+    expect(learningReport().latestCandidate?.status).toBe('paper_applied')
+  })
+
+  it('skips an override for a strategy outside the registry instead of failing the whole candidate', async () => {
+    // long_short_sentiment is a council member gated by its own settings
+    // flag, not an entry in the STRATEGIES registry — historical evidence
+    // can still name it, and applying its override must not abort the
+    // rest of the candidate (this previously threw uncaught on every
+    // cycle that proposed such an override).
+    await setMode('paper_trade')
+    const store = await import('./finance-store')
+    const db = store.readFinanceStore()
+    const base = Date.now()
+    const closedAt = (index: number) =>
+      new Date(base + index * 1000).toISOString()
+    db.strategy_results = [
+      {
+        kind: 'demo_strategy_score',
+        strategyId: 'long_short_sentiment',
+        trades: 3,
+        wins: 0,
+        losses: 3,
+        totalPnlQuote: -9,
+        score: -1,
+        winRate: 0,
+        avgPnlQuote: -3,
+        lossStreak: 3,
+        updatedAt: closedAt(4),
+      },
+      ...[-3, -2, -4].map((pnl, index) => ({
+        kind: 'demo_trade_log',
+        id: `paper_loss_${index}`,
+        symbol: 'BTCUSDT',
+        strategyId: 'long_short_sentiment',
+        entryPrice: 100,
+        exitPrice: 100 + pnl,
+        quantity: 1,
+        entryQuote: 100,
+        exitQuote: 100 + pnl,
+        pnlQuote: pnl,
+        feesQuote: 0,
+        reason: 'paper loss',
+        openedAt: closedAt(index),
+        closedAt: closedAt(index + 1),
+      })),
+    ]
+    store.writeFinanceStore(db)
+    const { learningReport, runLearningCycle } =
+      await import('./demo-trading-engine')
+
+    const result = runLearningCycle()
+    const nextDb = store.readFinanceStore()
+
+    expect(result.generatedCandidate?.status).toBe('paper_applied')
+    expect(result.appliedCandidate?.status).toBe('paper_applied')
+    expect((nextDb.settings.demoTrading as any).quotePerTrade).toBe(6.25)
+    expect(
+      (nextDb.settings.demoTrading as any).strategyOverrides?.active ?? [],
+    ).toHaveLength(0)
     expect(learningReport().latestCandidate?.status).toBe('paper_applied')
   })
 
@@ -2752,7 +2812,7 @@ describe('learning cycle', () => {
         closedAt: closedAt(index + 1),
         executionMode: 'testnet',
       })),
-    ] as any
+    ]
     store.writeFinanceStore(db)
     const { runLearningCycle } = await import('./demo-trading-engine')
 
@@ -2778,7 +2838,7 @@ describe('learning cycle', () => {
     // the same knob set_demo_config exposes at src/routes/api/finance.ts.
     db.settings.demoTrading = {
       learningPolicy: { autoApplyModes: ['paper_trade', 'testnet_execute'] },
-    } as any
+    }
     const base = Date.now()
     const closedAt = (index: number) =>
       new Date(base + index * 1000).toISOString()
@@ -2813,7 +2873,7 @@ describe('learning cycle', () => {
         closedAt: closedAt(index + 1),
         executionMode: 'testnet',
       })),
-    ] as any
+    ]
     store.writeFinanceStore(db)
     const { learningReport, runLearningCycle } =
       await import('./demo-trading-engine')
@@ -2881,7 +2941,7 @@ describe('learning cycle', () => {
         openedAt: closedAt(index),
         closedAt: closedAt(index + 1),
       })),
-    ] as any
+    ]
     store.writeFinanceStore(db)
     const { runLearningCycle } = await import('./demo-trading-engine')
 
@@ -3008,7 +3068,7 @@ describe('strategyGuardReview', () => {
       strategyGuardMaxPnlQuote: 0,
       strategyGuardAction: 'reduce_size',
       guardEvidenceWindowDays: 14,
-    } as never
+    }
     db.strategy_results = [
       ...Array.from({ length: 4 }, (_, i) => ({
         kind: 'demo_trade_log',
@@ -3027,7 +3087,7 @@ describe('strategyGuardReview', () => {
         closedAt: new Date(now - (9 - i) * 60_000).toISOString(),
         executionMode: 'testnet',
       })),
-    ] as any
+    ]
     store.writeFinanceStore(db)
 
     const { strategyGuardReview } = await import('./demo-trading-engine')
@@ -3065,7 +3125,7 @@ describe('strategyGuardReview', () => {
         ],
         history: [],
       },
-    } as never
+    }
     db.strategy_results = [
       ...Array.from({ length: 4 }, (_, i) => ({
         kind: 'demo_trade_log',
@@ -3084,7 +3144,7 @@ describe('strategyGuardReview', () => {
         closedAt: new Date(now - (9 - i) * 60_000).toISOString(),
         executionMode: 'testnet',
       })),
-    ] as any
+    ]
     store.writeFinanceStore(db)
 
     const { strategyGuardReview } = await import('./demo-trading-engine')
