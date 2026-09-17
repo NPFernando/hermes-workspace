@@ -3,11 +3,14 @@ import { json } from '@tanstack/react-start'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { decryptFinanceBackup, encryptFinanceBackup, verifyFinanceBackup } from '../../server/finance-backup'
 import { readFinanceStore, writeFinanceStore } from '../../server/finance-store'
+import { financeRestorePlan } from '../../server/finance-restore-policy'
 
 type BackupRequest = {
   action?: 'export' | 'restore' | 'verify'
   passphrase?: string
   backup?: unknown
+  mode?: 'preview' | 'apply'
+  confirmation?: string
 }
 
 export const Route = createFileRoute('/api/finance-backup')({
@@ -26,8 +29,20 @@ export const Route = createFileRoute('/api/finance-backup')({
           }
           if (body.action === 'restore') {
             const restored = decryptFinanceBackup(body.backup, body.passphrase)
+            const verification = verifyFinanceBackup(body.backup, body.passphrase)
+            const plan = financeRestorePlan({ mode: body.mode, confirmation: body.confirmation })
+            if (!plan.apply) {
+              return json({
+                ok: true,
+                preview: true,
+                restored: false,
+                schemaVersion: restored.schemaVersion,
+                verification,
+                requiredConfirmation: plan.requiredConfirmation,
+              })
+            }
             writeFinanceStore(restored)
-            return json({ ok: true, restored: true, schemaVersion: restored.schemaVersion })
+            return json({ ok: true, preview: false, restored: true, schemaVersion: restored.schemaVersion, verification })
           }
           return json({ ok: false, error: 'Unsupported backup action.' }, { status: 400 })
         } catch (error) {
