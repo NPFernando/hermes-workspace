@@ -169,10 +169,7 @@ function emptyState(): ValidationRunState {
 
 function loadState(): ValidationRunState {
   const db = readFinanceStore()
-  if (!db || !db.settings || typeof db.settings !== 'object') {
-    return emptyState()
-  }
-  const raw = (db.settings as Record<string, unknown>).validationRuns
+  const raw = db.settings.validationRuns
   if (!raw || typeof raw !== 'object') return emptyState()
   const state = raw as Partial<ValidationRunState>
   return {
@@ -400,7 +397,7 @@ export async function startValidationRun(
   const db = readFinanceStore()
   const settings = db.settings as Record<string, unknown>
   const resolvedMode = executionModeForTradingMode(
-    db.settings.tradingMode as string,
+    db.settings.tradingMode,
   )
   if (resolvedMode === 'live' || resolvedMode === null) {
     throw new Error(
@@ -570,6 +567,12 @@ const RACE_REASON = 'a trading cycle is already in progress'
 const AUTO_CYCLE_INTERVAL_MS = 20 * 60_000
 const AUTO_CYCLE_STALE_AFTER_MS = AUTO_CYCLE_INTERVAL_MS + 60_000
 const AUTO_CYCLE_RECOVERY_COOLDOWN_MS = 5 * 60_000
+
+function validationAutomationDisabled(): boolean {
+  return /^(0|false|no|off)$/i.test(
+    process.env.HERMES_VALIDATION_AUTOMATION?.trim() ?? '',
+  )
+}
 let validationAutomationTimer: ReturnType<typeof setInterval> | null = null
 let validationAutomationTickInProgress = false
 let validationAutomationLastTickAt = 0
@@ -605,6 +608,7 @@ async function runAutomaticValidationTick(source: 'startup' | 'interval' | 'reco
  * so a mode switch or safety halt cannot be bypassed by automation.
  */
 export function ensureValidationRunAutomation(): void {
+  if (validationAutomationDisabled()) return
   if (validationAutomationTimer) return
   appendAuditLog('validation_run_automation_started', {
     cadenceMs: AUTO_CYCLE_INTERVAL_MS,
@@ -662,7 +666,7 @@ export async function runValidationCycle(
 
   const db = readFinanceStore()
   const resolvedMode = executionModeForTradingMode(
-    db.settings.tradingMode as string,
+    db.settings.tradingMode,
   )
   if (resolvedMode !== run.executionMode) {
     return {
@@ -692,7 +696,7 @@ export async function runValidationCycle(
   const cycle = await runTradingCycle({
     force: options.force === true,
     client: options.client,
-    config: { enabledStrategies: run.strategies } as never,
+    config: { enabledStrategies: run.strategies },
   })
 
   if (cycle.diagnostics) {
