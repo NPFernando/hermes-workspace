@@ -33,5 +33,8 @@ The command validates remote access, reads and confirms a new passphrase
 without echoing it or placing it in command arguments, updates only the two
 dedicated keys in `~/.hermes/.env` with mode `0600`, installs/enables the
 versioned systemd timer, and runs one encrypted upload/download round-trip.
+The round-trip is completed before the timer is enabled, so an invalid
+passphrase or remote cannot leave behind a scheduled job that is guaranteed to
+fail.
 It refuses to use a local path as an off-site remote and makes no changes when
 remote validation or passphrase confirmation fails.

@@ -51,11 +51,11 @@ mv -f "$temporary" "$ENV_FILE"
 trap - EXIT
 unset passphrase confirmation
 
+echo 'Configuration staged. Running one encrypted round-trip verification before enabling the timer...'
+HERMES_HOME="$HERMES_HOME_DIR" pnpm --dir "$ROOT_DIR" run finance:offsite-backup
+
 sudo install -m 0644 "$ROOT_DIR/deploy/systemd/hermes-finance-offsite-backup.service" "$UNIT_DIR/"
 sudo install -m 0644 "$ROOT_DIR/deploy/systemd/hermes-finance-offsite-backup.timer" "$UNIT_DIR/"
 sudo systemctl daemon-reload
 sudo systemctl enable --now hermes-finance-offsite-backup.timer
-
-echo 'Backup configuration written and timer enabled. Running one encrypted round-trip verification...'
-HERMES_HOME="$HERMES_HOME_DIR" pnpm --dir "$ROOT_DIR" run finance:offsite-backup
 echo 'Finance off-site backup setup and verification completed.'
