@@ -14,8 +14,15 @@ export async function runReleaseSmoke(baseUrl, fetchImpl = fetch, expectedBuild 
   const assets = await runAssetIntegrity(baseUrl, fetchImpl)
   const auth = await fetchImpl(`${baseUrl}/api/auth-check`, { cache: 'no-store' })
   if (![200, 401, 503].includes(auth.status)) throw new Error(`auth-check returned unexpected HTTP ${auth.status}`)
-  const body = await auth.json().catch(() => null)
-  if (!body || typeof body !== 'object') throw new Error('auth-check returned a non-JSON response')
+  const contentType = auth.headers.get('content-type') || ''
+  const bodyText = await auth.text()
+  let body = null
+  try {
+    body = JSON.parse(bodyText)
+  } catch {
+    throw new Error(`auth-check returned non-JSON HTTP ${auth.status} (${contentType || 'no content type'})`)
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error(`auth-check returned invalid JSON HTTP ${auth.status}`)
   return { rootStatus: root.status, authStatus: auth.status, build: root.headers.get('x-workspace-build'), assetCount: assets.assetCount }
 }
 

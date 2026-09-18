@@ -161,6 +161,11 @@ ROLLBACK_DIR="$(mktemp -d "$RUNTIME_DIR/rollback.XXXXXX")"
 cp -a dist "$ROLLBACK_DIR/dist"
 if [ -f "$BUILD_MARKER" ]; then cp "$BUILD_MARKER" "$ROLLBACK_DIR/build-commit"; fi
 trap rollback_failed_release ERR
+# Vite does not guarantee removal of every previously generated hashed asset.
+# Keep the rollback snapshot, then build from an empty artifact directory so
+# SSR cannot reference a stale client chunk from an earlier release.
+rm -rf dist
+mkdir -p dist/server
 pnpm build
 echo "==> checking built SSR/client asset integrity"
 pnpm run check:build-integrity
