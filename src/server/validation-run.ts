@@ -553,6 +553,11 @@ export async function startValidationRun(
 export interface RunValidationCycleOptions {
   force?: boolean
   client?: BinanceExecutionClient
+  /** Set only by runAutomaticValidationTick — see MIN_AUTO_CYCLE_GAP_MS. A
+   * manual/API-triggered call (the "Run cycle now" button, tests, an
+   * explicit run_validation_cycle request) is never subject to the
+   * automated-cadence floor. */
+  automated?: boolean
 }
 
 export interface RunValidationCycleResult {
@@ -567,6 +572,25 @@ const RACE_REASON = 'a trading cycle is already in progress'
 const AUTO_CYCLE_INTERVAL_MS = 20 * 60_000
 const AUTO_CYCLE_STALE_AFTER_MS = AUTO_CYCLE_INTERVAL_MS + 60_000
 const AUTO_CYCLE_RECOVERY_COOLDOWN_MS = 5 * 60_000
+// The ~20-minute cadence above is enforced only by the setInterval that
+// calls runAutomaticValidationTick — runValidationCycle itself has never
+// had a time-based guard, only cycle/trade *count* budgets. In production
+// this let observably duplicate/concurrent automated triggers (root cause
+// not fully pinned down — the in-memory validationAutomationTimer
+// singleton guard looked correct, but ensureValidationRunAutomation()
+// logged three validation_run_automation_started events ~10s apart during
+// one cold start, implying more than one interval ends up registered at
+// least some of the time) run back-to-back-to-back, each
+// proposing/reapplying the same learning-cycle recommendation. This is a
+// persisted (survives restarts, and — unlike
+// validationAutomationTickInProgress — visible to every timer regardless
+// of which one registered it) floor on how often *automated* ticks can
+// drive one run's cycle, independent of how many timers ask for one.
+// Scoped to RunValidationCycleOptions.automated only — a manual/API call
+// (the "Run cycle now" button, an explicit request, tests) is never
+// subject to it, since those are expected to chain cycles back-to-back
+// (e.g. one to open a position, immediately another to close it).
+const MIN_AUTO_CYCLE_GAP_MS = 60_000
 
 function validationAutomationDisabled(): boolean {
   return /^(0|false|no|off)$/i.test(
@@ -589,7 +613,7 @@ async function runAutomaticValidationTick(source: 'startup' | 'interval' | 'reco
     const active = reviewValidationRuns().active.filter((run) => run.autoRun)
     for (const run of active) {
       try {
-        await runValidationCycle(run.stage)
+        await runValidationCycle(run.stage, { automated: true })
       } catch (error) {
         console.error(
           `[validation-run] automated ${run.stage} cycle failed:`,
@@ -683,6 +707,23 @@ export async function runValidationCycle(
   }
   if (run.progress.tradesClosed >= run.budgets.maxTrades) {
     return endRun(run.id, 'completed', 'trade budget reached')
+  }
+
+  if (
+    options.automated === true &&
+    options.force !== true &&
+    run.progress.lastCycleAt
+  ) {
+    const sinceLastCycleMs = now - new Date(run.progress.lastCycleAt).getTime()
+    if (sinceLastCycleMs < MIN_AUTO_CYCLE_GAP_MS) {
+      return {
+        ok: true,
+        message: `Skipped: last cycle for this run was ${Math.round(sinceLastCycleMs / 1000)}s ago (minimum gap ${MIN_AUTO_CYCLE_GAP_MS / 1000}s).`,
+        run,
+        cycle: null,
+        state,
+      }
+    }
   }
 
   const beforeAt = new Date().toISOString()
