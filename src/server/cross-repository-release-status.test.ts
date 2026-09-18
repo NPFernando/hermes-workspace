@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   getCrossRepositoryReleaseStatus,
-  type ReleaseRepository,
 } from './cross-repository-release-status'
+import type { ReleaseRepository } from './cross-repository-release-status'
 
 const repositories: Array<ReleaseRepository> = [
   { id: 'hermes', label: 'Hermes', slug: 'NPFernando/hermes-workspace' },
@@ -13,7 +13,7 @@ describe('cross-repository release status', () => {
   it('normalizes metadata and the latest workflow into operator-safe statuses', async () => {
     const report = await getCrossRepositoryReleaseStatus({
       repositories,
-      run: async (args) => args[0] === 'repo'
+      run: (args) => args[0] === 'repo'
         ? { stdout: JSON.stringify({ defaultBranchRef: { name: 'main' }, pushedAt: '2026-09-18T00:00:00Z' }), stderr: '' }
         : { stdout: JSON.stringify([{ workflowName: 'CI', status: 'completed', conclusion: 'success', headSha: 'abc123', createdAt: '2026-09-18T01:00:00Z' }]), stderr: '' },
     })
@@ -26,7 +26,7 @@ describe('cross-repository release status', () => {
   it('keeps one repository failure isolated and value-blind', async () => {
     const report = await getCrossRepositoryReleaseStatus({
       repositories,
-      run: async (args) => {
+      run: (args) => {
         if (args.includes('NPFernando/harp-control-plane')) throw new Error('GitHub CLI unavailable')
         return args[0] === 'repo'
           ? { stdout: JSON.stringify({ defaultBranchRef: { name: 'main' } }), stderr: '' }
