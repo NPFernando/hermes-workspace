@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS public.swarm_dispatch_queue_jobs (
   id uuid PRIMARY KEY,
   status text NOT NULL CHECK (status IN (
-    'pending', 'running', 'succeeded', 'failed', 'cancelled', 'interrupted'
+    'pending', 'paused', 'running', 'succeeded', 'failed', 'cancelled', 'interrupted'
   )),
   assignment_count integer NOT NULL CHECK (assignment_count BETWEEN 1 AND 12),
   priority integer NOT NULL DEFAULT 0 CHECK (priority BETWEEN 0 AND 9),
@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.swarm_dispatch_queue_jobs (
   result jsonb,
   error text,
   cancel_requested_at timestamptz,
+  paused_at timestamptz,
   queued_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   started_at timestamptz,
   finished_at timestamptz,
@@ -20,11 +21,19 @@ CREATE TABLE IF NOT EXISTS public.swarm_dispatch_queue_jobs (
 
 -- Explicit migration additions for installations that already have the table.
 ALTER TABLE public.swarm_dispatch_queue_jobs
+  DROP CONSTRAINT IF EXISTS swarm_dispatch_queue_jobs_status_check;
+
+ALTER TABLE public.swarm_dispatch_queue_jobs
+  ADD CONSTRAINT swarm_dispatch_queue_jobs_status_check
+  CHECK (status IN ('pending', 'paused', 'running', 'succeeded', 'failed', 'cancelled', 'interrupted'));
+
+ALTER TABLE public.swarm_dispatch_queue_jobs
   ADD COLUMN IF NOT EXISTS lease_token uuid,
   ADD COLUMN IF NOT EXISTS lease_expires_at timestamptz,
   ADD COLUMN IF NOT EXISTS dead_letter_at timestamptz,
   ADD COLUMN IF NOT EXISTS retry_of_job_id uuid REFERENCES public.swarm_dispatch_queue_jobs(id),
   ADD COLUMN IF NOT EXISTS submission_key text,
+  ADD COLUMN IF NOT EXISTS paused_at timestamptz,
   ADD COLUMN IF NOT EXISTS priority integer NOT NULL DEFAULT 0;
 
 ALTER TABLE public.swarm_dispatch_queue_jobs
