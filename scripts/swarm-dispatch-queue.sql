@@ -64,3 +64,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS swarm_dispatch_queue_retry_once_idx
 CREATE UNIQUE INDEX IF NOT EXISTS swarm_dispatch_queue_submission_once_idx
   ON public.swarm_dispatch_queue_jobs (submission_key)
   WHERE submission_key IS NOT NULL;
+
+-- Durable operator approvals for potentially duplicate dead-letter replays.
+CREATE TABLE IF NOT EXISTS public.swarm_dispatch_queue_retry_audits (
+  id uuid PRIMARY KEY,
+  source_job_id uuid NOT NULL REFERENCES public.swarm_dispatch_queue_jobs(id),
+  retry_job_id uuid NOT NULL REFERENCES public.swarm_dispatch_queue_jobs(id),
+  operator text NOT NULL,
+  approval_note text NOT NULL,
+  duplicate_risk_acknowledged boolean NOT NULL DEFAULT true,
+  already_queued boolean NOT NULL DEFAULT false,
+  approved_at timestamptz NOT NULL DEFAULT clock_timestamp()
+);
+
+CREATE INDEX IF NOT EXISTS swarm_dispatch_queue_retry_audit_recent_idx
+  ON public.swarm_dispatch_queue_retry_audits (approved_at DESC);
+
+CREATE INDEX IF NOT EXISTS swarm_dispatch_queue_retry_audit_source_idx
+  ON public.swarm_dispatch_queue_retry_audits (source_job_id, approved_at DESC);

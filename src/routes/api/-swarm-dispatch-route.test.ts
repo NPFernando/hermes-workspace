@@ -108,7 +108,10 @@ describe('swarm dispatch queue API authorization and retry', () => {
         {
           method: 'PATCH',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ acknowledgePossibleDuplicate: false }),
+          body: JSON.stringify({
+            acknowledgePossibleDuplicate: false,
+            approvalNote: 'Retry reviewed by operator.',
+          }),
         },
       ),
     })
@@ -116,6 +119,7 @@ describe('swarm dispatch queue API authorization and retry', () => {
     expect(retrySwarmDispatchQueueJob).toHaveBeenCalledWith(
       '00000000-0000-4000-8000-000000000000',
       false,
+      { operator: 'authenticated-operator', note: 'Retry reviewed by operator.' },
     )
     expect(response.status).toBe(409)
   })
@@ -128,14 +132,20 @@ describe('swarm dispatch queue API authorization and retry', () => {
       queuedAt: 1,
       retryOfJobId: '00000000-0000-4000-8000-000000000000',
       alreadyQueued: false,
+      auditId: '00000000-0000-4000-8000-000000000002',
     })
     const response = await handlers.PATCH({
       request: new Request(
         'http://localhost/api/swarm-dispatch?id=00000000-0000-4000-8000-000000000000',
         {
           method: 'PATCH',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ acknowledgePossibleDuplicate: true }),
+          headers: {
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            acknowledgePossibleDuplicate: true,
+            approvalNote: 'Retry reviewed by operator.',
+          }),
         },
       ),
     })
@@ -144,6 +154,7 @@ describe('swarm dispatch queue API authorization and retry', () => {
     expect(await response.json()).toMatchObject({
       retryOfJobId: '00000000-0000-4000-8000-000000000000',
       alreadyQueued: false,
+      auditId: '00000000-0000-4000-8000-000000000002',
     })
   })
 })

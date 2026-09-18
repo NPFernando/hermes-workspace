@@ -93,6 +93,16 @@ type QueueStatus = {
     deadLetterAt: number | null
     retryOfJobId: string | null
   }>
+  retryAudits: Array<{
+    id: string
+    sourceJobId: string
+    retryJobId: string
+    operator: string
+    approvalNote: string
+    duplicateRiskAcknowledged: boolean
+    alreadyQueued: boolean
+    approvedAt: number
+  }>
 }
 
 type FollowUpResponse = {
@@ -435,6 +445,13 @@ export function RouterChat({
       'This dispatch may already have reached some agents. Inspect their state first. Retrying can send duplicate prompts. Continue?',
     )
     if (!confirmed) return
+    const approvalNote = window.prompt(
+      'Enter the operator approval reason (8–1,000 characters). This is recorded in the queue audit trail:',
+    )?.trim()
+    if (!approvalNote || approvalNote.length < 8 || approvalNote.length > 1_000) {
+      setDispatchError('A queue retry approval note of 8 to 1,000 characters is required.')
+      return
+    }
     setRetryingQueueId(id)
     try {
       const response = await fetch(
@@ -442,7 +459,10 @@ export function RouterChat({
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ acknowledgePossibleDuplicate: true }),
+          body: JSON.stringify({
+            acknowledgePossibleDuplicate: true,
+            approvalNote,
+          }),
         },
       )
       if (!response.ok) {
@@ -857,6 +877,24 @@ export function RouterChat({
                           ) : null}
                         </div>
                       ))}
+                      {queueStatus.retryAudits.length > 0 ? (
+                        <div className="mt-2 border-t border-[var(--theme-border)] pt-2 text-[10px] opacity-80">
+                          <div className="uppercase tracking-[0.14em] text-[var(--theme-muted)]">
+                            Retry approval audit
+                          </div>
+                          {queueStatus.retryAudits.slice(0, 3).map((audit) => (
+                            <div key={audit.id} className="mt-1">
+                              <span className="text-[var(--theme-accent)]">
+                                {new Date(audit.approvedAt).toLocaleString()}
+                              </span>{' '}
+                              · {audit.operator} · {audit.alreadyQueued ? 'duplicate request' : 'queued'}
+                              <div className="truncate" title={audit.approvalNote}>
+                                {audit.approvalNote}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </>
                   </div>
                 ) : null}
