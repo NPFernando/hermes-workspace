@@ -13,6 +13,27 @@ const baseUrl =
 const browser = await chromium.launch({ headless: true })
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
 const failures = []
+const assetFailures = []
+
+page.on('response', async (response) => {
+  const request = response.request()
+  const resourceType = request.resourceType()
+  const url = response.url()
+  const asset =
+    ['script', 'stylesheet', 'font'].includes(resourceType) ||
+    /\.(?:js|mjs|css|woff2?|ttf|otf)(?:[?#]|$)/i.test(url)
+  if (!asset) return
+  const contentType = response.headers()['content-type'] || ''
+  const expectedType = resourceType === 'stylesheet' ? /text\/css/i : resourceType === 'script' ? /javascript|ecmascript/i : true
+  if (response.status() >= 400 || (expectedType !== true && !expectedType.test(contentType))) {
+    assetFailures.push({
+      resourceType,
+      status: response.status(),
+      contentType,
+      url,
+    })
+  }
+})
 
 try {
   const response = await page.goto(`${baseUrl}/`, {
@@ -33,6 +54,13 @@ try {
       { timeout: 10_000 },
     )
     .catch(() => {})
+  // Allow late stylesheet/script responses to be recorded before the DOM and
+  // keyboard checks run. This remains bounded and does not wait on app polling.
+  await page.waitForTimeout(250)
+  if (assetFailures.length)
+    failures.push(
+      `asset load failures: ${assetFailures.slice(0, 8).map((asset) => `${asset.status} ${asset.resourceType} ${asset.url}`).join('; ')}`,
+    )
 
   const audit = await page.evaluate(() => {
     const visible = (element) => {
@@ -204,6 +232,7 @@ try {
         title: audit.title,
         focusTargets,
         focusPath,
+        assetFailures,
         audit,
         failures,
       },
