@@ -1,8 +1,8 @@
-import { Editor } from '@monaco-editor/react'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { FloppyDiskIcon, LockIcon } from '@hugeicons/core-free-icons'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
+import { LazyMonacoEditor } from '@/components/lazy-monaco-editor'
 
 type SaveState = 'saved' | 'saving' | 'unsaved' | 'error'
 
@@ -101,7 +101,7 @@ function MemoryEditor({
             {error}
           </div>
         ) : (
-          <Editor
+          <LazyMonacoEditor
             height="100%"
             theme={theme === 'dark' ? 'vs-dark' : 'vs-light'}
             language="markdown"
