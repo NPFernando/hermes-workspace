@@ -133,12 +133,13 @@ describe('ops-observability deployment journal', () => {
     const path = join(dir, 'deployment-history.jsonl')
     writeFileSync(path, [
       JSON.stringify({ at: '2026-07-08T00:00:00Z', commit: 'old', build: 'a', service: 'hermes-workspace.service', canary: 'passed', releaseSmoke: 'passed', securityGate: 'passed' }),
-      JSON.stringify({ at: '2026-07-09T00:00:00Z', commit: 'new', previousCommit: 'old', build: 'b', service: 'hermes-workspace.service', canary: 'passed', releaseSmoke: 'passed', securityGate: 'passed', links: { commit: 'https://github.com/example/repo/commit/new', checks: 'https://github.com/example/repo/actions/runs/1' }, approval: { status: 'approved', actor: 'owner' } }),
+      JSON.stringify({ at: '2026-07-09T00:00:00Z', deploymentId: 'deploy-test-2', commit: 'new', previousCommit: 'old', build: 'b', service: 'hermes-workspace.service', canary: 'passed', releaseSmoke: 'passed', securityGate: 'passed', links: { commit: 'https://github.com/example/repo/commit/new', checks: 'https://github.com/example/repo/actions/runs/1' }, approval: { status: 'approved', actor: 'owner' } }),
     ].join('\n') + '\n', 'utf8')
 
     expect(getDeploymentJournal({ path, limit: 1 })).toEqual([
       expect.objectContaining({
         commit: 'new',
+        deploymentId: 'deploy-test-2',
         previousCommit: 'old',
         links: expect.objectContaining({ commit: expect.stringContaining('/commit/new') }),
         approval: expect.objectContaining({ status: 'approved', actor: 'owner' }),

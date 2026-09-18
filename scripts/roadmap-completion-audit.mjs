@@ -241,6 +241,29 @@ function recentAuthenticatedSmokeEvidence(root) {
   }
 }
 
+function recentDeploymentCorrelationEvidence(root) {
+  const path = join(root, '.runtime', 'deployment-history.jsonl')
+  try {
+    return readFileSync(path, 'utf8')
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .slice(-20)
+      .some((line) => {
+        try {
+          const entry = JSON.parse(line)
+          return typeof entry?.deploymentId === 'string' &&
+            entry.deploymentId.length > 0 &&
+            typeof entry.at === 'string' &&
+            typeof entry.commit === 'string'
+        } catch {
+          return false
+        }
+      })
+  } catch {
+    return false
+  }
+}
+
 export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
   const roots = [
     root,
@@ -390,7 +413,7 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
     }
     if (index === 13) {
       const smoke = recentAuthenticatedSmokeEvidence(root)
-      const verified = smoke.ok && smoke.labels.has('ops API returns safe-mode and runtime-build evidence')
+      const verified = smoke.ok && smoke.labels.has('ops API returns safe-mode, runtime-build, and deployment-correlation evidence')
       return evidence(verified, verified ? 'authenticated safe-mode and runtime evidence passed' : `safe-mode evidence: ${smoke.detail}`)
     }
     if (index === 15) {
@@ -411,12 +434,13 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
       const readiness = getReadiness()
       const backupReady = readiness?.checks?.backups?.status === 'pass'
       const runtimeBuildReady = readiness?.checks?.deploymentIdentity?.status === 'pass'
-      const verified = serviceActive && backupReady && Array.isArray(state?.serviceHealthHistory) &&
+      const correlatedDeployment = recentDeploymentCorrelationEvidence(root)
+      const verified = serviceActive && backupReady && correlatedDeployment && Array.isArray(state?.serviceHealthHistory) &&
         state.serviceHealthHistory.length > 0 && existsSync(authFailuresPath) &&
         readFileSync(authFailuresPath, 'utf8').trim().length > 0 && runtimeBuildReady
       return evidence(verified, verified
-        ? 'service history, backup freshness, structured auth evidence, and runtime build identity are coherent'
-        : `service history, backup freshness, structured auth evidence, or runtime build identity is missing/degraded`)
+        ? 'deployment correlation, service history, backup freshness, structured auth evidence, and runtime build identity are coherent'
+        : `deployment correlation, service history, backup freshness, structured auth evidence, or runtime build identity is missing/degraded`)
     }
     if (index === 17) {
       const smoke = recentAuthenticatedSmokeEvidence(root)

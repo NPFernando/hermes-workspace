@@ -308,8 +308,16 @@ try {
         typeof body.safeMode.enabled === 'boolean' &&
         body?.runtimeBuild &&
         ['pass', 'degraded'].includes(body.runtimeBuild.status) &&
-        typeof body.runtimeBuild.detail === 'string',
-      label: 'ops API returns safe-mode and runtime-build evidence',
+        typeof body.runtimeBuild.detail === 'string' &&
+        Array.isArray(body?.deploymentJournal) &&
+        body.deploymentJournal.some(
+          (entry) =>
+            typeof entry?.deploymentId === 'string' &&
+            entry.deploymentId.length > 0 &&
+            typeof entry?.at === 'string' &&
+            typeof entry?.commit === 'string',
+        ),
+      label: 'ops API returns safe-mode, runtime-build, and deployment-correlation evidence',
     },
   ]
   for (const api of authenticatedApiChecks) {

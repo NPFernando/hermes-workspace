@@ -656,6 +656,8 @@ export function getFinanceStorageMonitorSummary(
 
 export interface DeploymentJournalEntry {
   at: string
+  /** Correlates the deployment with service and release evidence when available. */
+  deploymentId?: string | null
   commit: string
   previousCommit: string | null
   build: string
@@ -727,6 +729,7 @@ export function getDeploymentJournal(
       })
       .filter((entry) => {
         if (typeof entry.at !== 'string' || typeof entry.commit !== 'string') return false
+        if (entry.deploymentId != null && typeof entry.deploymentId !== 'string') return false
         if (entry.links != null && typeof entry.links !== 'object') return false
         if (entry.approval != null && typeof entry.approval !== 'object') return false
         return true
