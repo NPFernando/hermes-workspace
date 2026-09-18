@@ -173,6 +173,7 @@ if [ "$PREVIEW" = "1" ]; then
   changed_files=0
   changed_runtime_json='[]'
   migration_json='[]'
+  changed_file_list_json='[]'
   worktree_dirty=false
   [ -n "$WORKTREE_STATUS" ] && worktree_dirty=true
   action=deploy-target
@@ -180,6 +181,7 @@ if [ "$PREVIEW" = "1" ]; then
   if [ "$CURRENT" != "$TARGET" ]; then
     changed_file_list="$(git diff --name-only "$CURRENT" "$TARGET")"
     changed_files="$(printf '%s\n' "$changed_file_list" | sed '/^$/d' | wc -l | tr -d ' ')"
+    changed_file_list_json="$(printf '%s\n' "$changed_file_list" | jq -Rsc 'split("\n") | map(select(length > 0))')"
     changed_runtime_json="$(printf '%s\n' "$changed_file_list" | jq -Rsc 'split("\n") | map(select(length > 0 and test("^(src/|public/|server-entry\\.js$|index\\.html$|vite\\.config\\.|package\\.json$|pnpm-lock\\.yaml$|electron/)")))')"
     migration_json="$(printf '%s\n' "$changed_file_list" | jq -Rsc 'split("\n") | map(select(length > 0 and test("(^|/)(migrations?|schema|.*\\.sql$)"; "i")))')"
   fi
@@ -188,7 +190,55 @@ if [ "$PREVIEW" = "1" ]; then
   rollback_available=false
   [ -d dist ] && rollback_available=true
   rollback_target_json="$(printf '%s' "$rollback_target" | jq -Rsc '.')"
-  printf '%s\n' "{\"preview\":true,\"current\":\"$CURRENT\",\"target\":\"$TARGET\",\"worktreeDirty\":$worktree_dirty,\"changedFiles\":$changed_files,\"changedRuntimeFiles\":$changed_runtime_json,\"migrationFiles\":$migration_json,\"rollbackTarget\":$rollback_target_json,\"rollbackArtifactAvailable\":$rollback_available,\"securityEvidenceRequired\":true,\"action\":\"$action\"}"
+  approval_status="${DEPLOY_APPROVAL_STATUS:-not-requested}"
+  approval_actor="${DEPLOY_APPROVAL_ACTOR:-}"
+  approval_ref="${DEPLOY_APPROVAL_REF:-}"
+  current_image_tag="${DEPLOY_CURRENT_IMAGE_TAG:-${CURRENT_IMAGE_TAG:-}}"
+  target_image_tag="${DEPLOY_IMAGE_TAG:-${TARGET_IMAGE_TAG:-}}"
+  jq -cn \
+    --arg current "$CURRENT" \
+    --arg target "$TARGET" \
+    --arg action "$action" \
+    --arg rollbackTarget "$rollback_target" \
+    --arg approvalStatus "$approval_status" \
+    --arg approvalActor "$approval_actor" \
+    --arg approvalRef "$approval_ref" \
+    --arg currentImageTag "$current_image_tag" \
+    --arg targetImageTag "$target_image_tag" \
+    --argjson changedFileList "$changed_file_list_json" \
+    --argjson changedRuntimeFiles "$changed_runtime_json" \
+    --argjson migrationFiles "$migration_json" \
+    --argjson worktreeDirty "$worktree_dirty" \
+    --argjson changedFiles "$changed_files" \
+    --argjson rollbackArtifactAvailable "$rollback_available" \
+    --arg service "${HERMES_SERVICE_NAME:-hermes-workspace.service}" \
+    '{
+      preview: true,
+      action: $action,
+      current: $current,
+      target: $target,
+      worktreeDirty: $worktreeDirty,
+      changedFiles: $changedFiles,
+      changedFileList: $changedFileList,
+      changedRuntimeFiles: $changedRuntimeFiles,
+      migrationFiles: $migrationFiles,
+      imageTags: {
+        current: (if $currentImageTag == "" then null else $currentImageTag end),
+        target: (if $targetImageTag == "" then null else $targetImageTag end)
+      },
+      rollback: {
+        target: $rollbackTarget,
+        artifactAvailable: $rollbackArtifactAvailable,
+        service: $service
+      },
+      approval: {
+        required: ($current != $target),
+        status: $approvalStatus,
+        actor: (if $approvalActor == "" then null else $approvalActor end),
+        reference: (if $approvalRef == "" then null else $approvalRef end)
+      },
+      securityEvidenceRequired: true
+    }'
   exit 0
 fi
 if [ "$CURRENT" = "$TARGET" ]; then
