@@ -7,7 +7,7 @@
  * green build or a plausible commit from being mistaken for production proof.
  */
 import { execFileSync } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -60,6 +60,35 @@ function recentPassedDrEvidence() {
         try {
           const report = JSON.parse(readFileSync(join(directory, file), 'utf8'))
           return report.ok === true && Array.isArray(report.results) && report.results.every((result) => result.status === 'passed' || result.status === 'skipped')
+        } catch {
+          return false
+        }
+      })
+  } catch {
+    return false
+  }
+}
+
+function recentForkPreviewEvidence() {
+  const directory = process.env.HERMES_FORK_SYNC_REPORT_DIR || join(homedir(), '.hermes-data', 'fork-sync-previews')
+  try {
+    return readdirSync(directory)
+      .filter((file) => file.endsWith('.json'))
+      .map((file) => join(directory, file))
+      .sort((left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs)
+      .some((file) => {
+        try {
+          const report = JSON.parse(readFileSync(file, 'utf8'))
+          const ageMs = Date.now() - statSync(file).mtimeMs
+          const preservation = report.customChangePreservation
+          return ageMs >= 0 && ageMs <= 48 * 60 * 60 * 1000 &&
+            report.scheduled === true &&
+            ['clean', 'changes', 'conflicts'].includes(report.status) &&
+            Array.isArray(report.conflictFiles) &&
+            preservation && typeof preservation.status === 'string' &&
+            Array.isArray(preservation.committedPaths) &&
+            Array.isArray(preservation.untrackedPathsIncluded) &&
+            Array.isArray(preservation.untrackedPathsExcluded)
         } catch {
           return false
         }
@@ -183,6 +212,7 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
     if (index === 9) return recentPassedDrEvidence()
     if (index === 10) return getPerformance()?.ok === true
     if (index === 11) return getReleaseHealth()?.ok === true
+    if (index === 12) return recentForkPreviewEvidence()
     if (index === 14) {
       return getPrivacySecurity()?.ok === true && getReadiness()?.checks?.security?.status === 'pass'
     }
