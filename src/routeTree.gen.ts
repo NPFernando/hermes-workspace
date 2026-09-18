@@ -108,6 +108,7 @@ import { Route as ApiPreviewFileRouteImport } from './routes/api/preview-file'
 import { Route as ApiProductionReadinessRouteImport } from './routes/api/production-readiness'
 import { Route as ApiProviderUsageRouteImport } from './routes/api/provider-usage'
 import { Route as ApiRiskCheckRouteImport } from './routes/api/risk-check'
+import { Route as ApiRoadmapAuditRouteImport } from './routes/api/roadmap-audit'
 import { Route as ApiRouteSisterRouteImport } from './routes/api/route-sister'
 import { Route as ApiSecretRotationRouteImport } from './routes/api/secret-rotation'
 import { Route as ApiSendRouteImport } from './routes/api/send'
@@ -760,6 +761,11 @@ const ApiProviderUsageRoute = ApiProviderUsageRouteImport.update({
 const ApiRiskCheckRoute = ApiRiskCheckRouteImport.update({
   id: '/api/risk-check',
   path: '/api/risk-check',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRoadmapAuditRoute = ApiRoadmapAuditRouteImport.update({
+  id: '/api/roadmap-audit',
+  path: '/api/roadmap-audit',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiRouteSisterRoute = ApiRouteSisterRouteImport.update({
@@ -1658,6 +1664,7 @@ export interface FileRoutesByFullPath {
   '/api/production-readiness': typeof ApiProductionReadinessRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/risk-check': typeof ApiRiskCheckRoute
+  '/api/roadmap-audit': typeof ApiRoadmapAuditRoute
   '/api/route-sister': typeof ApiRouteSisterRoute
   '/api/secret-rotation': typeof ApiSecretRotationRoute
   '/api/send': typeof ApiSendRoute
@@ -1915,6 +1922,7 @@ export interface FileRoutesByTo {
   '/api/production-readiness': typeof ApiProductionReadinessRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/risk-check': typeof ApiRiskCheckRoute
+  '/api/roadmap-audit': typeof ApiRoadmapAuditRoute
   '/api/route-sister': typeof ApiRouteSisterRoute
   '/api/secret-rotation': typeof ApiSecretRotationRoute
   '/api/send': typeof ApiSendRoute
@@ -2174,6 +2182,7 @@ export interface FileRoutesById {
   '/api/production-readiness': typeof ApiProductionReadinessRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/risk-check': typeof ApiRiskCheckRoute
+  '/api/roadmap-audit': typeof ApiRoadmapAuditRoute
   '/api/route-sister': typeof ApiRouteSisterRoute
   '/api/secret-rotation': typeof ApiSecretRotationRoute
   '/api/send': typeof ApiSendRoute
@@ -2434,6 +2443,7 @@ export interface FileRouteTypes {
     | '/api/production-readiness'
     | '/api/provider-usage'
     | '/api/risk-check'
+    | '/api/roadmap-audit'
     | '/api/route-sister'
     | '/api/secret-rotation'
     | '/api/send'
@@ -2691,6 +2701,7 @@ export interface FileRouteTypes {
     | '/api/production-readiness'
     | '/api/provider-usage'
     | '/api/risk-check'
+    | '/api/roadmap-audit'
     | '/api/route-sister'
     | '/api/secret-rotation'
     | '/api/send'
@@ -2949,6 +2960,7 @@ export interface FileRouteTypes {
     | '/api/production-readiness'
     | '/api/provider-usage'
     | '/api/risk-check'
+    | '/api/roadmap-audit'
     | '/api/route-sister'
     | '/api/secret-rotation'
     | '/api/send'
@@ -3208,6 +3220,7 @@ export interface RootRouteChildren {
   ApiProductionReadinessRoute: typeof ApiProductionReadinessRoute
   ApiProviderUsageRoute: typeof ApiProviderUsageRoute
   ApiRiskCheckRoute: typeof ApiRiskCheckRoute
+  ApiRoadmapAuditRoute: typeof ApiRoadmapAuditRoute
   ApiRouteSisterRoute: typeof ApiRouteSisterRoute
   ApiSecretRotationRoute: typeof ApiSecretRotationRoute
   ApiSendRoute: typeof ApiSendRoute
@@ -4020,6 +4033,13 @@ declare module '@tanstack/react-router' {
       path: '/api/risk-check'
       fullPath: '/api/risk-check'
       preLoaderRoute: typeof ApiRiskCheckRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/roadmap-audit': {
+      id: '/api/roadmap-audit'
+      path: '/api/roadmap-audit'
+      fullPath: '/api/roadmap-audit'
+      preLoaderRoute: typeof ApiRoadmapAuditRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/route-sister': {
@@ -5480,6 +5500,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProductionReadinessRoute: ApiProductionReadinessRoute,
   ApiProviderUsageRoute: ApiProviderUsageRoute,
   ApiRiskCheckRoute: ApiRiskCheckRoute,
+  ApiRoadmapAuditRoute: ApiRoadmapAuditRoute,
   ApiRouteSisterRoute: ApiRouteSisterRoute,
   ApiSecretRotationRoute: ApiSecretRotationRoute,
   ApiSendRoute: ApiSendRoute,

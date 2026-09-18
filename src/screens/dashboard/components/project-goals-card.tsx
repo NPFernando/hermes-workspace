@@ -77,6 +77,16 @@ type LiveGoalEvidence = {
   releaseStatus: CrossRepositoryReleaseStatus | null
 }
 
+type RoadmapAudit = {
+  ok: boolean
+  generatedAt: string
+  items: Array<{
+    id: number
+    title: string
+    status: 'verified' | 'implemented-awaiting-live-evidence' | 'missing'
+  }>
+}
+
 // Deliberately declarative: this is the operator-facing cross-project
 // checklist. Runtime health and usage remain sourced from the dashboard API;
 // these records capture the human acceptance state that APIs cannot infer.
@@ -343,6 +353,9 @@ export function ProjectGoalsCard() {
   const [releaseStatusError, setReleaseStatusError] = useState<string | null>(
     null,
   )
+  const [roadmapAudit, setRoadmapAudit] = useState<RoadmapAudit | null>(null)
+  const [roadmapAuditLoading, setRoadmapAuditLoading] = useState(false)
+  const [roadmapAuditError, setRoadmapAuditError] = useState<string | null>(null)
   const liveGoals = useMemo(
     () => goalsWithLiveEvidence(GOALS, { releaseStatus }),
     [releaseStatus],
@@ -420,9 +433,33 @@ export function ProjectGoalsCard() {
     }
   }, [])
 
+  const refreshRoadmapAudit = useCallback(async () => {
+    setRoadmapAuditLoading(true)
+    setRoadmapAuditError(null)
+    try {
+      const response = await fetch('/api/roadmap-audit', {
+        headers: { Accept: 'application/json' },
+      })
+      const data = (await response.json()) as {
+        ok?: boolean
+        error?: string
+        report?: RoadmapAudit
+      }
+      if (!response.ok || !data.ok || !data.report) {
+        throw new Error(data.error || `Roadmap audit failed (${response.status})`)
+      }
+      setRoadmapAudit(data.report)
+    } catch (error) {
+      setRoadmapAuditError(error instanceof Error ? error.message : 'Roadmap audit failed.')
+    } finally {
+      setRoadmapAuditLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     void refreshReadiness()
     void refreshReleaseStatus()
+    void refreshRoadmapAudit()
   }, [refreshReadiness, refreshReleaseStatus])
 
   return (
@@ -491,11 +528,12 @@ export function ProjectGoalsCard() {
             onClick={() => {
               void refreshReadiness()
               void refreshReleaseStatus()
+              void refreshRoadmapAudit()
             }}
-            disabled={readinessLoading || releaseStatusLoading}
+            disabled={readinessLoading || releaseStatusLoading || roadmapAuditLoading}
             className="min-h-9 rounded-lg border border-[var(--theme-accent)] px-3 py-1.5 text-xs font-semibold text-[var(--theme-text)] disabled:opacity-50"
           >
-            {readinessLoading || releaseStatusLoading
+            {readinessLoading || releaseStatusLoading || roadmapAuditLoading
               ? 'Checking…'
               : 'Refresh evidence'}
           </button>
@@ -503,6 +541,11 @@ export function ProjectGoalsCard() {
         {readinessError && (
           <p className="mt-2 text-xs text-[var(--theme-danger)]" role="alert">
             {readinessError}
+          </p>
+        )}
+        {roadmapAuditError && (
+          <p className="mt-2 text-xs text-[var(--theme-danger)]" role="alert">
+            {roadmapAuditError}
           </p>
         )}
         {liveReadiness && (
@@ -757,6 +800,30 @@ export function ProjectGoalsCard() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+        {roadmapAudit && (
+          <div className="mt-3 rounded-md border border-[var(--theme-border)] px-2 py-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-semibold text-[var(--theme-text)]">Roadmap completion audit</span>
+              <span className={roadmapAudit.ok ? 'text-[var(--theme-success)]' : 'text-[var(--theme-warning)]'}>
+                {roadmapAudit.items.filter((item) => item.status === 'verified').length}/{roadmapAudit.items.length} verified
+              </span>
+            </div>
+            <div className="mt-2 space-y-1">
+              {roadmapAudit.items
+                .filter((item) => item.status !== 'verified')
+                .slice(0, 5)
+                .map((item) => (
+                  <div key={item.id} className="flex items-center justify-between gap-2 text-[11px] text-muted">
+                    <span className="truncate">{item.id}. {item.title}</span>
+                    <span className="shrink-0">{item.status === 'missing' ? 'missing' : 'live evidence pending'}</span>
+                  </div>
+                ))}
+            </div>
+            <p className="mt-2 text-[10px] text-muted">
+              Checked {new Date(roadmapAudit.generatedAt).toLocaleString()}; implementation files never count as completion proof.
+            </p>
           </div>
         )}
       </div>
