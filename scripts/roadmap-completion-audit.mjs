@@ -36,9 +36,14 @@ const ROADMAP = [
   ['final roadmap completion audit', ['roadmap-completion-audit.mjs'], 'This audit itself must return ok=true'],
 ]
 
-function command(file, args, cwd) {
+function command(file, args, cwd, env = process.env) {
   try {
-    return execFileSync(file, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+    return execFileSync(file, args, {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env,
+    }).trim()
   } catch {
     return ''
   }
@@ -125,6 +130,7 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
   let deploymentPreview
   let accessibilityReport
   let privacySecurityReport
+  let performanceReport
   const getReadiness = () => {
     if (readinessReport === undefined) {
       readinessReport = parseJson(run(process.execPath, ['scripts/production-readiness.mjs', '--skip-tests', '--json'], root))
@@ -149,10 +155,26 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
     }
     return privacySecurityReport
   }
+  const getPerformance = () => {
+    if (performanceReport === undefined) {
+      const astrologyRoot = roots[1]
+      performanceReport = parseJson(run(
+        process.execPath,
+        ['apps/web/scripts/check-mobile-performance.mjs'],
+        astrologyRoot,
+        {
+          ...process.env,
+          PERF_URL: process.env.ASTROLOGY_PERF_URL || 'https://astrology.fernandofamily.com',
+        },
+      ))
+    }
+    return performanceReport
+  }
   const liveEvidenceFor = (index) => {
     if (index === 5) return getReadiness()?.checks?.configurationPreflight?.status === 'pass'
     if (index === 8) return hasDeploymentPreview(getDeploymentPreview())
     if (index === 9) return recentPassedDrEvidence()
+    if (index === 10) return getPerformance()?.ok === true
     if (index === 14) {
       return getPrivacySecurity()?.ok === true && getReadiness()?.checks?.security?.status === 'pass'
     }
