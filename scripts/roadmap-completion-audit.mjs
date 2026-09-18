@@ -90,6 +90,30 @@ function staticEvidence(roots, files) {
   ))
 }
 
+function parseJson(output) {
+  try {
+    return JSON.parse(output)
+  } catch {
+    return null
+  }
+}
+
+function hasDeploymentPreview(report) {
+  return report?.preview === true &&
+    Array.isArray(report.changedFileList) &&
+    Array.isArray(report.migrationFiles) &&
+    report.rollback && typeof report.rollback === 'object' &&
+    report.approval && typeof report.approval === 'object'
+}
+
+function hasAccessibilityEvidence(report) {
+  return report?.ok === true && report.audit &&
+    Array.isArray(report.audit.unnamed) &&
+    Array.isArray(report.audit.imagesMissingAlt) &&
+    Array.isArray(report.audit.duplicateIds) &&
+    Array.isArray(report.audit.hiddenFocusable)
+}
+
 export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
   const roots = [
     root,
@@ -97,9 +121,51 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
   ]
   const serviceActive = run('systemctl', ['is-active', 'hermes-workspace.service'], root) === 'active'
   const currentHead = run('git', ['rev-parse', 'HEAD'], root)
+  let readinessReport
+  let deploymentPreview
+  let accessibilityReport
+  const getReadiness = () => {
+    if (readinessReport === undefined) {
+      readinessReport = parseJson(run(process.execPath, ['scripts/production-readiness.mjs', '--skip-tests', '--json'], root))
+    }
+    return readinessReport
+  }
+  const getDeploymentPreview = () => {
+    if (deploymentPreview === undefined) {
+      deploymentPreview = parseJson(run('bash', ['scripts/deploy.sh', '--preview'], root))
+    }
+    return deploymentPreview
+  }
+  const getAccessibility = () => {
+    if (accessibilityReport === undefined) {
+      accessibilityReport = parseJson(run(process.execPath, ['scripts/accessibility-browser-smoke.mjs', 'http://127.0.0.1:3000'], root))
+    }
+    return accessibilityReport
+  }
+  const liveEvidenceFor = (index) => {
+    if (index === 5) return getReadiness()?.checks?.configurationPreflight?.status === 'pass'
+    if (index === 8) return hasDeploymentPreview(getDeploymentPreview())
+    if (index === 9) return recentPassedDrEvidence()
+    if (index === 15) return serviceActive && hasAccessibilityEvidence(getAccessibility())
+    if (index === 16) {
+      const statePath = join(root, '.runtime', 'ops-monitor-state.json')
+      const authFailuresPath = join(root, '.runtime', 'auth-failures.jsonl')
+      let state
+      try {
+        state = JSON.parse(readFileSync(statePath, 'utf8'))
+      } catch {
+        state = null
+      }
+      const backupReady = getReadiness()?.checks?.backups?.status === 'pass'
+      return serviceActive && backupReady && Array.isArray(state?.serviceHealthHistory) &&
+        state.serviceHealthHistory.length > 0 && existsSync(authFailuresPath) &&
+        readFileSync(authFailuresPath, 'utf8').trim().length > 0
+    }
+    return false
+  }
   const items = ROADMAP.map(([title, files, liveRequirement], index) => {
     const implementationPresent = staticEvidence(roots, files)
-    const liveEvidence = index === 9 ? recentPassedDrEvidence() : false
+    const liveEvidence = liveEvidenceFor(index)
     return {
       id: index + 1,
       title,
