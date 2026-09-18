@@ -23,6 +23,7 @@
     "test:pg-integration": "tsx scripts/finance-pg-integration.ts",
     "finance:postgres-backup-restore": "tsx scripts/finance-pg-backup-restore.ts",
     "finance:offsite-backup": "tsx scripts/finance-offsite-backup.ts",
+    "dr:exercise": "tsx scripts/disaster-recovery-exercise.ts",
     "finance:offsite-backup:configure": "bash scripts/configure-finance-offsite-backup.sh",
     "finance:audit-retention": "tsx scripts/finance-audit-retention.ts",
     "fork-sync:preview": "python3 scripts/fork_sync_scheduled_preview.py",
