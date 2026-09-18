@@ -54,8 +54,68 @@ record_deployment() {
   local tmp="$journal.tmp"
   local at
   at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  local commit
+  commit="$(git rev-parse HEAD)"
+  local repository_url="${DEPLOY_REPOSITORY_URL:-}"
+  if [[ -z "$repository_url" ]]; then
+    repository_url="$(git remote get-url origin 2>/dev/null || true)"
+  fi
+  repository_url="$(printf '%s' "$repository_url" | sed -E 's#^git@github\.com:#https://github.com/#; s#\.git$##')"
+  local server_url="${GITHUB_SERVER_URL:-https://github.com}"
+  local repository="${GITHUB_REPOSITORY:-}"
+  if [[ -z "$repository" && "$repository_url" =~ ^https://github\.com/([^/]+/[^/]+)$ ]]; then
+    repository="${BASH_REMATCH[1]}"
+  fi
+  local commit_url=""
+  local checks_url="${DEPLOY_CHECKS_URL:-}"
+  local deployment_url="${DEPLOYMENT_URL:-}"
+  if [[ -n "$repository" ]]; then
+    commit_url="${repository_url:-$server_url/$repository}/commit/$commit"
+    if [[ -z "$checks_url" && -n "${GITHUB_RUN_ID:-}" ]]; then
+      checks_url="$server_url/$repository/actions/runs/$GITHUB_RUN_ID"
+    fi
+  fi
+  local approval_status="${DEPLOY_APPROVAL_STATUS:-local-deploy-gate-passed}"
+  local approval_actor="${DEPLOY_APPROVAL_ACTOR:-}"
+  local approval_ref="${DEPLOY_APPROVAL_REF:-}"
   mkdir -p "$RUNTIME_DIR"
-  printf '%s\n' "{\"at\":\"$at\",\"commit\":\"$(git rev-parse HEAD)\",\"previousCommit\":\"$PREVIOUS_DEPLOYMENT_COMMIT\",\"build\":\"$EXPECTED_BUILD\",\"service\":\"hermes-workspace.service\",\"canary\":\"passed\",\"releaseSmoke\":\"passed\",\"securityGate\":\"passed\"}" >> "$journal"
+  jq -cn \
+    --arg at "$at" \
+    --arg commit "$commit" \
+    --arg previousCommit "$PREVIOUS_DEPLOYMENT_COMMIT" \
+    --arg build "$EXPECTED_BUILD" \
+    --arg service "hermes-workspace.service" \
+    --arg canary "passed" \
+    --arg releaseSmoke "passed" \
+    --arg securityGate "passed" \
+    --arg repository "$repository" \
+    --arg commitUrl "$commit_url" \
+    --arg checksUrl "$checks_url" \
+    --arg deploymentUrl "$deployment_url" \
+    --arg approvalStatus "$approval_status" \
+    --arg approvalActor "$approval_actor" \
+    --arg approvalRef "$approval_ref" \
+    '{
+      at: $at,
+      commit: $commit,
+      previousCommit: (if $previousCommit == "" then null else $previousCommit end),
+      build: $build,
+      service: $service,
+      canary: $canary,
+      releaseSmoke: $releaseSmoke,
+      securityGate: $securityGate,
+      links: {
+        repository: (if $repository == "" then null else $repository end),
+        commit: (if $commitUrl == "" then null else $commitUrl end),
+        checks: (if $checksUrl == "" then null else $checksUrl end),
+        deployment: (if $deploymentUrl == "" then null else $deploymentUrl end)
+      },
+      approval: {
+        status: $approvalStatus,
+        actor: (if $approvalActor == "" then null else $approvalActor end),
+        reference: (if $approvalRef == "" then null else $approvalRef end)
+      }
+    }' >> "$journal"
   tail -n 100 "$journal" > "$tmp"
   mv "$tmp" "$journal"
   chmod 600 "$journal"

@@ -660,6 +660,17 @@ export interface DeploymentJournalEntry {
   canary: string
   releaseSmoke: string
   securityGate: string
+  links?: {
+    repository?: string | null
+    commit?: string | null
+    checks?: string | null
+    deployment?: string | null
+  }
+  approval?: {
+    status: string
+    actor?: string | null
+    reference?: string | null
+  }
 }
 
 export function getDeploymentJournal(
@@ -679,7 +690,12 @@ export function getDeploymentJournal(
           return []
         }
       })
-      .filter((entry) => typeof entry.at === 'string' && typeof entry.commit === 'string')
+      .filter((entry) => {
+        if (typeof entry.at !== 'string' || typeof entry.commit !== 'string') return false
+        if (entry.links != null && typeof entry.links !== 'object') return false
+        if (entry.approval != null && typeof entry.approval !== 'object') return false
+        return true
+      })
       .slice(-limit)
       .reverse()
   } catch {

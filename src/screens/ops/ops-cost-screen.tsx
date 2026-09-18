@@ -86,6 +86,17 @@ interface DeploymentJournalEntry {
   canary: string
   releaseSmoke: string
   securityGate: string
+  links?: {
+    repository?: string | null
+    commit?: string | null
+    checks?: string | null
+    deployment?: string | null
+  }
+  approval?: {
+    status: string
+    actor?: string | null
+    reference?: string | null
+  }
 }
 interface FinanceStorageSmokeCronOutput {
   path: string
@@ -582,6 +593,12 @@ export function OpsCostScreen() {
                 </div>
                 <p className="mt-1 text-xs text-[var(--theme-muted)]">
                   {entry.previousCommit ? `from ${entry.previousCommit.slice(0, 12)} · ` : ''}build {entry.build} · canary {entry.canary} · release {entry.releaseSmoke} · security {entry.securityGate}
+                </p>
+                <p className="mt-2 flex flex-wrap gap-3 text-xs">
+                  {entry.links?.commit ? <a className="text-accent-500 underline" href={entry.links.commit} target="_blank" rel="noreferrer">commit</a> : null}
+                  {entry.links?.checks ? <a className="text-accent-500 underline" href={entry.links.checks} target="_blank" rel="noreferrer">checks</a> : null}
+                  {entry.links?.deployment ? <a className="text-accent-500 underline" href={entry.links.deployment} target="_blank" rel="noreferrer">deployment</a> : null}
+                  {entry.approval ? <span className="text-[var(--theme-muted)]">approval: {entry.approval.status}{entry.approval.actor ? ` · ${entry.approval.actor}` : ''}</span> : null}
                 </p>
               </div>
             ))}
