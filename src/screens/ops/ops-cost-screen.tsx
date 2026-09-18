@@ -98,6 +98,11 @@ interface DeploymentJournalEntry {
     reference?: string | null
   }
 }
+interface SafeModeStatus {
+  enabled: boolean
+  source: 'HERMES_SAFE_MODE' | 'disabled'
+  detail: string
+}
 interface FinanceStorageSmokeCronOutput {
   path: string
   outputAt: string
@@ -184,6 +189,7 @@ interface OpsPayload {
   financeStorageMonitor: FinanceStorageMonitorSummary | null
   financeStorageSmokeCron: FinanceStorageSmokeCronSummary | null
   deploymentJournal: Array<DeploymentJournalEntry>
+  safeMode: SafeModeStatus
   headroom: HeadroomStats | null
 }
 
@@ -536,6 +542,7 @@ export function OpsCostScreen() {
     financeStorageSmokeCron,
     deploymentJournal,
     headroom,
+    safeMode,
   } = opsQuery.data
   const runwayDays =
     cost?.remaining != null &&
@@ -581,6 +588,13 @@ export function OpsCostScreen() {
 
       <OperationalHealthPanel />
       <ProductionReadinessPanel />
+
+      <Panel title="External-write safe mode">
+        <div className={safeMode.enabled ? 'text-amber-400' : 'text-emerald-400'}>
+          {safeMode.enabled ? 'ACTIVE — external writes are blocked' : 'DISABLED — normal integration gates apply'}
+        </div>
+        <p className="mt-1 text-xs text-[var(--theme-muted)]">{safeMode.detail}</p>
+      </Panel>
 
       <Panel title="Production change journal">
         {deploymentJournal.length > 0 ? (

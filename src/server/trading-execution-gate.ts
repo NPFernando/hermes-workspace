@@ -1,4 +1,5 @@
 import { isConnectivityBreakerTripped } from './connectivity-breaker'
+import { isSafeModeEnabled } from './safe-mode'
 
 export interface ExecutionGateResult {
   allowed: boolean
@@ -23,6 +24,9 @@ export function executionModeAllowed(
   config: { enabled: boolean },
   disabledReason: string,
 ): ExecutionGateResult {
+  if (isSafeModeEnabled()) {
+    return { allowed: false, reason: 'safe mode is active; external writes are disabled' }
+  }
   if (settings.emergencyKillSwitch) {
     return { allowed: false, reason: 'emergency kill switch is active' }
   }

@@ -14,6 +14,7 @@ import {
   rollbackDifyWorkflow,
   runDifyWorkflow,
 } from '../../server/dify'
+import { ExternalWriteBlockedError } from '../../server/safe-mode'
 
 export const Route = createFileRoute('/api/dify-integration')({
   server: {
@@ -108,7 +109,9 @@ export const Route = createFileRoute('/api/dify-integration')({
               error: safeErrorMessage(error),
               history: getDifyIntegration().history,
             },
-            { status: 400 },
+            {
+              status: error instanceof ExternalWriteBlockedError ? 423 : 400,
+            },
           )
         }
       },

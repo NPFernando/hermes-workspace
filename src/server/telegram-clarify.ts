@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { safeErrorMessage } from './rate-limit'
+import { assertExternalWritesEnabled } from './safe-mode'
 import type { ClarificationQuestion, TaskRecord } from './tasks-store'
 
 // ---------------------------------------------------------------------------
@@ -129,6 +130,7 @@ async function tgPost(
   method: string,
   body: Record<string, unknown>,
 ): Promise<unknown> {
+  assertExternalWritesEnabled(`Telegram ${method}`)
   const res = await fetch(`${cfg.relayBase}/bot${cfg.token}/${method}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -28,6 +28,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import { fetchBinanceKlines } from './binance-market.service'
+import { isSafeModeEnabled } from './safe-mode'
 import {
   appendAuditLog,
   readFinanceStore,
@@ -674,6 +675,7 @@ function gridHermesBin(): string {
   return _gridHermesBin
 }
 function sendGridAlert(message: string): void {
+  if (isSafeModeEnabled()) return
   if (!GRID_ALERTS_ENABLED) return
   if (process.env.VITEST || process.env.NODE_ENV === 'test') return
   try {

@@ -8,6 +8,7 @@ import {
   financeStorageStatus,
 } from './finance-store'
 import { resolveHermesBin } from './hermes-bin'
+import { isSafeModeEnabled } from './safe-mode'
 import type { FinanceStorageHealthStatus } from './finance-store'
 
 export const FINANCE_STORAGE_MONITOR_STATE_PATH = path.join(
@@ -178,6 +179,7 @@ export function formatFinanceStorageOpsAlert(input: {
 }
 
 export function sendFinanceStorageOpsAlert(message: string): boolean {
+  if (isSafeModeEnabled()) return false
   if (envFlagOff('HERMES_FINANCE_STORAGE_ALERTS')) return false
   if (process.env.VITEST || process.env.NODE_ENV === 'test') return false
   const target =

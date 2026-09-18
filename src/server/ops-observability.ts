@@ -22,8 +22,10 @@ import {
   FINANCE_STORAGE_MONITOR_STATE_PATH,
   readFinanceStorageMonitorState,
 } from './finance-storage-monitor'
+import { getSafeModeStatus } from './safe-mode'
 import { getHeadroomStats } from './headroom-client'
 import type { HeadroomStats } from './headroom-client'
+import type { SafeModeStatus } from './safe-mode'
 
 const execFileAsync = promisify(execFile)
 
@@ -720,6 +722,7 @@ export interface OpsObservability {
   deploymentJournal: Array<DeploymentJournalEntry>
   /** Local Headroom compression proxy stats; null when the proxy isn't running. */
   headroom: HeadroomStats | null
+  safeMode: SafeModeStatus
 }
 
 export async function getOpsObservability(): Promise<OpsObservability> {
@@ -754,5 +757,6 @@ export async function getOpsObservability(): Promise<OpsObservability> {
     financeStorageSmokeCron: getFinanceStorageSmokeCronSummary(),
     deploymentJournal: getDeploymentJournal(),
     headroom,
+    safeMode: getSafeModeStatus(),
   }
 }
