@@ -3,9 +3,11 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  compareDifyWorkflowVersions,
   difyConfig,
   getDifyIntegration,
   getDifyStatus,
+  rollbackDifyWorkflow,
   runDifyWorkflow,
   validateDifyPublicInputs,
 } from './dify'
@@ -111,6 +113,28 @@ describe('Dify public workflow adapter', () => {
       'DIFY_WORKFLOWS_JSON',
       JSON.stringify([
         { id: 'public-faq', name: 'Public FAQ', provider: 'Dify Cloud' },
+      ]),
+    )
+  }
+
+  function configureVersions() {
+    vi.stubEnv(
+      'DIFY_WORKFLOW_VERSIONS_JSON',
+      JSON.stringify([
+        {
+          workflowId: 'public-faq',
+          version: '2026-09-15',
+          name: 'Public FAQ stable',
+          description: 'Stable public FAQ workflow',
+          provider: 'Dify Cloud',
+        },
+        {
+          workflowId: 'public-faq',
+          version: '2026-09-16',
+          name: 'Public FAQ revised',
+          description: 'Revised public FAQ workflow',
+          provider: 'Dify Cloud',
+        },
       ]),
     )
   }
@@ -236,6 +260,56 @@ describe('Dify public workflow adapter', () => {
     expect(history[0]).toMatchObject({
       status: 'cancelled',
       error: 'Dify workflow cancelled.',
+    })
+  })
+
+  it('compares configured workflow versions without exposing credentials', () => {
+    configure()
+    configureVersions()
+    const comparison = compareDifyWorkflowVersions(
+      'public-faq',
+      '2026-09-15',
+      '2026-09-16',
+    )
+    expect(comparison.changes).toEqual([
+      {
+        field: 'name',
+        before: 'Public FAQ stable',
+        after: 'Public FAQ revised',
+      },
+      {
+        field: 'description',
+        before: 'Stable public FAQ workflow',
+        after: 'Revised public FAQ workflow',
+      },
+    ])
+    expect(getDifyIntegration()).toMatchObject({
+      versions: [
+        { workflowId: 'public-faq', version: '2026-09-15' },
+        { workflowId: 'public-faq', version: '2026-09-16' },
+      ],
+    })
+    expect(JSON.stringify(getDifyIntegration())).not.toContain('server-only-key')
+  })
+
+  it('rolls back the active workflow mapping only when explicitly enabled', async () => {
+    configure()
+    configureVersions()
+    vi.stubEnv('DIFY_WORKFLOW_ROLLBACK_ENABLED', 'true')
+    const directory = await mkdtemp(join(tmpdir(), 'dify-version-state-'))
+    vi.stubEnv('HERMES_WORKSPACE_STATE_DIR', directory)
+    const integration = rollbackDifyWorkflow(
+      'public-faq',
+      '2026-09-15',
+      'Restore stable public FAQ after review.',
+    )
+    expect(integration.activeVersions).toEqual({
+      'public-faq': '2026-09-15',
+    })
+    expect(integration.rollbackHistory[0]).toMatchObject({
+      workflowId: 'public-faq',
+      version: '2026-09-15',
+      requestedBy: 'authenticated-operator',
     })
   })
 })

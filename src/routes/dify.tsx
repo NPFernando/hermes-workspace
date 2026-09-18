@@ -1,6 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
-import type { DifyIntegration, DifyStatus } from '@/server/dify'
+import type {
+  DifyIntegration,
+  DifyStatus,
+  DifyWorkflowComparison,
+} from '@/server/dify'
 import { usePageTitle } from '@/hooks/use-page-title'
 import { FeatureNotReady } from '@/components/feature-not-ready'
 
@@ -22,6 +26,12 @@ function DifyRoute() {
   const [output, setOutput] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [compareFrom, setCompareFrom] = useState('')
+  const [compareTo, setCompareTo] = useState('')
+  const [comparison, setComparison] =
+    useState<DifyWorkflowComparison | null>(null)
+  const [rollbackNote, setRollbackNote] = useState('')
+  const [rollbackBusy, setRollbackBusy] = useState(false)
   const runController = useRef<AbortController | null>(null)
 
   async function refreshIntegration() {
@@ -114,6 +124,72 @@ function DifyRoute() {
 
   function cancelWorkflow() {
     runController.current?.abort('Cancelled by operator.')
+  }
+
+  const workflowVersions = (integration?.versions ?? []).filter(
+    (version) => version.workflowId === workflowId,
+  )
+
+  async function compareVersions() {
+    if (!compareFrom || !compareTo || compareFrom === compareTo) return
+    setError(null)
+    try {
+      const response = await fetch('/api/dify-integration', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'compare',
+          workflowId,
+          fromVersion: compareFrom,
+          toVersion: compareTo,
+        }),
+      })
+      const data = (await response.json()) as {
+        ok?: boolean
+        error?: string
+        comparison?: DifyWorkflowComparison
+      }
+      if (!response.ok || !data.ok || !data.comparison)
+        throw new Error(data.error || `Comparison failed (HTTP ${response.status})`)
+      setComparison(data.comparison)
+    } catch (compareError) {
+      setError(
+        compareError instanceof Error
+          ? compareError.message
+          : 'Workflow comparison failed.',
+      )
+    }
+  }
+
+  async function rollbackWorkflow() {
+    if (!compareFrom || !rollbackNote.trim()) return
+    setRollbackBusy(true)
+    setError(null)
+    try {
+      const response = await fetch('/api/dify-integration', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'rollback',
+          workflowId,
+          version: compareFrom,
+          note: rollbackNote,
+        }),
+      })
+      const data = (await response.json()) as IntegrationResponse
+      if (!response.ok || !data.ok)
+        throw new Error(data.error || `Rollback failed (HTTP ${response.status})`)
+      setIntegration(data)
+      setRollbackNote('')
+    } catch (rollbackError) {
+      setError(
+        rollbackError instanceof Error
+          ? rollbackError.message
+          : 'Workflow rollback failed.',
+      )
+    } finally {
+      setRollbackBusy(false)
+    }
   }
 
   return (
@@ -262,6 +338,111 @@ function DifyRoute() {
           </div>
         </section>
       </div>
+      <section className="mt-4 max-w-5xl rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">Workflow versions</h2>
+            <p className="mt-1 text-sm text-[var(--theme-muted)]">
+              Compare configured public workflow mappings and, when explicitly
+              enabled by the server, restore a previous mapping with an audit
+              note. This does not mutate the external Dify service.
+            </p>
+          </div>
+          <span className="rounded-full border border-[var(--theme-border)] px-3 py-1 text-xs text-[var(--theme-muted)]">
+            {integration?.rollbackEnabled ? 'Rollback enabled' : 'Rollback locked'}
+          </span>
+        </div>
+        {workflowVersions.length >= 2 ? (
+          <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+            <label className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
+              Compare from
+              <select
+                value={compareFrom}
+                onChange={(event) => setCompareFrom(event.target.value)}
+                className="mt-1 min-h-11 w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 text-sm font-normal normal-case tracking-normal"
+              >
+                <option value="">Select version</option>
+                {workflowVersions.map((version) => (
+                  <option key={version.version} value={version.version}>
+                    v{version.version} · {version.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
+              Compare to
+              <select
+                value={compareTo}
+                onChange={(event) => setCompareTo(event.target.value)}
+                className="mt-1 min-h-11 w-full rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 text-sm font-normal normal-case tracking-normal"
+              >
+                <option value="">Select version</option>
+                {workflowVersions.map((version) => (
+                  <option key={version.version} value={version.version}>
+                    v{version.version} · {version.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              disabled={!compareFrom || !compareTo || compareFrom === compareTo}
+              onClick={() => void compareVersions()}
+              className="min-h-11 rounded-xl border border-[var(--theme-border)] px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Compare
+            </button>
+          </div>
+        ) : (
+          <p className="mt-4 rounded-xl border border-[var(--theme-border)] p-3 text-sm text-[var(--theme-muted)]">
+            Configure at least two entries for this workflow in
+            DIFY_WORKFLOW_VERSIONS_JSON to compare or restore versions.
+          </p>
+        )}
+        {comparison && (
+          <div className="mt-4 rounded-xl border border-[var(--theme-border)] p-4 text-sm">
+            <p className="font-medium">
+              v{comparison.fromVersion} → v{comparison.toVersion}
+            </p>
+            {comparison.changes.length ? (
+              <div className="mt-2 space-y-2">
+                {comparison.changes.map((change) => (
+                  <div key={change.field} className="grid gap-1 md:grid-cols-[9rem_1fr_1fr]">
+                    <span className="text-[var(--theme-muted)]">{change.field}</span>
+                    <code className="break-all text-xs">{change.before ?? '—'}</code>
+                    <code className="break-all text-xs">{change.after ?? '—'}</code>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-[var(--theme-muted)]">No configured metadata differences.</p>
+            )}
+            <div className="mt-4 flex flex-wrap gap-2">
+              <input
+                value={rollbackNote}
+                onChange={(event) => setRollbackNote(event.target.value)}
+                maxLength={500}
+                placeholder="Rollback reason (8–500 characters)"
+                className="min-h-11 min-w-64 flex-1 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-bg)] px-3 text-sm"
+              />
+              <button
+                type="button"
+                disabled={!integration?.rollbackEnabled || rollbackBusy || !rollbackNote.trim()}
+                onClick={() => void rollbackWorkflow()}
+                className="min-h-11 rounded-xl bg-[var(--theme-warning)] px-4 text-sm font-semibold text-[var(--theme-bg)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {rollbackBusy ? 'Restoring…' : `Restore v${comparison.fromVersion}`}
+              </button>
+            </div>
+          </div>
+        )}
+        {(integration?.rollbackHistory.length ?? 0) > 0 && (
+          <div className="mt-4 text-xs text-[var(--theme-muted)]">
+            Last restore: v{integration?.rollbackHistory[0]?.version} ·{' '}
+            {integration?.rollbackHistory[0]?.note}
+          </div>
+        )}
+      </section>
       <p className="mt-4 max-w-5xl text-xs text-[var(--theme-muted)]">
         Privacy mode: {integration?.privacy.mode ?? 'public-only'} ·{' '}
         {integration?.privacy.historyStores ?? 'metadata-only'}. Hermes never
