@@ -65,6 +65,43 @@ function repositorySlug(remote) {
   return match?.[1] || null
 }
 
+export function evaluateDeploymentIdentity({
+  head = null,
+  branch = null,
+  dirty = false,
+  remote = null,
+  marker = null,
+  artifact = null,
+  served = null,
+  servicePid = null,
+} = {}) {
+  const markerMatchesHead = Boolean(marker && head && marker === head)
+  const artifactMatchesServed = Boolean(served && artifact && served === artifact)
+  const statusPasses = artifactMatchesServed && markerMatchesHead && !dirty
+  return {
+    status: statusPasses ? 'pass' : 'degraded',
+    head,
+    branch,
+    dirty,
+    remote,
+    buildMarker: marker,
+    artifactBuild: artifact,
+    servedBuild: served,
+    markerMatchesHead,
+    artifactMatchesServed,
+    servicePid,
+    detail: statusPasses
+      ? 'The deployment marker, compiled artifact, and live build header agree.'
+      : !markerMatchesHead
+        ? 'The deployment marker does not match the current checkout.'
+        : !artifactMatchesServed
+          ? 'The live build header does not match the local compiled artifact.'
+          : dirty
+            ? 'The readiness checkout has uncommitted changes.'
+            : 'Live build identity could not be fully verified.',
+  }
+}
+
 async function deploymentIdentity() {
   const [head, branch, dirty, remote, marker, servicePid] = await Promise.all([
     command('git', ['rev-parse', 'HEAD']),
@@ -84,31 +121,16 @@ async function deploymentIdentity() {
     .then((response) => response.headers.get('x-workspace-build'))
     .catch(() => null)
   const artifact = artifactBuildId()
-  const markerMatchesHead = Boolean(marker.ok && head.ok && marker.stdout === head.stdout)
-  const matches = Boolean(served && artifact && served === artifact)
-  const statusPasses = matches && markerMatchesHead && !dirty.stdout
-  return {
-    status: statusPasses ? 'pass' : 'degraded',
+  return evaluateDeploymentIdentity({
     head: head.stdout || null,
     branch: branch.stdout || null,
     dirty: Boolean(dirty.stdout),
     remote: repositorySlug(remote.stdout),
-    buildMarker: marker.stdout || null,
-    artifactBuild: artifact,
-    servedBuild: served,
-    markerMatchesHead,
-    artifactMatchesServed: matches,
+    marker: marker.stdout || null,
+    artifact,
+    served,
     servicePid: servicePid.stdout || null,
-    detail: statusPasses
-      ? 'The deployment marker, compiled artifact, and live build header agree.'
-      : !markerMatchesHead
-        ? 'The deployment marker does not match the current checkout.'
-        : !matches
-          ? 'The live build header does not match the local compiled artifact.'
-          : dirty.stdout
-            ? 'The readiness checkout has uncommitted changes.'
-            : 'Live build identity could not be fully verified.',
-  }
+  })
 }
 
 async function serviceCheck() {

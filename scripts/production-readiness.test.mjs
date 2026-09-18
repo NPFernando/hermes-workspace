@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { buildConfigurationPreflight } from './production-readiness.mjs'
+import {
+  buildConfigurationPreflight,
+  evaluateDeploymentIdentity,
+} from './production-readiness.mjs'
 
 function configured(keys) {
   return (key) => keys.has(key)
@@ -72,6 +75,35 @@ describe('production configuration preflight', () => {
       oauth: { status: 'degraded', passwordAuthConfigured: true },
       database: { status: 'pass' },
       alerts: { status: 'pass', telegramConfigured: true },
+    })
+  })
+})
+
+describe('deployment identity readiness', () => {
+  it('fails when the deployment marker is stale even if the served artifact matches disk', () => {
+    expect(evaluateDeploymentIdentity({
+      head: 'head-new',
+      marker: 'head-old',
+      artifact: 'artifact-1',
+      served: 'artifact-1',
+    })).toMatchObject({
+      status: 'degraded',
+      markerMatchesHead: false,
+      artifactMatchesServed: true,
+      detail: 'The deployment marker does not match the current checkout.',
+    })
+  })
+
+  it('passes only when marker, artifact, and served process all agree', () => {
+    expect(evaluateDeploymentIdentity({
+      head: 'head-1',
+      marker: 'head-1',
+      artifact: 'artifact-1',
+      served: 'artifact-1',
+    })).toMatchObject({
+      status: 'pass',
+      markerMatchesHead: true,
+      artifactMatchesServed: true,
     })
   })
 })
