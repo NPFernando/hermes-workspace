@@ -180,6 +180,14 @@ export function revokeSessionToken(token: string): void {
   _persist()
 }
 
+/** Return the current session expiry without exposing the session token. */
+export function getSessionExpiry(request: Request): number | null {
+  if (!isPasswordProtectionEnabled()) return null
+  const token = getSessionTokenFromCookie(request.headers.get('cookie'))
+  if (!token || !isValidSessionToken(token)) return null
+  return _tokens.get(token) ?? null
+}
+
 /**
  * Resolve the configured workspace password.
  *
@@ -198,10 +206,16 @@ function getConfiguredPassword(): string {
  * Check if password protection is enabled.
  */
 export function isPasswordProtectionEnabled(): boolean {
-  return getConfiguredPassword().length > 0 || Boolean(process.env.HERMES_E2E_PASSWORD)
+  return (
+    getConfiguredPassword().length > 0 ||
+    Boolean(process.env.HERMES_E2E_PASSWORD)
+  )
 }
 
-function timingSafePasswordMatch(password: string, configured: string): boolean {
+function timingSafePasswordMatch(
+  password: string,
+  configured: string,
+): boolean {
   if (!configured) return false
   const passwordBuf = Buffer.from(password, 'utf8')
   const configuredBuf = Buffer.from(configured, 'utf8')
@@ -373,4 +387,12 @@ export function createSessionCookie(
   }
   // rememberMe=false → session cookie, no Max-Age
   return `claude-auth=${token}; ${attrs.join('; ')}`
+}
+
+/** Clear the workspace session cookie after an explicit disconnect. */
+export function clearSessionCookie(): string {
+  const attrs = ['HttpOnly']
+  if (shouldSetSecureCookie()) attrs.push('Secure')
+  attrs.push('SameSite=Strict', 'Path=/', 'Max-Age=0')
+  return `claude-auth=; ${attrs.join('; ')}`
 }

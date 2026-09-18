@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils'
 
 export type SettingsNavId =
   | 'connection'
+  | 'account'
   | 'claude'
   | 'agent'
   | 'routing'
@@ -21,6 +22,7 @@ type NavItem = { id: SettingsNavId; label: string }
 
 export const SETTINGS_NAV_ITEMS: Array<NavItem> = [
   { id: 'connection', label: 'Connection' },
+  { id: 'account', label: 'Account & session' },
   { id: 'claude', label: 'Model & Provider' },
   { id: 'harp', label: 'HARP Routing' },
   { id: 'agent', label: 'Agent Behavior' },
