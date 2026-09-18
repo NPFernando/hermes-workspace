@@ -69,6 +69,7 @@ import { Route as ApiDemoTradingRebalanceRouteImport } from './routes/api/demo-t
 import { Route as ApiDifyIntegrationRouteImport } from './routes/api/dify-integration'
 import { Route as ApiDifyStatusRouteImport } from './routes/api/dify-status'
 import { Route as ApiDownloadApkRouteImport } from './routes/api/download-apk'
+import { Route as ApiDrEvidenceRouteImport } from './routes/api/dr-evidence'
 import { Route as ApiEnvResetRouteImport } from './routes/api/env-reset'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
@@ -562,6 +563,11 @@ const ApiDifyStatusRoute = ApiDifyStatusRouteImport.update({
 const ApiDownloadApkRoute = ApiDownloadApkRouteImport.update({
   id: '/api/download-apk',
   path: '/api/download-apk',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDrEvidenceRoute = ApiDrEvidenceRouteImport.update({
+  id: '/api/dr-evidence',
+  path: '/api/dr-evidence',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiEnvResetRoute = ApiEnvResetRouteImport.update({
@@ -1601,6 +1607,7 @@ export interface FileRoutesByFullPath {
   '/api/dify-integration': typeof ApiDifyIntegrationRoute
   '/api/dify-status': typeof ApiDifyStatusRoute
   '/api/download-apk': typeof ApiDownloadApkRoute
+  '/api/dr-evidence': typeof ApiDrEvidenceRoute
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
@@ -1855,6 +1862,7 @@ export interface FileRoutesByTo {
   '/api/dify-integration': typeof ApiDifyIntegrationRoute
   '/api/dify-status': typeof ApiDifyStatusRoute
   '/api/download-apk': typeof ApiDownloadApkRoute
+  '/api/dr-evidence': typeof ApiDrEvidenceRoute
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
@@ -2111,6 +2119,7 @@ export interface FileRoutesById {
   '/api/dify-integration': typeof ApiDifyIntegrationRoute
   '/api/dify-status': typeof ApiDifyStatusRoute
   '/api/download-apk': typeof ApiDownloadApkRoute
+  '/api/dr-evidence': typeof ApiDrEvidenceRoute
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
   '/api/files': typeof ApiFilesRoute
@@ -2368,6 +2377,7 @@ export interface FileRouteTypes {
     | '/api/dify-integration'
     | '/api/dify-status'
     | '/api/download-apk'
+    | '/api/dr-evidence'
     | '/api/env-reset'
     | '/api/events'
     | '/api/files'
@@ -2622,6 +2632,7 @@ export interface FileRouteTypes {
     | '/api/dify-integration'
     | '/api/dify-status'
     | '/api/download-apk'
+    | '/api/dr-evidence'
     | '/api/env-reset'
     | '/api/events'
     | '/api/files'
@@ -2877,6 +2888,7 @@ export interface FileRouteTypes {
     | '/api/dify-integration'
     | '/api/dify-status'
     | '/api/download-apk'
+    | '/api/dr-evidence'
     | '/api/env-reset'
     | '/api/events'
     | '/api/files'
@@ -3133,6 +3145,7 @@ export interface RootRouteChildren {
   ApiDifyIntegrationRoute: typeof ApiDifyIntegrationRoute
   ApiDifyStatusRoute: typeof ApiDifyStatusRoute
   ApiDownloadApkRoute: typeof ApiDownloadApkRoute
+  ApiDrEvidenceRoute: typeof ApiDrEvidenceRoute
   ApiEnvResetRoute: typeof ApiEnvResetRoute
   ApiEventsRoute: typeof ApiEventsRoute
   ApiFilesRoute: typeof ApiFilesRoute
@@ -3708,6 +3721,13 @@ declare module '@tanstack/react-router' {
       path: '/api/download-apk'
       fullPath: '/api/download-apk'
       preLoaderRoute: typeof ApiDownloadApkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dr-evidence': {
+      id: '/api/dr-evidence'
+      path: '/api/dr-evidence'
+      fullPath: '/api/dr-evidence'
+      preLoaderRoute: typeof ApiDrEvidenceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/env-reset': {
@@ -5381,6 +5401,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDifyIntegrationRoute: ApiDifyIntegrationRoute,
   ApiDifyStatusRoute: ApiDifyStatusRoute,
   ApiDownloadApkRoute: ApiDownloadApkRoute,
+  ApiDrEvidenceRoute: ApiDrEvidenceRoute,
   ApiEnvResetRoute: ApiEnvResetRoute,
   ApiEventsRoute: ApiEventsRoute,
   ApiFilesRoute: ApiFilesRoute,
