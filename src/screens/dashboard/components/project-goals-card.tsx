@@ -87,6 +87,13 @@ type RoadmapAudit = {
   }>
 }
 
+type FeatureFlagSnapshot = Array<{
+  name: string
+  enabled: boolean
+  rolloutPercent: number
+  enabledForSubject: boolean
+}>
+
 // Deliberately declarative: this is the operator-facing cross-project
 // checklist. Runtime health and usage remain sourced from the dashboard API;
 // these records capture the human acceptance state that APIs cannot infer.
@@ -356,6 +363,9 @@ export function ProjectGoalsCard() {
   const [roadmapAudit, setRoadmapAudit] = useState<RoadmapAudit | null>(null)
   const [roadmapAuditLoading, setRoadmapAuditLoading] = useState(false)
   const [roadmapAuditError, setRoadmapAuditError] = useState<string | null>(null)
+  const [featureFlags, setFeatureFlags] = useState<FeatureFlagSnapshot | null>(null)
+  const [featureFlagsLoading, setFeatureFlagsLoading] = useState(false)
+  const [featureFlagsError, setFeatureFlagsError] = useState<string | null>(null)
   const liveGoals = useMemo(
     () => goalsWithLiveEvidence(GOALS, { releaseStatus }),
     [releaseStatus],
@@ -456,11 +466,36 @@ export function ProjectGoalsCard() {
     }
   }, [])
 
+  const refreshFeatureFlags = useCallback(async () => {
+    setFeatureFlagsLoading(true)
+    setFeatureFlagsError(null)
+    try {
+      const response = await fetch('/api/feature-flags', {
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      })
+      const data = (await response.json()) as {
+        ok?: boolean
+        error?: string
+        flags?: FeatureFlagSnapshot
+      }
+      if (!response.ok || !data.ok || !data.flags) {
+        throw new Error(data.error || `Feature flag request failed (${response.status})`)
+      }
+      setFeatureFlags(data.flags)
+    } catch (error) {
+      setFeatureFlagsError(error instanceof Error ? error.message : 'Feature flag request failed.')
+    } finally {
+      setFeatureFlagsLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     void refreshReadiness()
     void refreshReleaseStatus()
     void refreshRoadmapAudit()
-  }, [refreshReadiness, refreshReleaseStatus])
+    void refreshFeatureFlags()
+  }, [refreshReadiness, refreshReleaseStatus, refreshRoadmapAudit, refreshFeatureFlags])
 
   return (
     <section
@@ -529,11 +564,12 @@ export function ProjectGoalsCard() {
               void refreshReadiness()
               void refreshReleaseStatus()
               void refreshRoadmapAudit()
+              void refreshFeatureFlags()
             }}
-            disabled={readinessLoading || releaseStatusLoading || roadmapAuditLoading}
+            disabled={readinessLoading || releaseStatusLoading || roadmapAuditLoading || featureFlagsLoading}
             className="min-h-9 rounded-lg border border-[var(--theme-accent)] px-3 py-1.5 text-xs font-semibold text-[var(--theme-text)] disabled:opacity-50"
           >
-            {readinessLoading || releaseStatusLoading || roadmapAuditLoading
+            {readinessLoading || releaseStatusLoading || roadmapAuditLoading || featureFlagsLoading
               ? 'Checking…'
               : 'Refresh evidence'}
           </button>
@@ -546,6 +582,11 @@ export function ProjectGoalsCard() {
         {roadmapAuditError && (
           <p className="mt-2 text-xs text-[var(--theme-danger)]" role="alert">
             {roadmapAuditError}
+          </p>
+        )}
+        {featureFlagsError && (
+          <p className="mt-2 text-xs text-[var(--theme-danger)]" role="alert">
+            {featureFlagsError}
           </p>
         )}
         {liveReadiness && (
@@ -824,6 +865,21 @@ export function ProjectGoalsCard() {
             <p className="mt-2 text-[10px] text-muted">
               Checked {new Date(roadmapAudit.generatedAt).toLocaleString()}; implementation files never count as completion proof.
             </p>
+          </div>
+        )}
+        {featureFlags && (
+          <div className="mt-3 rounded-md border border-[var(--theme-border)] px-2 py-2">
+            <div className="font-semibold text-[var(--theme-text)]">Staged feature flags</div>
+            <div className="mt-2 space-y-1">
+              {featureFlags.map((flag) => (
+                <div key={flag.name} className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted">
+                  <span className="truncate">{flag.name}</span>
+                  <span>
+                    {flag.enabled ? `${flag.rolloutPercent}% configured` : 'disabled'} · {flag.enabledForSubject ? 'enabled for this session' : 'not enabled for this session'}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
