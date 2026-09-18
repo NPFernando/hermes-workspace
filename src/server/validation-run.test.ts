@@ -1,12 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type * as LongShortSentimentModule from './long-short-sentiment'
 
 // fetchTopTraderLongShortRatio makes a real network call — mock just that
 // export so tests never hit fapi.binance.com (same as demo-trading-engine.test.ts).
 vi.mock('./long-short-sentiment', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./long-short-sentiment')>()
+  const actual = await importOriginal<typeof LongShortSentimentModule>()
   return { ...actual, fetchTopTraderLongShortRatio: vi.fn() }
 })
 
@@ -319,6 +320,57 @@ describe('runValidationCycle', () => {
     expect(result.run?.progress.tradesOpened).toBeGreaterThanOrEqual(1)
   })
 
+  it('debounces back-to-back automated cycles but never a manual one', async () => {
+    // Regression: nothing stopped multiple independent automation timers
+    // (or any other rapid-fire automated trigger) from driving the same
+    // run's cycle repeatedly within seconds — runValidationCycle had no
+    // time-based guard at all, only cycle/trade count budgets.
+    await setMode('testnet_execute')
+    const { startValidationRun, runValidationCycle } =
+      await import('./validation-run')
+    await startValidationRun({
+      stage: 'sandbox',
+      strategies: ['rsi_reversion'],
+      budgets: VALID_BUDGETS,
+    })
+
+    const first = await runValidationCycle('sandbox', {
+      client: fakeClient() as never,
+      automated: true,
+    })
+    expect(first.ok).toBe(true)
+    expect(first.cycle).not.toBeNull()
+    expect(first.run?.progress.cyclesRun).toBe(1)
+
+    // A second automated call moments later must be skipped, not run.
+    const secondAutomated = await runValidationCycle('sandbox', {
+      client: fakeClient() as never,
+      automated: true,
+    })
+    expect(secondAutomated.ok).toBe(true)
+    expect(secondAutomated.cycle).toBeNull()
+    expect(secondAutomated.message).toMatch(/Skipped: last cycle/)
+    expect(secondAutomated.run?.progress.cyclesRun).toBe(1)
+
+    // An explicit manual call (no `automated` flag) must never be
+    // debounced — this is exactly the "open, then immediately close"
+    // pattern the API and other tests rely on.
+    const manual = await runValidationCycle('sandbox', {
+      client: fakeClient({ getKlines: async () => flatHighCandles(130) }) as never,
+    })
+    expect(manual.cycle).not.toBeNull()
+    expect(manual.run?.progress.cyclesRun).toBe(2)
+
+    // force:true bypasses the debounce even for an automated call.
+    const forcedAutomated = await runValidationCycle('sandbox', {
+      client: fakeClient() as never,
+      automated: true,
+      force: true,
+    })
+    expect(forcedAutomated.cycle).not.toBeNull()
+    expect(forcedAutomated.run?.progress.cyclesRun).toBe(3)
+  })
+
   it('attributes realized P&L, fees, and a ledger record id once a trade closes', async () => {
     await setMode('testnet_execute')
     const { startValidationRun, runValidationCycle } =
@@ -395,7 +447,7 @@ describe('restart recovery (time-budget reconciliation)', () => {
     const db = store.readFinanceStore()
     const state = (db.settings as Record<string, unknown>)
       .validationRuns as { active: Array<{ createdAt: string }> }
-    state.active[0]!.createdAt = new Date(Date.now() - 3_600_000).toISOString()
+    state.active[0].createdAt = new Date(Date.now() - 3_600_000).toISOString()
     store.writeFinanceStore(db)
 
     const reconciled = reviewValidationRuns()
