@@ -651,6 +651,42 @@ export function getFinanceStorageMonitorSummary(
   }
 }
 
+export interface DeploymentJournalEntry {
+  at: string
+  commit: string
+  previousCommit: string | null
+  build: string
+  service: string
+  canary: string
+  releaseSmoke: string
+  securityGate: string
+}
+
+export function getDeploymentJournal(
+  options: { path?: string; limit?: number } = {},
+): Array<DeploymentJournalEntry> {
+  const path = options.path ?? join(process.cwd(), '.runtime', 'deployment-history.jsonl')
+  const limit = Math.max(1, Math.min(100, options.limit ?? 20))
+  if (!existsSync(path)) return []
+  try {
+    return readFileSync(path, 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .flatMap((line) => {
+        try {
+          return [JSON.parse(line) as DeploymentJournalEntry]
+        } catch {
+          return []
+        }
+      })
+      .filter((entry) => typeof entry.at === 'string' && typeof entry.commit === 'string')
+      .slice(-limit)
+      .reverse()
+  } catch {
+    return []
+  }
+}
+
 // ── Aggregate payload ────────────────────────────────────────────────────────
 
 export interface OpsObservability {
@@ -665,6 +701,7 @@ export interface OpsObservability {
   cronJobs: Array<OpsCronJob> | null
   financeStorageMonitor: FinanceStorageMonitorSummary | null
   financeStorageSmokeCron: FinanceStorageSmokeCronSummary | null
+  deploymentJournal: Array<DeploymentJournalEntry>
   /** Local Headroom compression proxy stats; null when the proxy isn't running. */
   headroom: HeadroomStats | null
 }
@@ -699,6 +736,7 @@ export async function getOpsObservability(): Promise<OpsObservability> {
     cronJobs: getOpsCronJobs(),
     financeStorageMonitor: getFinanceStorageMonitorSummary(),
     financeStorageSmokeCron: getFinanceStorageSmokeCronSummary(),
+    deploymentJournal: getDeploymentJournal(),
     headroom,
   }
 }
