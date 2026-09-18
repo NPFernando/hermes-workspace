@@ -2715,6 +2715,79 @@ describe('learning cycle', () => {
     expect(learningReport().latestCandidate?.status).toBe('paper_applied')
   })
 
+  it('does not regenerate or reapply an identical candidate every cycle once already applied', async () => {
+    // Regression: upsertLearningCandidate used to dedupe only on an exact
+    // status match. A freshly built candidate always starts as 'proposed',
+    // so it could never match an already-applied one (status now
+    // 'paper_applied'/'testnet_applied') even with an identical
+    // fingerprint — the same recommendation (e.g. "keep this losing
+    // strategy disabled") got reproposed and reapplied every single cycle
+    // forever, spamming learning_candidate_created/*_applied and evicting
+    // real history out of the LEARNING_CANDIDATE_CAP window.
+    await setMode('paper_trade')
+    const store = await import('./finance-store')
+    const db = store.readFinanceStore()
+    const base = Date.now()
+    const closedAt = (index: number) =>
+      new Date(base + index * 1000).toISOString()
+    db.strategy_results = [
+      {
+        kind: 'demo_strategy_score',
+        strategyId: 'rsi_reversion',
+        trades: 3,
+        wins: 0,
+        losses: 3,
+        totalPnlQuote: -9,
+        score: -1,
+        winRate: 0,
+        avgPnlQuote: -3,
+        lossStreak: 3,
+        updatedAt: closedAt(4),
+      },
+      ...[-3, -2, -4].map((pnl, index) => ({
+        kind: 'demo_trade_log',
+        id: `paper_loss_${index}`,
+        symbol: 'BTCUSDT',
+        strategyId: 'rsi_reversion',
+        entryPrice: 100,
+        exitPrice: 100 + pnl,
+        quantity: 1,
+        entryQuote: 100,
+        exitQuote: 100 + pnl,
+        pnlQuote: pnl,
+        feesQuote: 0,
+        reason: 'paper loss',
+        openedAt: closedAt(index),
+        closedAt: closedAt(index + 1),
+      })),
+    ]
+    store.writeFinanceStore(db)
+    const { learningReport, runLearningCycle } =
+      await import('./demo-trading-engine')
+
+    const first = runLearningCycle()
+    expect(first.appliedCandidate?.status).toBe('paper_applied')
+
+    // The first apply anchors dt.learning.baseQuotePerTrade at the
+    // pre-reduction quote, so the *second* cycle's own configPatch comes
+    // out empty (nothing further to reduce) — a genuinely different
+    // fingerprint from the first candidate's, so a fresh candidate here is
+    // correct, not a dedup failure. It's the third cycle, evaluating
+    // identical (still-empty-configPatch, same overrides) evidence against
+    // an already-*applied* candidate, that must dedupe.
+    const second = runLearningCycle()
+    expect(second.appliedCandidate?.status).toBe('paper_applied')
+    const secondAppliedId = second.appliedCandidate?.id
+    const candidatesAfterSecond = learningReport().candidates.length
+
+    const third = runLearningCycle()
+
+    expect(third.generatedCandidate?.id).toBe(secondAppliedId)
+    expect(third.appliedCandidate).toBeNull()
+    expect(third.skippedReason).toMatch(/duplicate of already-applied/)
+    expect(learningReport().candidates.length).toBe(candidatesAfterSecond)
+  })
+
   it('skips an override for a strategy outside the registry instead of failing the whole candidate', async () => {
     // long_short_sentiment is a council member gated by its own settings
     // flag, not an entry in the STRATEGIES registry — historical evidence

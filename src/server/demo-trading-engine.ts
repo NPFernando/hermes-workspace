@@ -4248,12 +4248,28 @@ function upsertLearningCandidate(
 ): LearningCandidate {
   const rows = db.strategy_results as Array<SRRow>
   const candidates = loadLearningCandidates(rows)
+  const now = Date.now()
+  const isActiveApplied = (existing: LearningCandidate) =>
+    (existing.status === 'paper_applied' ||
+      existing.status === 'testnet_applied') &&
+    (!existing.expiresAt || new Date(existing.expiresAt).getTime() > now)
+  // A freshly built candidate always starts life with status 'proposed', so
+  // matching only on identical status meant an already-applied candidate
+  // (status now 'paper_applied'/'testnet_applied') could never dedupe
+  // against a newly proposed one with the exact same fingerprint — the
+  // learning cycle kept reproposing and reapplying the same override every
+  // ~5 minutes, forever, as long as the underlying recommendation stood
+  // (e.g. "keep this losing strategy disabled"), spamming
+  // learning_candidate_created/testnet_applied and pushing real candidate
+  // history out of the LEARNING_CANDIDATE_CAP window. Also honor an
+  // already-applied, still-unexpired candidate with a matching fingerprint
+  // as a duplicate — nothing changed, so there's nothing new to record.
   const duplicate = [...candidates]
     .reverse()
     .find(
       (existing) =>
         existing.fingerprint === candidate.fingerprint &&
-        existing.status === candidate.status,
+        (existing.status === candidate.status || isActiveApplied(existing)),
     )
   if (duplicate) return duplicate
   const others = rows.filter((row) => row.kind !== SR_KIND_LEARNING_CANDIDATE)
@@ -4503,6 +4519,8 @@ export function runLearningCycle(): LearningCycleResult {
       } else if (generatedCandidate.status === 'proposed') {
         skippedReason =
           'candidate requires paper_trade or testnet_execute auto-apply to be enabled'
+      } else if (generatedCandidate.id !== candidate.id) {
+        skippedReason = `duplicate of already-applied candidate ${generatedCandidate.id}; recommendation unchanged, nothing to do`
       } else {
         skippedReason = 'candidate is a promotion recommendation only'
       }
