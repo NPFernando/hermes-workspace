@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Hermes disaster-recovery exercise quarterly
+
+[Timer]
+OnCalendar=quarterly
+Persistent=true
+RandomizedDelaySec=2h
+Unit=hermes-disaster-recovery-exercise.service
+
+[Install]
+WantedBy=timers.target
