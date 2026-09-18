@@ -48,6 +48,7 @@ if [ -f "$BUILD_MARKER" ]; then
 fi
 ROLLBACK_DIR=""
 ROLLBACK_ACTIVE=0
+DEPLOYMENT_CORRELATION_ID="${DEPLOYMENT_CORRELATION_ID:-deploy-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
 
 record_deployment() {
   local journal="$RUNTIME_DIR/deployment-history.jsonl"
@@ -81,6 +82,7 @@ record_deployment() {
   mkdir -p "$RUNTIME_DIR"
   jq -cn \
     --arg at "$at" \
+    --arg deploymentId "$DEPLOYMENT_CORRELATION_ID" \
     --arg commit "$commit" \
     --arg previousCommit "$PREVIOUS_DEPLOYMENT_COMMIT" \
     --arg build "$EXPECTED_BUILD" \
@@ -97,6 +99,7 @@ record_deployment() {
     --arg approvalRef "$approval_ref" \
     '{
       at: $at,
+      deploymentId: $deploymentId,
       commit: $commit,
       previousCommit: (if $previousCommit == "" then null else $previousCommit end),
       build: $build,
@@ -205,6 +208,7 @@ if [ "$PREVIEW" = "1" ]; then
     --arg approvalRef "$approval_ref" \
     --arg currentImageTag "$current_image_tag" \
     --arg targetImageTag "$target_image_tag" \
+    --arg deploymentId "$DEPLOYMENT_CORRELATION_ID" \
     --argjson changedFileList "$changed_file_list_json" \
     --argjson changedRuntimeFiles "$changed_runtime_json" \
     --argjson migrationFiles "$migration_json" \
@@ -215,6 +219,7 @@ if [ "$PREVIEW" = "1" ]; then
     '{
       preview: true,
       action: $action,
+      deploymentId: $deploymentId,
       current: $current,
       target: $target,
       worktreeDirty: $worktreeDirty,

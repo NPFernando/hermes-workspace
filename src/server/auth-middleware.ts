@@ -1,4 +1,4 @@
-import { randomBytes, timingSafeEqual } from 'node:crypto'
+import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import {
   chmodSync,
   existsSync,
@@ -41,6 +41,60 @@ const STORE_FILE = join(
 const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 days (legacy default)
 const TOKEN_TTL_LONG = 365 * 24 * 60 * 60 * 1000 // 1 year (remember me)
 const TOKEN_TTL_SHORT = 24 * 60 * 60 * 1000 // 24 hours (session-only)
+
+export type AuthFailureReason =
+  | 'missing-session'
+  | 'invalid-session'
+  | 'readonly-role'
+
+/** Return a bounded request correlation ID without trusting arbitrary header text. */
+export function getRequestCorrelationId(request: Request): string {
+  const supplied = request.headers.get('x-request-id')?.trim() ?? ''
+  return /^[A-Za-z0-9._:-]{1,128}$/.test(supplied) ? supplied : randomUUID()
+}
+
+/**
+ * Record only metadata for failed authentication checks. Cookies, IPs, and
+ * credentials are intentionally excluded. The log is capped to prevent a
+ * burst of unauthenticated traffic from growing it without bound.
+ */
+export function recordAuthFailure(
+  request: Request,
+  reason: AuthFailureReason,
+): string {
+  const correlationId = getRequestCorrelationId(request)
+  const logPath =
+    process.env.HERMES_AUTH_FAILURE_LOG ??
+    join(
+      process.env.HERMES_RUNTIME_STATE_DIR ?? join(process.cwd(), '.runtime'),
+      'auth-failures.jsonl',
+    )
+  try {
+    const directory = dirname(logPath)
+    if (!existsSync(directory)) mkdirSync(directory, { recursive: true, mode: 0o700 })
+    const previous = existsSync(logPath)
+      ? readFileSync(logPath, 'utf8').split(/\r?\n/).filter(Boolean).slice(-199)
+      : []
+    previous.push(
+      JSON.stringify({
+        at: new Date().toISOString(),
+        correlationId,
+        method: request.method.toUpperCase(),
+        path: new URL(request.url).pathname.slice(0, 256),
+        reason,
+      }),
+    )
+    writeFileSync(logPath, `${previous.join('\n')}\n`, { encoding: 'utf8', mode: 0o600 })
+    try {
+      chmodSync(logPath, 0o600)
+    } catch {
+      // Best effort on platforms without chmod support.
+    }
+  } catch {
+    // Authentication must remain fail-closed even if observability storage fails.
+  }
+  return correlationId
+}
 
 function loadStore(): SessionStore {
   try {
@@ -328,15 +382,20 @@ export function isAuthenticated(request: Request): boolean {
   const token = getSessionTokenFromCookie(cookieHeader)
 
   if (!token) {
+    recordAuthFailure(request, 'missing-session')
     return false
   }
 
-  if (!isValidSessionToken(token)) return false
+  if (!isValidSessionToken(token)) {
+    recordAuthFailure(request, 'invalid-session')
+    return false
+  }
   const role = _roles.get(token) ?? 'full'
   if (
     role === 'e2e-readonly' &&
     !['GET', 'HEAD', 'OPTIONS'].includes(request.method.toUpperCase())
   ) {
+    recordAuthFailure(request, 'readonly-role')
     return false
   }
   return true
