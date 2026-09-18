@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   getCopilotDailyUsage,
   getCopilotUsageSummary,
+  getDeploymentJournal,
   getFinanceStorageMonitorSummary,
   getFinanceStorageSmokeCronSummary,
   getHermesDailyUsage,
@@ -122,6 +123,28 @@ describe('ops-observability finance storage monitor', () => {
         statePath: join(tmpdir(), 'missing-storage-monitor.json'),
       }),
     ).toBeNull()
+  })
+})
+
+describe('ops-observability deployment journal', () => {
+  it('reads recent value-safe deployment entries newest first', () => {
+    const dir = makeTempDir()
+    const path = join(dir, 'deployment-history.jsonl')
+    writeFileSync(path, [
+      JSON.stringify({ at: '2026-07-08T00:00:00Z', commit: 'old', build: 'a', service: 'hermes-workspace.service', canary: 'passed', releaseSmoke: 'passed', securityGate: 'passed' }),
+      JSON.stringify({ at: '2026-07-09T00:00:00Z', commit: 'new', previousCommit: 'old', build: 'b', service: 'hermes-workspace.service', canary: 'passed', releaseSmoke: 'passed', securityGate: 'passed' }),
+    ].join('\n') + '\n', 'utf8')
+
+    expect(getDeploymentJournal({ path, limit: 1 })).toEqual([
+      expect.objectContaining({ commit: 'new', previousCommit: 'old' }),
+    ])
+  })
+
+  it('ignores malformed or incomplete entries', () => {
+    const dir = makeTempDir()
+    const path = join(dir, 'deployment-history.jsonl')
+    writeFileSync(path, '{bad json}\n{}\n', 'utf8')
+    expect(getDeploymentJournal({ path })).toEqual([])
   })
 })
 

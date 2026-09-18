@@ -77,6 +77,16 @@ interface FinanceStorageSmokeCronSummary {
   recentOutputs: Array<FinanceStorageSmokeCronOutput>
   recentFailureCount: number
 }
+interface DeploymentJournalEntry {
+  at: string
+  commit: string
+  previousCommit: string | null
+  build: string
+  service: string
+  canary: string
+  releaseSmoke: string
+  securityGate: string
+}
 interface FinanceStorageSmokeCronOutput {
   path: string
   outputAt: string
@@ -162,6 +172,7 @@ interface OpsPayload {
   cronJobs: Array<OpsCronJob> | null
   financeStorageMonitor: FinanceStorageMonitorSummary | null
   financeStorageSmokeCron: FinanceStorageSmokeCronSummary | null
+  deploymentJournal: Array<DeploymentJournalEntry>
   headroom: HeadroomStats | null
 }
 
@@ -512,6 +523,7 @@ export function OpsCostScreen() {
     cronJobs,
     financeStorageMonitor,
     financeStorageSmokeCron,
+    deploymentJournal,
     headroom,
   } = opsQuery.data
   const runwayDays =
@@ -558,6 +570,26 @@ export function OpsCostScreen() {
 
       <OperationalHealthPanel />
       <ProductionReadinessPanel />
+
+      <Panel title="Production change journal">
+        {deploymentJournal.length > 0 ? (
+          <div className="space-y-2 text-sm">
+            {deploymentJournal.slice(0, 8).map((entry) => (
+              <div key={`${entry.at}-${entry.commit}`} className="rounded-lg border border-[var(--theme-border,rgba(128,128,128,0.2))] p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-mono text-xs text-[var(--theme-text)]">{entry.commit.slice(0, 12)}</span>
+                  <time className="text-xs text-[var(--theme-muted)]" dateTime={entry.at}>{new Date(entry.at).toLocaleString()}</time>
+                </div>
+                <p className="mt-1 text-xs text-[var(--theme-muted)]">
+                  {entry.previousCommit ? `from ${entry.previousCommit.slice(0, 12)} · ` : ''}build {entry.build} · canary {entry.canary} · release {entry.releaseSmoke} · security {entry.securityGate}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-[var(--theme-muted)]">No successful deployment entries recorded yet.</p>
+        )}
+      </Panel>
 
       {/* Headline stat tiles */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

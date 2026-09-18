@@ -42,8 +42,24 @@ artifact_build_id() {
 
 RUNTIME_DIR="${HERMES_RUNTIME_STATE_DIR:-.runtime}"
 BUILD_MARKER="$RUNTIME_DIR/build-commit"
+PREVIOUS_DEPLOYMENT_COMMIT=""
+if [ -f "$BUILD_MARKER" ]; then
+  PREVIOUS_DEPLOYMENT_COMMIT="$(tr -d '\r\n' < "$BUILD_MARKER")"
+fi
 ROLLBACK_DIR=""
 ROLLBACK_ACTIVE=0
+
+record_deployment() {
+  local journal="$RUNTIME_DIR/deployment-history.jsonl"
+  local tmp="$journal.tmp"
+  local at
+  at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  mkdir -p "$RUNTIME_DIR"
+  printf '%s\n' "{\"at\":\"$at\",\"commit\":\"$(git rev-parse HEAD)\",\"previousCommit\":\"$PREVIOUS_DEPLOYMENT_COMMIT\",\"build\":\"$EXPECTED_BUILD\",\"service\":\"hermes-workspace.service\",\"canary\":\"passed\",\"releaseSmoke\":\"passed\",\"securityGate\":\"passed\"}" >> "$journal"
+  tail -n 100 "$journal" > "$tmp"
+  mv "$tmp" "$journal"
+  chmod 600 "$journal"
+}
 
 rollback_failed_release() {
   local exit_code=$?
@@ -169,6 +185,7 @@ for i in $(seq 1 15); do
     # gates. Keep it as the final success criterion so a deployment cannot
     # advance its marker after only the lightweight canary passes.
     RELEASE_SMOKE_EXPECTED_BUILD="$EXPECTED_BUILD" node scripts/release-checklist.mjs http://127.0.0.1:3000
+    record_deployment
     printf '%s\n' "$(git rev-parse HEAD)" > "$BUILD_MARKER"
     rm -rf "$ROLLBACK_DIR"
     ROLLBACK_DIR=""
