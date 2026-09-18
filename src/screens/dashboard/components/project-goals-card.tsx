@@ -64,6 +64,7 @@ type CrossRepositoryReleaseStatus = {
     } | null
     openPullRequests: Array<{
       number: number
+      url: string | null
       title: string
       isDraft: boolean
       reviewDecision: string | null
@@ -830,7 +831,18 @@ export function ProjectGoalsCard() {
                             className="mt-1 truncate text-[11px] text-muted"
                             title={pullRequest.title}
                           >
-                            #{pullRequest.number} {pullRequest.title}
+                            {pullRequest.url ? (
+                              <a
+                                href={pullRequest.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="hover:text-[var(--theme-accent)] hover:underline"
+                              >
+                                #{pullRequest.number} {pullRequest.title}
+                              </a>
+                            ) : (
+                              <>#{pullRequest.number} {pullRequest.title}</>
+                            )}
                             {pullRequest.isDraft
                               ? ' · draft'
                               : pullRequest.reviewDecision

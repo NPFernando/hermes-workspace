@@ -23,6 +23,7 @@ export type RepositoryReleaseStatus = ReleaseRepository & {
   } | null
   openPullRequests: Array<{
     number: number
+    url: string | null
     title: string
     isDraft: boolean
     reviewDecision: string | null
@@ -142,7 +143,7 @@ export async function getCrossRepositoryReleaseStatus({
           '--limit',
           '20',
           '--json',
-          'number,title,isDraft,reviewDecision,statusCheckRollup,updatedAt',
+          'number,url,title,isDraft,reviewDecision,statusCheckRollup,updatedAt',
         ])
         const metadata = JSON.parse(metadataResult.stdout) as {
           defaultBranchRef?: { name?: string }
@@ -169,6 +170,7 @@ export async function getCrossRepositoryReleaseStatus({
           pullRequestsResult.stdout || '[]',
         ) as Array<{
           number?: number
+          url?: string
           title?: string
           isDraft?: boolean
           reviewDecision?: string | null
@@ -182,6 +184,7 @@ export async function getCrossRepositoryReleaseStatus({
           .filter((pullRequest) => typeof pullRequest.number === 'number')
           .map((pullRequest) => ({
             number: pullRequest.number as number,
+            url: pullRequest.url ?? null,
             title: pullRequest.title ?? 'Untitled pull request',
             isDraft: pullRequest.isDraft === true,
             reviewDecision: pullRequest.reviewDecision ?? null,

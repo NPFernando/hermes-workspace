@@ -37,6 +37,7 @@ describe('cross-repository release status', () => {
                 stdout: JSON.stringify([
                   {
                     number: 12,
+                    url: 'https://github.com/NPFernando/hermes-workspace/pull/12',
                     title: 'Improve checks',
                     isDraft: false,
                     reviewDecision: 'APPROVED',
@@ -59,6 +60,7 @@ describe('cross-repository release status', () => {
     expect(report.repositories[0].openPullRequests).toEqual([
       expect.objectContaining({
         number: 12,
+        url: 'https://github.com/NPFernando/hermes-workspace/pull/12',
         reviewDecision: 'APPROVED',
         failingChecks: 0,
       }),
