@@ -17,6 +17,14 @@ type LiveReadiness = {
   generatedAt: string
   blockers: Array<string>
   warnings: Array<string>
+  checks?: {
+    credentialRotation?: {
+      status: string
+      detail: string
+      expiring?: Array<{ key: string; daysRemaining: number }>
+      expired?: Array<string>
+    }
+  }
 }
 
 // Deliberately declarative: this is the operator-facing cross-project
@@ -337,6 +345,23 @@ export function ProjectGoalsCard() {
               <p className="text-[var(--theme-warning)]">
                 <span className="font-semibold">Warnings:</span> {liveReadiness.warnings.join(' · ')}
               </p>
+            )}
+            {liveReadiness.checks?.credentialRotation && (
+              <div className="rounded-md border border-[var(--theme-border)] px-2 py-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-semibold text-[var(--theme-text)]">Credential rotation</span>
+                  <span className={cn('rounded-full px-2 py-0.5 font-semibold', liveReadiness.checks.credentialRotation.status === 'pass' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300')}>
+                    {liveReadiness.checks.credentialRotation.status}
+                  </span>
+                </div>
+                <p className="mt-1 text-muted">{liveReadiness.checks.credentialRotation.detail}</p>
+                {liveReadiness.checks.credentialRotation.expiring?.map((entry) => (
+                  <p key={entry.key} className="mt-1 text-[var(--theme-warning)]">{entry.key} expires in {entry.daysRemaining} day{entry.daysRemaining === 1 ? '' : 's'}.</p>
+                ))}
+                {liveReadiness.checks.credentialRotation.expired?.map((key) => (
+                  <p key={key} className="mt-1 text-[var(--theme-danger)]">{key} rotation metadata is expired.</p>
+                ))}
+              </div>
             )}
           </div>
         )}

@@ -202,6 +202,26 @@ async function backupCheck() {
   })
 }
 
+async function credentialRotationCheck() {
+  const audit = await command(process.execPath, ['scripts/secrets-rotation.mjs', 'status'], { timeout: 10_000 })
+  if (!audit.ok) return result('unavailable', 'Credential rotation metadata could not be read.')
+  let statuses
+  try { statuses = JSON.parse(audit.stdout).status } catch { return result('unavailable', 'Credential rotation metadata returned invalid JSON.') }
+  if (!Array.isArray(statuses)) return result('unavailable', 'Credential rotation metadata has no status list.')
+  const expired = statuses.filter((entry) => entry.state === 'expired')
+  const expiring = statuses.filter((entry) => entry.state === 'expiring')
+  const unconfigured = statuses.filter((entry) => entry.configured === false)
+  const status = statuses.length === 0 || expired.length > 0 || expiring.length > 0 || unconfigured.length > 0 ? 'degraded' : 'pass'
+  return result(status, status === 'pass' ? 'Tracked credentials have valid rotation metadata.' : statuses.length === 0 ? 'No credential rotation metadata has been recorded.' : `Credential rotation needs attention: ${expired.length} expired, ${expiring.length} expiring, ${unconfigured.length} not configured.`, {
+    tracked: statuses.length,
+    expired: expired.map((entry) => entry.key),
+    expiring: expiring.map((entry) => ({ key: entry.key, daysRemaining: entry.daysRemaining })),
+    unconfigured: unconfigured.map((entry) => entry.key),
+    statuses,
+    evidence: 'value-blind rotation metadata; secret values excluded',
+  })
+}
+
 async function forkSyncCheck() {
   const remote = await command('git', ['remote', 'get-url', 'origin'])
   const slug = repositorySlug(remote.stdout)
@@ -227,11 +247,12 @@ export async function buildReadinessReport({ skipTests = false, fetchImpl = fetc
   const originalFetch = globalThis.fetch
   if (fetchImpl !== originalFetch) globalThis.fetch = fetchImpl
   try {
-    const [tests, security, migrations, backups, forkSync, service, identity] = await Promise.all([
+    const [tests, security, migrations, backups, credentialRotation, forkSync, service, identity] = await Promise.all([
       testCheck(skipTests),
       securityCheck(),
       migrationCheck(),
       backupCheck(),
+      credentialRotationCheck(),
       forkSyncCheck(),
       serviceCheck(),
       deploymentIdentity(),
@@ -246,7 +267,7 @@ export async function buildReadinessReport({ skipTests = false, fetchImpl = fetc
       const smokeReport = await runReleaseSmoke(baseUrl, fetchImpl)
       release = result('pass', 'Release smoke passed.', smokeReport)
     } catch (error) { release = result('fail', error instanceof Error ? error.message : String(error)) }
-    const checks = { tests, security, migrations, backups, forkSync, service, assets, release, deploymentIdentity: identity }
+    const checks = { tests, security, migrations, backups, credentialRotation, forkSync, service, assets, release, deploymentIdentity: identity }
     const blockers = Object.entries(checks).filter(([, check]) => check.status === 'fail').map(([name, check]) => `${name}: ${check.detail}`)
     const warnings = Object.entries(checks).filter(([, check]) => ['degraded', 'unavailable', 'not-run'].includes(check.status)).map(([name, check]) => `${name}: ${check.detail}`)
     return { generatedAt: new Date().toISOString(), overall: blockers.length ? 'blocked' : warnings.length ? 'degraded' : 'ready', blockers, warnings, checks }
