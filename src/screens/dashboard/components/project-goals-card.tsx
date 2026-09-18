@@ -28,6 +28,15 @@ type LiveReadiness = {
       expiring?: Array<{ key: string; daysRemaining: number }>
       expired?: Array<string>
     }
+    backups?: {
+      status: string
+      detail: string
+      encrypted?: boolean
+      remoteConfigured?: boolean
+      timerEnabled?: boolean
+      timerActive?: boolean
+      roundTripEvidence?: boolean
+    }
   }
 }
 
@@ -369,6 +378,33 @@ export function ProjectGoalsCard() {
                 {liveReadiness.checks.credentialRotation.expired?.map((key) => (
                   <p key={key} className="mt-1 text-[var(--theme-danger)]">{key} rotation metadata is expired.</p>
                 ))}
+              </div>
+            )}
+            {liveReadiness.checks?.backups && (
+              <div className="rounded-md border border-[var(--theme-border)] px-2 py-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-semibold text-[var(--theme-text)]">Finance backup reminder</span>
+                  <span className={cn(
+                    'rounded-full px-2 py-0.5 font-semibold',
+                    liveReadiness.checks.backups.status === 'pass'
+                      ? 'bg-emerald-500/15 text-emerald-300'
+                      : 'bg-amber-500/15 text-amber-300',
+                  )}>
+                    {liveReadiness.checks.backups.status}
+                  </span>
+                </div>
+                <p className="mt-1 text-muted">{liveReadiness.checks.backups.detail}</p>
+                <div className="mt-2 grid gap-1 text-[11px] text-muted sm:grid-cols-2">
+                  <span>Encrypted: {liveReadiness.checks.backups.encrypted ? 'configured' : 'missing'}</span>
+                  <span>Off-site remote: {liveReadiness.checks.backups.remoteConfigured ? 'configured' : 'missing'}</span>
+                  <span>Timer: {liveReadiness.checks.backups.timerActive ? 'active' : liveReadiness.checks.backups.timerEnabled ? 'enabled, not active' : 'not enabled'}</span>
+                  <span>Restore evidence: {liveReadiness.checks.backups.roundTripEvidence ? 'recent' : 'missing'}</span>
+                </div>
+                {liveReadiness.checks.backups.status !== 'pass' && (
+                  <p className="mt-2 text-[var(--theme-warning)]">
+                    Run the operator-only off-site backup setup and complete a round-trip restore drill before enabling production execution.
+                  </p>
+                )}
               </div>
             )}
             {liveReadiness.checks && (
