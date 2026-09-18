@@ -269,7 +269,7 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
     }
     if (index === 4) {
       const smoke = recentAuthenticatedSmokeEvidence(root)
-      const verified = smoke.ok && smoke.labels.has('auth-check confirms the authenticated session')
+      const verified = smoke.ok && smoke.labels.has('account session can re-authenticate after disconnect')
       return evidence(verified, verified ? 'recent authenticated session and auth UX smoke passed' : `authenticated UX evidence: ${smoke.detail}`)
     }
     if (index === 8) {

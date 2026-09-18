@@ -364,6 +364,29 @@ try {
   await page.getByText('Settings', { exact: true }).last().click()
   await page.waitForURL(/\/settings(?:[/?]|$)/)
   check(true, 'mobile command search opens Settings')
+
+  // Exercise the reversible account-disconnect path. Re-authenticate in the
+  // same browser context so the remaining smoke checks and evidence stay
+  // authenticated without retaining the revoked session.
+  const signOut = page.getByRole('button', { name: 'Sign out', exact: true })
+  await signOut.waitFor({ state: 'visible', timeout: 30_000 })
+  await signOut.click()
+  await page.waitForURL(/\/login(?:[/?]|$)/)
+  check(true, 'account session disconnect returns to sign-in')
+  const relogin = page.locator('#lp-pw')
+  await relogin.fill(password)
+  await page.getByRole('button', { name: 'Sign In', exact: true }).click()
+  await page.getByRole('heading', { name: /Hermes Workspace/i, level: 1 }).waitFor({
+    state: 'visible',
+    timeout: initialAuthTimeout,
+  })
+  const reauth = await page.evaluate(async () =>
+    (await fetch('/api/auth-check', { cache: 'no-store' })).json(),
+  )
+  check(
+    reauth?.authenticated === true,
+    'account session can re-authenticate after disconnect',
+  )
   await page.setViewportSize({ width: 1280, height: 900 })
 } finally {
   await context.close()
