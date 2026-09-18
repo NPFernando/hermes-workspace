@@ -36,7 +36,16 @@ import {
 import { rosterByWorkerId } from '../../server/swarm-roster'
 import { publishSwarmCheckpointNotification } from '../../server/swarm-notifications'
 import { ensureSwarmProfileConfig } from '../../server/swarm-profile-config'
+import { getProviderUsage } from '../../server/provider-usage'
+import {
+  dailySpendByProvider,
+  decideProviderSchedule,
+  hasProviderBudgetPolicy,
+  providerKeyForWorkerModel,
+  readProviderBudgetConfig,
+} from '../../server/provider-scheduling-policy'
 import { safeErrorMessage } from '../../server/rate-limit'
+import type { ProviderScheduleDecision } from '../../server/provider-scheduling-policy'
 import type { SwarmRosterWorker } from '../../server/swarm-roster'
 import type { ParsedSwarmCheckpoint } from '../../server/swarm-checkpoints'
 
@@ -837,6 +846,28 @@ function inferHarpTaskType(assignment: AssignmentRequest): string {
     : assignment.workerId === 'qa'
       ? 'debugging'
       : 'code_generation'
+}
+
+async function scheduleForAssignments(
+  assignments: Array<AssignmentRequest>,
+  roster: Map<string, SwarmRosterWorker>,
+): Promise<ProviderScheduleDecision> {
+  const providers = assignments.map((assignment) =>
+    providerKeyForWorkerModel(roster.get(assignment.workerId)?.model ?? assignment.workerId),
+  )
+  const config = readProviderBudgetConfig()
+  if (!hasProviderBudgetPolicy())
+    return decideProviderSchedule({ providers, config })
+  try {
+    const usage = await getProviderUsage()
+    return decideProviderSchedule({
+      providers,
+      usedUsdByProvider: dailySpendByProvider(usage.providers),
+      config,
+    })
+  } catch {
+    return decideProviderSchedule({ providers, config })
+  }
 }
 
 function inferHarpRiskLevel(assignment: AssignmentRequest): string {
@@ -1774,6 +1805,12 @@ export async function dispatchSwarmAssignments(
       `assignment task exceeds ${MAX_PROMPT_CHARS} characters`,
     )
   }
+  const roster = rosterByWorkerId(
+    assignments.map((assignment) => assignment.workerId),
+  )
+  const providerSchedule = await scheduleForAssignments(assignments, roster)
+  if (!providerSchedule.allowed)
+    throw new SwarmDispatchError(providerSchedule.message, 429)
   if (serialDispatch && !context.queueWorker) {
     if (process.env.VITEST || process.env.NODE_ENV === 'test') {
       throw new SwarmDispatchQueueUnavailableError(
@@ -1877,9 +1914,6 @@ export async function dispatchSwarmAssignments(
     ),
   }))
 
-  const roster = rosterByWorkerId(
-    assignments.map((assignment) => assignment.workerId),
-  )
   let dispatchedAt: number
   let results: Array<WorkerResult>
   const queuePosition: number | null = null
@@ -1919,16 +1953,40 @@ export async function dispatchSwarmAssignments(
     }
   } else {
     dispatchedAt = Date.now()
-    results = await Promise.all(
-      assignments.map((assignment) =>
-        runWorker(assignment, timeoutMs, roster.get(assignment.workerId), {
-          waitForCheckpoint,
-          checkpointPollMs: checkpointPollSeconds * 1000,
-          missionId: mission.id,
-          notifySessionKey,
-        }),
-      ),
-    )
+    const pending = [...assignments]
+    results = []
+    while (pending.length > 0) {
+      const batch: Array<AssignmentRequest> = []
+      const providerCounts = new Map<string, number>()
+      for (const assignment of pending) {
+        const provider = providerKeyForWorkerModel(
+          roster.get(assignment.workerId)?.model ?? assignment.workerId,
+        )
+        const maxConcurrent =
+          providerSchedule.schedules.find((item) => item.provider === provider)
+            ?.maxConcurrent ?? null
+        const count = providerCounts.get(provider) ?? 0
+        if (maxConcurrent !== null && count >= maxConcurrent) continue
+        providerCounts.set(provider, count + 1)
+        batch.push(assignment)
+      }
+      if (batch.length === 0) batch.push(pending[0])
+      const batchKeys = new Set(batch)
+      for (let index = pending.length - 1; index >= 0; index -= 1) {
+        if (batchKeys.has(pending[index])) pending.splice(index, 1)
+      }
+      const batchResults = await Promise.all(
+        batch.map((assignment) =>
+          runWorker(assignment, timeoutMs, roster.get(assignment.workerId), {
+            waitForCheckpoint,
+            checkpointPollMs: checkpointPollSeconds * 1000,
+            missionId: mission.id,
+            notifySessionKey,
+          }),
+        ),
+      )
+      results.push(...batchResults)
+    }
   }
 
   const latestMission = getSwarmMission(mission.id) ?? mission
@@ -1948,6 +2006,7 @@ export async function dispatchSwarmAssignments(
     checkpointPollSeconds,
     notifySessionKey,
     dispatchMode: serialDispatch ? 'serial' : 'parallel',
+    providerSchedule,
     queueId,
     queuePosition,
     results,
