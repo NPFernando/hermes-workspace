@@ -92,6 +92,48 @@ describe('operational monitor', () => {
     expect(larger.issues).toContainEqual(expect.objectContaining({ code: 'memory_growth', level: 'warning' }))
   })
 
+  it('requires repeated high-growth samples before suggesting a restart', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'hermes-ops-restart-threshold-'))
+    const statePath = join(root, 'state.json')
+    const exec = (file, args) => {
+      if (file === 'git' && args[0] === 'rev-parse') return 'abc'
+      if (file === 'git' && args[0] === 'show') return '100'
+      if (file === 'systemctl') return 'MainPID=22\nExecMainStatus=0\nResult=success\nActiveState=active'
+      if (file === 'bash') return '400000 kB'
+      return ''
+    }
+    await writeFile(statePath, JSON.stringify({ residentMemoryKb: 100_000, memoryGrowthSamples: 2 }))
+    const status = await collectOperationalStatus({ repo: root, statePath, exec })
+    expect(status.restart).toMatchObject({ enabled: false, attempted: false })
+    expect(status.issues).toContainEqual(expect.objectContaining({ code: 'memory_restart_required', level: 'critical' }))
+    expect(JSON.parse(await readFile(statePath, 'utf8'))).toMatchObject({ memoryGrowthSamples: 3 })
+  })
+
+  it('performs only an explicitly enabled guarded restart and records its cooldown', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'hermes-ops-restart-enabled-'))
+    const statePath = join(root, 'state.json')
+    const previousEnabled = process.env.HERMES_OPS_MEMORY_RESTART_ENABLED
+    process.env.HERMES_OPS_MEMORY_RESTART_ENABLED = '1'
+    try {
+      const exec = (file, args) => {
+        if (file === 'git' && args[0] === 'rev-parse') return 'abc'
+        if (file === 'git' && args[0] === 'show') return '100'
+        if (file === 'systemctl') return 'MainPID=22\nExecMainStatus=0\nResult=success\nActiveState=active'
+        if (file === 'bash') return '400000 kB'
+        return ''
+      }
+      await writeFile(statePath, JSON.stringify({ residentMemoryKb: 100_000, memoryGrowthSamples: 2 }))
+      const restarts = []
+      const status = await collectOperationalStatus({ repo: root, statePath, exec, restart: (service) => { restarts.push(service); return true } })
+      expect(restarts).toEqual(['hermes-workspace'])
+      expect(status.restart).toMatchObject({ enabled: true, attempted: true, restarted: true, cooldown: true })
+      expect(JSON.parse(await readFile(statePath, 'utf8'))).toMatchObject({ lastRestartAt: expect.any(Number) })
+    } finally {
+      if (previousEnabled === undefined) delete process.env.HERMES_OPS_MEMORY_RESTART_ENABLED
+      else process.env.HERMES_OPS_MEMORY_RESTART_ENABLED = previousEnabled
+    }
+  })
+
   it('delivers alertable findings once per cooldown window', async () => {
     const root = await mkdtemp(join(tmpdir(), 'hermes-ops-alerts-'))
     const statePath = join(root, 'alerts.json')

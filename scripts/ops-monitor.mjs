@@ -15,6 +15,10 @@ function isRuntimeFile(file) {
 
 const MEMORY_GROWTH_WARN_PERCENT = Number(process.env.HERMES_OPS_MEMORY_GROWTH_WARN_PERCENT || 25)
 const MEMORY_GROWTH_MIN_KB = Number(process.env.HERMES_OPS_MEMORY_GROWTH_MIN_KB || 64 * 1024)
+const MEMORY_RESTART_PERCENT = Number(process.env.HERMES_OPS_MEMORY_RESTART_PERCENT || 50)
+const MEMORY_RESTART_MIN_KB = Number(process.env.HERMES_OPS_MEMORY_RESTART_MIN_KB || 256 * 1024)
+const MEMORY_RESTART_CONSECUTIVE = Number(process.env.HERMES_OPS_MEMORY_RESTART_CONSECUTIVE || 3)
+const MEMORY_RESTART_COOLDOWN_MS = Number(process.env.HERMES_OPS_MEMORY_RESTART_COOLDOWN_SECONDS || 3600) * 1000
 const ALERTABLE_ISSUE_CODES = new Set(['stale_build', 'oom_event', 'failed_deploy', 'memory_growth'])
 const MONITOR_ENV_KEYS = new Set([
   'HERMES_OPS_ALERT_TELEGRAM',
@@ -77,6 +81,14 @@ function parseServiceShow(raw) {
 
 export async function collectOperationalStatus({
   repo = process.cwd(), service = DEFAULT_SERVICE, statePath = join(repo, '.runtime', 'ops-monitor-state.json'), now = Date.now(), exec = command,
+  restart = (targetService, targetRepo) => {
+    try {
+      execFileSync('sudo', ['-n', 'systemctl', 'restart', targetService], { cwd: targetRepo, stdio: 'ignore' })
+      return true
+    } catch {
+      return false
+    }
+  },
 } = {}) {
   const head = exec('git', ['rev-parse', 'HEAD'], repo)
   const commitSeconds = Number(exec('git', ['show', '-s', '--format=%ct', 'HEAD'], repo))
@@ -103,6 +115,12 @@ export async function collectOperationalStatus({
   const memoryGrowthPercent = Number.isFinite(previousMemoryKb) && previousMemoryKb > 0 && memoryGrowthKb != null
     ? (memoryGrowthKb / previousMemoryKb) * 100
     : null
+  const memoryGrowthDetected = memoryGrowthKb != null && memoryGrowthKb >= MEMORY_GROWTH_MIN_KB && memoryGrowthPercent >= MEMORY_GROWTH_WARN_PERCENT
+  const memoryGrowthSamples = memoryGrowthDetected ? Number(previous.memoryGrowthSamples || 0) + 1 : 0
+  const memoryRestartThresholdReached = memoryGrowthKb != null
+    && memoryGrowthKb >= MEMORY_RESTART_MIN_KB
+    && memoryGrowthPercent >= MEMORY_RESTART_PERCENT
+    && memoryGrowthSamples >= MEMORY_RESTART_CONSECUTIVE
   const oomLog = journalText(exec('journalctl', ['-k', '--since', '24 hours ago', '--no-pager', '-g', 'oom|out of memory|killed process'], repo))
   const errorLog = journalText(exec('journalctl', ['-u', service, '--since', '24 hours ago', '-p', 'err..alert', '--no-pager'], repo))
   const deploymentLog = journalText(exec('journalctl', ['-u', 'hermes-workspace-deploy.service', '--since', '7 days ago', '--no-pager'], repo))
@@ -124,8 +142,27 @@ export async function collectOperationalStatus({
     issues.push({ level: serviceOom ? 'critical' : 'warning', code: 'oom_event', detail: serviceOom ? 'Kernel journal contains a recent OOM event affecting this service.' : 'Kernel journal contains a recent OOM event affecting another workload.' })
   }
   if (errorLog.trim()) issues.push({ level: 'warning', code: 'service_errors', detail: `${errorLog.trim().split(/\r?\n/).length} recent service error log line(s) found.` })
-  if (memoryGrowthKb != null && memoryGrowthKb >= MEMORY_GROWTH_MIN_KB && memoryGrowthPercent >= MEMORY_GROWTH_WARN_PERCENT) {
+  if (memoryGrowthDetected) {
     issues.push({ level: 'warning', code: 'memory_growth', detail: `Resident memory grew by ${Math.round(memoryGrowthKb / 1024)} MiB (${Math.round(memoryGrowthPercent)}%) since the previous check.` })
+  }
+  let restartResult = { enabled: process.env.HERMES_OPS_MEMORY_RESTART_ENABLED === '1', attempted: false, restarted: false, cooldown: false }
+  if (memoryRestartThresholdReached) {
+    const lastRestartAt = Number(previous.lastRestartAt || 0)
+    if (lastRestartAt + MEMORY_RESTART_COOLDOWN_MS > now) {
+      restartResult.cooldown = true
+      issues.push({ level: 'critical', code: 'memory_restart_cooldown', detail: `Memory restart threshold remains exceeded, but the restart cooldown is active until ${new Date(lastRestartAt + MEMORY_RESTART_COOLDOWN_MS).toISOString()}.` })
+    } else if (restartResult.enabled) {
+      restartResult.attempted = true
+      restartResult.restarted = restart(service, repo)
+      if (restartResult.restarted) {
+        restartResult.cooldown = true
+        issues.push({ level: 'critical', code: 'memory_restart_triggered', detail: `Restarted ${service} after ${memoryGrowthSamples} consecutive high-growth samples.` })
+      } else {
+        issues.push({ level: 'critical', code: 'memory_restart_failed', detail: `Restart threshold reached for ${service}, but the guarded systemd restart failed.` })
+      }
+    } else {
+      issues.push({ level: 'critical', code: 'memory_restart_required', detail: `Memory restart threshold reached after ${memoryGrowthSamples} consecutive high-growth samples; set HERMES_OPS_MEMORY_RESTART_ENABLED=1 to permit a guarded restart.` })
+    }
   }
   if (previous.pid && serviceShow.pid !== '0' && previous.pid !== serviceShow.pid) issues.push({ level: 'warning', code: 'pid_changed', detail: `Service PID changed from ${previous.pid} to ${serviceShow.pid}.` })
   const parkedStashes = stashLines ? stashLines.split(/\r?\n/).filter(Boolean).length : 0
@@ -134,7 +171,14 @@ export async function collectOperationalStatus({
   const activeSince = serviceShow.activeEnterTimestamp ? parseSystemdTimestamp(serviceShow.activeEnterTimestamp) : NaN
   const uptimeSeconds = Number.isFinite(activeSince) && activeSince <= now ? Math.floor((now - activeSince) / 1000) : null
   const deploymentHistory = deploymentLog.trim() ? deploymentLog.trim().split(/\r?\n/).slice(-20) : []
-  await writeFile(statePath, JSON.stringify({ checkedAt: now, head, pid: serviceShow.pid, residentMemoryKb }, null, 2) + '\n', { mode: 0o600 })
+  await writeFile(statePath, JSON.stringify({
+    checkedAt: now,
+    head,
+    pid: serviceShow.pid,
+    residentMemoryKb,
+    memoryGrowthSamples,
+    lastRestartAt: restartResult.restarted ? now : Number(previous.lastRestartAt || 0),
+  }, null, 2) + '\n', { mode: 0o600 })
   return {
     checkedAt: now,
     head,
@@ -146,6 +190,7 @@ export async function collectOperationalStatus({
     deploymentHistory,
     recentErrorLines: errorLog.trim() ? errorLog.trim().split(/\r?\n/).slice(-20) : [],
     parkedStashes,
+    restart: restartResult,
     issues,
   }
 }
