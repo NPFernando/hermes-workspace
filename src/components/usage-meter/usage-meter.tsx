@@ -145,6 +145,34 @@ type ProviderUsageEntry = {
   updatedAt: number
 }
 
+type UsageBudget = {
+  level: string
+  limitUsd: number | null
+  usedUsd: number | null
+  remainingUsd: number | null
+  percentUsed: number | null
+  message: string
+}
+
+type UsageAnomaly = {
+  provider: string
+  displayName: string
+  label: string
+  day: string
+  ratio: number
+  severity: 'warning' | 'critical'
+  message: string
+}
+
+type UsageHistoryPoint = {
+  day: string
+  provider: string
+  displayName: string
+  label: string
+  measure: 'quota' | 'spend'
+  used: number
+}
+
 function getTodayKey() {
   const now = new Date()
   return now.toISOString().slice(0, 10)
@@ -464,6 +492,10 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
   const [providerUpdatedAt, setProviderUpdatedAt] = useState<number | null>(
     null,
   )
+  const [sharedBudget, setSharedBudget] = useState<UsageBudget | null>(null)
+  const [monthlyBudget, setMonthlyBudget] = useState<UsageBudget | null>(null)
+  const [usageHistory, setUsageHistory] = useState<Array<UsageHistoryPoint>>([])
+  const [usageAnomalies, setUsageAnomalies] = useState<Array<UsageAnomaly>>([])
   const [open, setOpen] = useState(false)
   const [statsView, setStatsView] = useState<StatsView>(getStoredStatsView)
   const [agentActivity] = useState<AgentActivity>({
@@ -514,6 +546,10 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
         providers?: Array<ProviderUsageEntry>
         updatedAt?: number
         error?: string
+        sharedBudget?: UsageBudget
+        monthlyBudget?: UsageBudget
+        history?: Array<UsageHistoryPoint>
+        anomalies?: Array<UsageAnomaly>
       } | null
 
       if (!res.ok || data?.ok === false) {
@@ -522,6 +558,10 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
 
       setProviderUsage(data?.providers ?? [])
       setProviderUpdatedAt(data?.updatedAt ?? Date.now())
+      setSharedBudget(data?.sharedBudget ?? null)
+      setMonthlyBudget(data?.monthlyBudget ?? null)
+      setUsageHistory(data?.history ?? [])
+      setUsageAnomalies(data?.anomalies ?? [])
       setProviderError(null)
     } catch (err) {
       const errorMessage = safeErrorMessage(err)
@@ -701,6 +741,10 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
       providerUsage,
       providerError,
       providerUpdatedAt,
+      sharedBudget,
+      monthlyBudget,
+      history: usageHistory,
+      anomalies: usageAnomalies,
       onRefreshProviders: refreshProviders,
       preferredProvider,
       onSetPreferredProvider: handleSetPreferredProvider,
@@ -709,6 +753,10 @@ export function UsageMeter({ visible = true }: { visible?: boolean }) {
       error,
       providerError,
       providerUpdatedAt,
+      sharedBudget,
+      monthlyBudget,
+      usageHistory,
+      usageAnomalies,
       providerUsage,
       usage,
       refreshProviders,
