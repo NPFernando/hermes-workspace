@@ -27,6 +27,10 @@ const WORKSPACE_BUILD_ID = (() => {
     return 'unknown'
   }
 })()
+// Make the identity captured when this process starts available to the
+// server-side observability payload. This lets operators distinguish the
+// artifact currently on disk from the artifact actually serving requests.
+process.env.HERMES_RUNTIME_BUILD_ID = WORKSPACE_BUILD_ID
 
 const port = parseInt(process.env.PORT || '3000', 10)
 const HTTP_METRIC_WINDOW_MS = 15 * 60 * 1000

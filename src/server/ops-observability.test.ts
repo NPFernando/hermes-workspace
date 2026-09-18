@@ -10,6 +10,7 @@ import {
   getFinanceStorageMonitorSummary,
   getFinanceStorageSmokeCronSummary,
   getHermesDailyUsage,
+  getRuntimeBuildIdentity,
 } from './ops-observability'
 
 const tempDirs: Array<string> = []
@@ -150,6 +151,19 @@ describe('ops-observability deployment journal', () => {
     const path = join(dir, 'deployment-history.jsonl')
     writeFileSync(path, '{bad json}\n{}\n', 'utf8')
     expect(getDeploymentJournal({ path })).toEqual([])
+  })
+})
+
+describe('ops-observability runtime build identity', () => {
+  it('reports missing process identity as degraded without treating disk state as live proof', () => {
+    const dir = makeTempDir()
+    mkdirSync(join(dir, '.runtime'), { recursive: true })
+    writeFileSync(join(dir, '.runtime', 'build-commit'), 'not-current-head\n')
+    expect(getRuntimeBuildIdentity(dir)).toMatchObject({
+      status: 'degraded',
+      markerMatchesHead: false,
+      artifactBuild: null,
+    })
   })
 })
 

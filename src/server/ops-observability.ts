@@ -13,8 +13,9 @@
  * already used by 20+ server modules). Each section is independently try/caught so
  * one failing source degrades to `null` instead of failing the whole payload.
  */
-import { execFile } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
 import { promisify } from 'node:util'
+import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
@@ -756,6 +757,75 @@ export interface OpsObservability {
   /** Local Headroom compression proxy stats; null when the proxy isn't running. */
   headroom: HeadroomStats | null
   safeMode: SafeModeStatus
+  runtimeBuild: RuntimeBuildIdentity
+}
+
+export interface RuntimeBuildIdentity {
+  status: 'pass' | 'degraded'
+  servedBuild: string | null
+  artifactBuild: string | null
+  buildMarker: string | null
+  head: string | null
+  markerMatchesHead: boolean
+  artifactMatchesServed: boolean
+  detail: string
+}
+
+export function getRuntimeBuildIdentity(
+  root = process.cwd(),
+): RuntimeBuildIdentity {
+  const readText = (path: string): string | null => {
+    try {
+      const value = readFileSync(path, 'utf8').trim()
+      return value || null
+    } catch {
+      return null
+    }
+  }
+  const buildMarker = readText(join(root, '.runtime', 'build-commit'))
+  const artifactPath = join(root, 'dist', 'server', 'server.js')
+  let artifactBuild: string | null = null
+  try {
+    artifactBuild = createHash('sha256')
+      .update(readFileSync(artifactPath))
+      .digest('hex')
+      .slice(0, 16)
+  } catch {
+    artifactBuild = null
+  }
+  let head: string | null = null
+  try {
+    head = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim() || null
+  } catch {
+    head = null
+  }
+  const servedBuild = process.env.HERMES_RUNTIME_BUILD_ID?.trim() || null
+  const markerMatchesHead = Boolean(buildMarker && head && buildMarker === head)
+  const artifactMatchesServed = Boolean(servedBuild && artifactBuild && servedBuild === artifactBuild)
+  const status = markerMatchesHead && artifactMatchesServed ? 'pass' : 'degraded'
+  const detail = status === 'pass'
+    ? 'The running process, compiled artifact, and deployment marker agree.'
+    : !servedBuild
+      ? 'The running process identity is unavailable; restart after a guarded build to capture it.'
+      : !artifactBuild
+        ? 'The compiled server artifact is missing or unreadable.'
+        : !artifactMatchesServed
+          ? 'The running process is serving a different artifact than the one on disk.'
+          : 'The deployment marker does not match the current checkout.'
+  return {
+    status,
+    servedBuild,
+    artifactBuild,
+    buildMarker,
+    head,
+    markerMatchesHead,
+    artifactMatchesServed,
+    detail,
+  }
 }
 
 export async function getOpsObservability(): Promise<OpsObservability> {
@@ -792,5 +862,6 @@ export async function getOpsObservability(): Promise<OpsObservability> {
     serviceHealthHistory: getServiceHealthHistory(),
     headroom,
     safeMode: getSafeModeStatus(),
+    runtimeBuild: getRuntimeBuildIdentity(),
   }
 }

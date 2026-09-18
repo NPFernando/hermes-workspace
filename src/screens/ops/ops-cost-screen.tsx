@@ -113,6 +113,13 @@ interface SafeModeStatus {
   source: 'HERMES_SAFE_MODE' | 'disabled'
   detail: string
 }
+interface RuntimeBuildIdentity {
+  status: 'pass' | 'degraded'
+  servedBuild: string | null
+  artifactBuild: string | null
+  markerMatchesHead: boolean
+  detail: string
+}
 interface FinanceStorageSmokeCronOutput {
   path: string
   outputAt: string
@@ -202,6 +209,7 @@ interface OpsPayload {
   serviceHealthHistory: Array<ServiceHealthHistoryEntry>
   safeMode: SafeModeStatus
   headroom: HeadroomStats | null
+  runtimeBuild: RuntimeBuildIdentity
 }
 
 function money(v: number | null | undefined): string {
@@ -556,6 +564,7 @@ export function OpsCostScreen() {
     serviceHealthHistory,
     headroom,
     safeMode,
+    runtimeBuild,
   } = opsQuery.data
   const runwayDays =
     cost?.remaining != null &&
@@ -601,6 +610,21 @@ export function OpsCostScreen() {
 
       <OperationalHealthPanel />
       <ProductionReadinessPanel />
+
+      <Panel title="Runtime release identity">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className={runtimeBuild.status === 'pass' ? 'text-emerald-400' : 'text-amber-400'}>
+            {runtimeBuild.status === 'pass' ? 'COHERENT' : 'DEGRADED'}
+          </span>
+          <span className="font-mono text-[11px] text-[var(--theme-muted)]">
+            served {runtimeBuild.servedBuild ?? 'unknown'}
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-[var(--theme-muted)]">{runtimeBuild.detail}</p>
+        <p className="mt-1 text-[11px] text-[var(--theme-muted)]">
+          artifact {runtimeBuild.artifactBuild ?? 'missing'} · marker {runtimeBuild.markerMatchesHead ? 'matches HEAD' : 'does not match HEAD'}
+        </p>
+      </Panel>
 
       <Panel title="External-write safe mode">
         <div className="flex flex-wrap items-center justify-between gap-3">
