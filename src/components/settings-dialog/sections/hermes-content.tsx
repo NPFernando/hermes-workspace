@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SavedMessageBanner } from './settings-dialog-primitives'
-import { CredentialRotationCard } from './credential-rotation-card'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
@@ -495,8 +494,6 @@ export function HermesContent() {
   return (
     <div className="space-y-5">
       <SavedMessageBanner msg={msg} />
-
-      <CredentialRotationCard />
 
       {/* Provider Selection */}
       <div>
