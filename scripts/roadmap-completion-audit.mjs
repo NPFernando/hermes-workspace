@@ -241,7 +241,7 @@ function recentAuthenticatedSmokeEvidence(root) {
   }
 }
 
-function recentDeploymentCorrelationEvidence(root) {
+function recentDeploymentCorrelationEvidence(root, now = Date.now()) {
   const path = join(root, '.runtime', 'deployment-history.jsonl')
   try {
     return readFileSync(path, 'utf8')
@@ -251,7 +251,11 @@ function recentDeploymentCorrelationEvidence(root) {
       .some((line) => {
         try {
           const entry = JSON.parse(line)
-          return typeof entry?.deploymentId === 'string' &&
+          const at = Date.parse(entry?.at ?? '')
+          return Number.isFinite(at) &&
+            now - at >= 0 &&
+            now - at <= 48 * 60 * 60 * 1000 &&
+            typeof entry?.deploymentId === 'string' &&
             entry.deploymentId.length > 0 &&
             typeof entry.at === 'string' &&
             typeof entry.commit === 'string'
