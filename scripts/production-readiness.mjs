@@ -84,10 +84,11 @@ async function deploymentIdentity() {
     .then((response) => response.headers.get('x-workspace-build'))
     .catch(() => null)
   const artifact = artifactBuildId()
-  const expected = marker.ok && head.ok ? artifact : null
+  const markerMatchesHead = Boolean(marker.ok && head.ok && marker.stdout === head.stdout)
   const matches = Boolean(served && artifact && served === artifact)
+  const statusPasses = matches && markerMatchesHead && !dirty.stdout
   return {
-    status: matches && !dirty.stdout ? 'pass' : 'degraded',
+    status: statusPasses ? 'pass' : 'degraded',
     head: head.stdout || null,
     branch: branch.stdout || null,
     dirty: Boolean(dirty.stdout),
@@ -95,12 +96,18 @@ async function deploymentIdentity() {
     buildMarker: marker.stdout || null,
     artifactBuild: artifact,
     servedBuild: served,
-    markerMatchesHead: Boolean(expected && marker.stdout === head.stdout),
+    markerMatchesHead,
     artifactMatchesServed: matches,
     servicePid: servicePid.stdout || null,
-    detail: matches
-      ? 'The live build header matches the local compiled artifact.'
-      : 'Live build identity could not be fully verified.',
+    detail: statusPasses
+      ? 'The deployment marker, compiled artifact, and live build header agree.'
+      : !markerMatchesHead
+        ? 'The deployment marker does not match the current checkout.'
+        : !matches
+          ? 'The live build header does not match the local compiled artifact.'
+          : dirty.stdout
+            ? 'The readiness checkout has uncommitted changes.'
+            : 'Live build identity could not be fully verified.',
   }
 }
 
