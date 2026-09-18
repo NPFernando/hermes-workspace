@@ -2030,18 +2030,34 @@ export const Route = createFileRoute('/api/swarm-dispatch')({
             { status: 400 },
           )
         }
-        let body: { acknowledgePossibleDuplicate?: unknown }
+        let body: {
+          acknowledgePossibleDuplicate?: unknown
+          approvalNote?: unknown
+        }
         try {
           body = (await request.json()) as {
             acknowledgePossibleDuplicate?: unknown
+            approvalNote?: unknown
           }
         } catch {
           return json({ error: 'Invalid JSON body' }, { status: 400 })
+        }
+        const approvalNote =
+          typeof body.approvalNote === 'string' ? body.approvalNote.trim() : ''
+        if (approvalNote.length < 8 || approvalNote.length > 1_000) {
+          return json(
+            { error: 'An operator approval note of 8 to 1,000 characters is required.' },
+            { status: 400 },
+          )
         }
         try {
           const retry = await retrySwarmDispatchQueueJob(
             id,
             body.acknowledgePossibleDuplicate === true,
+            {
+              operator: process.env.HERMES_OPERATOR_ID?.trim() || 'authenticated-operator',
+              note: approvalNote,
+            },
           )
           ensureSwarmDispatchQueueWorker()
           return json(retry, { status: retry.alreadyQueued ? 200 : 202 })

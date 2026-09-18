@@ -3,8 +3,8 @@ import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { Pool } from 'pg'
 import {
-  cancelSwarmDispatchQueueJob,
   buildSwarmDispatchQueueNotification,
+  cancelSwarmDispatchQueueJob,
   closeSwarmDispatchQueuePool,
   enqueueSwarmDispatch,
   getSwarmDispatchQueueJob,
@@ -99,7 +99,7 @@ pgDescribe('Postgres-backed serial dispatch queue', () => {
     if (!/_test$/i.test(database))
       throw new Error('Queue integration tests require a *_test database.')
     await inspectionPool.query(
-      'TRUNCATE TABLE public.swarm_dispatch_queue_jobs',
+      'TRUNCATE TABLE public.swarm_dispatch_queue_retry_audits, public.swarm_dispatch_queue_jobs',
     )
   })
 
@@ -288,24 +288,55 @@ pgDescribe('Postgres-backed serial dispatch queue', () => {
     })
 
     await expect(
-      retrySwarmDispatchQueueJob(original.id, false),
+      retrySwarmDispatchQueueJob(original.id, false, {
+        operator: 'test-operator',
+        note: 'Reviewed isolated retry for test.',
+      }),
     ).rejects.toMatchObject({
       name: 'SwarmDispatchQueueRetryError',
       kind: 'acknowledgement-required',
     } satisfies Partial<SwarmDispatchQueueRetryError>)
-    const retried = await retrySwarmDispatchQueueJob(original.id, true)
+    const retried = await retrySwarmDispatchQueueJob(original.id, true, {
+      operator: 'test-operator',
+      note: 'Reviewed isolated retry for test.',
+    })
     expect(retried).toMatchObject({
       retryOfJobId: original.id,
       position: 1,
       alreadyQueued: false,
     })
 
-    const duplicateRequest = await retrySwarmDispatchQueueJob(original.id, true)
+    const duplicateRequest = await retrySwarmDispatchQueueJob(original.id, true, {
+      operator: 'test-operator',
+      note: 'Reviewed duplicate request for test.',
+    })
     expect(duplicateRequest).toMatchObject({
       id: retried.id,
       retryOfJobId: original.id,
       alreadyQueued: true,
     })
+    const audits = await inspectionPool.query<{
+      operator: string
+      approval_note: string
+      already_queued: boolean
+    }>(
+      `SELECT operator, approval_note, already_queued
+       FROM public.swarm_dispatch_queue_retry_audits
+       WHERE source_job_id = $1::uuid ORDER BY approved_at`,
+      [original.id],
+    )
+    expect(audits.rows).toMatchObject([
+      {
+        operator: 'test-operator',
+        approval_note: 'Reviewed isolated retry for test.',
+        already_queued: false,
+      },
+      {
+        operator: 'test-operator',
+        approval_note: 'Reviewed duplicate request for test.',
+        already_queued: true,
+      },
+    ])
     const snapshot = await getSwarmDispatchQueueSnapshot()
     expect(
       snapshot.waiting.filter((job) => job.retryOfJobId === original.id),

@@ -50,6 +50,7 @@ docker exec -i "$CONTAINER" psql -U postgres -d hermes_swarm_queue_test -v ON_ER
 docker exec -i "$CONTAINER" psql -U postgres -d hermes_swarm_queue_test -v ON_ERROR_STOP=1 <<'SQL'
 GRANT USAGE ON SCHEMA public TO hermes_queue_test_app;
 GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON public.swarm_dispatch_queue_jobs TO hermes_queue_test_app;
+GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON public.swarm_dispatch_queue_retry_audits TO hermes_queue_test_app;
 SQL
 
 HERMES_HOME="$TEMP_HERMES_HOME" \

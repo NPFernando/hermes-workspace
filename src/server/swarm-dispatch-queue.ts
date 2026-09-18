@@ -7,6 +7,7 @@ import { publishSwarmActionPrompt } from './swarm-notifications'
 import type { PoolClient, PoolConfig } from 'pg'
 
 const TABLE = 'public.swarm_dispatch_queue_jobs'
+const RETRY_AUDIT_TABLE = 'public.swarm_dispatch_queue_retry_audits'
 const LEADER_LOCK_A = 918_231
 const LEADER_LOCK_B = 112
 const ENQUEUE_LOCK_A = 918_232
@@ -55,6 +56,18 @@ export type SwarmDispatchQueueSnapshot = {
   active: SwarmDispatchQueueItem | null
   waiting: Array<SwarmDispatchQueueItem>
   recent: Array<SwarmDispatchQueueItem>
+  retryAudits: Array<SwarmDispatchQueueRetryAudit>
+}
+
+export type SwarmDispatchQueueRetryAudit = {
+  id: string
+  sourceJobId: string
+  retryJobId: string
+  operator: string
+  approvalNote: string
+  duplicateRiskAcknowledged: boolean
+  alreadyQueued: boolean
+  approvedAt: number
 }
 
 export class SwarmDispatchQueueFullError extends Error {
@@ -301,11 +314,15 @@ async function ensureSchema(): Promise<Pool> {
   const pg = getPool()
   if (schemaChecked) return pg
   try {
-    const result = await pg.query<{ table_name: string | null }>(
-      `SELECT to_regclass($1)::text AS table_name`,
-      [TABLE],
+    const result = await pg.query<{
+      table_name: string | null
+      audit_table_name: string | null
+    }>(
+      `SELECT to_regclass($1)::text AS table_name,
+              to_regclass($2)::text AS audit_table_name`,
+      [TABLE, RETRY_AUDIT_TABLE],
     )
-    if (!result.rows[0]?.table_name) {
+    if (!result.rows[0]?.table_name || !result.rows[0]?.audit_table_name) {
       throw new SwarmDispatchQueueUnavailableError(
         'Dedicated queue database is reachable, but its schema is missing. Run pnpm swarm-queue:migrate.',
       )
@@ -458,17 +475,27 @@ export async function enqueueSwarmDispatch(
 export async function retrySwarmDispatchQueueJob(
   id: string,
   acknowledgePossibleDuplicate: boolean,
+  approval: { operator: string; note: string },
 ): Promise<{
   id: string
   position: number
   queuedAt: number
   retryOfJobId: string
   alreadyQueued: boolean
+  auditId: string
 }> {
   if (!acknowledgePossibleDuplicate) {
     throw new SwarmDispatchQueueRetryError(
       'acknowledgement-required',
       'Explicit acknowledgement is required because an earlier attempt may have partially reached agents.',
+    )
+  }
+  const operator = approval.operator.trim()
+  const note = approval.note.trim()
+  if (!operator || !note) {
+    throw new SwarmDispatchQueueRetryError(
+      'acknowledgement-required',
+      'An operator approval note is required before retrying a dead-letter job.',
     )
   }
 
@@ -532,6 +559,14 @@ export async function retrySwarmDispatchQueueJob(
               [existing.id],
             )
           : null
+      const audit = await client.query<{ id: string }>(
+        `INSERT INTO ${RETRY_AUDIT_TABLE}
+           (id, source_job_id, retry_job_id, operator, approval_note,
+            duplicate_risk_acknowledged, already_queued)
+         VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, true, true)
+         RETURNING id`,
+        [randomUUID(), id, existing.id, operator, note],
+      )
       await client.query('COMMIT')
       return {
         id: existing.id,
@@ -539,6 +574,7 @@ export async function retrySwarmDispatchQueueJob(
         queuedAt: toMillis(existing.queued_at) ?? Date.now(),
         retryOfJobId: id,
         alreadyQueued: true,
+        auditId: audit.rows[0].id,
       }
     }
 
@@ -572,6 +608,14 @@ export async function retrySwarmDispatchQueueJob(
        AND (jobs.priority, jobs.queued_at, jobs.id) >= (target.priority, target.queued_at, target.id)`,
       [retryId],
     )
+    const audit = await client.query<{ id: string }>(
+      `INSERT INTO ${RETRY_AUDIT_TABLE}
+         (id, source_job_id, retry_job_id, operator, approval_note,
+          duplicate_risk_acknowledged, already_queued)
+       VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, true, false)
+       RETURNING id`,
+      [randomUUID(), id, retryId, operator, note],
+    )
     await client.query('COMMIT')
     return {
       id: retryId,
@@ -579,6 +623,7 @@ export async function retrySwarmDispatchQueueJob(
       queuedAt: toMillis(inserted.rows[0].queued_at) ?? Date.now(),
       retryOfJobId: id,
       alreadyQueued: false,
+      auditId: audit.rows[0].id,
     }
   } catch (error) {
     try {
@@ -654,7 +699,7 @@ export async function cancelSwarmDispatchQueueJob(
 
 export async function getSwarmDispatchQueueSnapshot(): Promise<SwarmDispatchQueueSnapshot> {
   const pg = await ensureSchema()
-  const [active, waiting, recent] = await Promise.all([
+  const [active, waiting, recent, retryAudits] = await Promise.all([
     pg.query<QueueRow>(
       `SELECT id, status, assignment_count, payload, result, error,
          priority, lease_token, cancel_requested_at, queued_at, started_at, finished_at,
@@ -673,6 +718,21 @@ export async function getSwarmDispatchQueueSnapshot(): Promise<SwarmDispatchQueu
          lease_expires_at, dead_letter_at, retry_of_job_id
        FROM ${TABLE} WHERE status IN ('succeeded', 'failed', 'cancelled', 'interrupted')
        ORDER BY finished_at DESC NULLS LAST LIMIT 20`,
+    ),
+    pg.query<{
+      id: string
+      source_job_id: string
+      retry_job_id: string
+      operator: string
+      approval_note: string
+      duplicate_risk_acknowledged: boolean
+      already_queued: boolean
+      approved_at: Date | string
+    }>(
+      `SELECT id, source_job_id, retry_job_id, operator, approval_note,
+              duplicate_risk_acknowledged, already_queued, approved_at
+       FROM ${RETRY_AUDIT_TABLE}
+       ORDER BY approved_at DESC LIMIT 20`,
     ),
   ])
   const toItem = (row: QueueRow, position: number): SwarmDispatchQueueItem => {
@@ -696,6 +756,16 @@ export async function getSwarmDispatchQueueSnapshot(): Promise<SwarmDispatchQueu
     active: active.rows[0] ? toItem(active.rows[0], 0) : null,
     waiting: waiting.rows.map((row, index) => toItem(row, index + 1)),
     recent: recent.rows.map((row) => toItem(row, 0)),
+    retryAudits: retryAudits.rows.map((row) => ({
+      id: row.id,
+      sourceJobId: row.source_job_id,
+      retryJobId: row.retry_job_id,
+      operator: row.operator,
+      approvalNote: row.approval_note,
+      duplicateRiskAcknowledged: row.duplicate_risk_acknowledged,
+      alreadyQueued: row.already_queued,
+      approvedAt: toMillis(row.approved_at) ?? Date.now(),
+    })),
   }
 }
 
