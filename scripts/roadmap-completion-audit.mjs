@@ -73,6 +73,30 @@ function recentPassedDrEvidence() {
   }
 }
 
+function recentPassedOffsiteEvidence() {
+  const directory = process.env.HERMES_DR_EVIDENCE_DIR || join(homedir(), '.hermes-data', 'dr-exercises')
+  try {
+    return readdirSync(directory)
+      .filter((file) => /^exercise-[0-9]{14,}\.json$/.test(file))
+      .sort()
+      .reverse()
+      .some((file) => {
+        try {
+          const report = JSON.parse(readFileSync(join(directory, file), 'utf8'))
+          return report.ok === true && Array.isArray(report.results) && report.results.some((result) =>
+            result.name === 'finance-offsite-round-trip' &&
+            result.status === 'passed' &&
+            result.output?.roundTripVerified === true,
+          )
+        } catch {
+          return false
+        }
+      })
+  } catch {
+    return false
+  }
+}
+
 function recentForkPreviewEvidence() {
   const directory = process.env.HERMES_FORK_SYNC_REPORT_DIR || join(homedir(), '.hermes-data', 'fork-sync-previews')
   try {
@@ -287,6 +311,12 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
     if (index === 0) {
       const smoke = astrologyAuthSmokeEvidence(run)
       return evidence(smoke.verified, smoke.detail)
+    }
+    if (index === 1) {
+      const verified = recentPassedOffsiteEvidence()
+      return evidence(verified, verified
+        ? 'recent encrypted Finance off-site round trip passed'
+        : 'no recent passed encrypted Finance off-site round trip found')
     }
     if (index === 5) {
       const status = getReadiness()?.checks?.configurationPreflight?.status

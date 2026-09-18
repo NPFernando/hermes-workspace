@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { buildRoadmapAudit } from './roadmap-completion-audit.mjs'
 
 describe('roadmap completion audit', () => {
@@ -63,5 +66,31 @@ describe('roadmap completion audit', () => {
     }
     const report = buildRoadmapAudit({ root: process.cwd(), run })
     expect(report.items[0]).toMatchObject({ status: 'verified', liveEvidence: true })
+  })
+
+  it('requires explicit passed off-site round-trip evidence for Finance item 2', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'hermes-roadmap-dr-'))
+    mkdirSync(directory, { recursive: true })
+    writeFileSync(join(directory, 'exercise-20260918120000.json'), JSON.stringify({
+      ok: true,
+      results: [{
+        name: 'finance-offsite-round-trip',
+        status: 'passed',
+        output: { roundTripVerified: true },
+      }],
+    }))
+    const previous = process.env.HERMES_DR_EVIDENCE_DIR
+    process.env.HERMES_DR_EVIDENCE_DIR = directory
+    try {
+      const report = buildRoadmapAudit({
+        root: process.cwd(),
+        run: (file) => file === 'systemctl' ? 'active' : file === 'git' ? 'test-head' : '',
+      })
+      expect(report.items[1]).toMatchObject({ status: 'verified', liveEvidence: true })
+    } finally {
+      if (previous === undefined) delete process.env.HERMES_DR_EVIDENCE_DIR
+      else process.env.HERMES_DR_EVIDENCE_DIR = previous
+      rmSync(directory, { recursive: true, force: true })
+    }
   })
 })
