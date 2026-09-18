@@ -8,6 +8,7 @@
  *  - Ops cron job health                                      (cron/jobs.json)
  */
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { AiUsagePanel } from './components/ai-usage-panel'
 import { AgentControlPlane } from './components/agent-control-plane'
 
@@ -476,6 +477,7 @@ function ProductionReadinessPanel() {
 }
 
 export function OpsCostScreen() {
+  const [safeModeCommandCopied, setSafeModeCommandCopied] = useState(false)
   const opsQuery = useQuery({
     queryKey: ['ops-observability'],
     queryFn: async () => {
@@ -601,10 +603,27 @@ export function OpsCostScreen() {
       <ProductionReadinessPanel />
 
       <Panel title="External-write safe mode">
-        <div className={safeMode.enabled ? 'text-amber-400' : 'text-emerald-400'}>
-          {safeMode.enabled ? 'ACTIVE — external writes are blocked' : 'DISABLED — normal integration gates apply'}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className={safeMode.enabled ? 'text-amber-400' : 'text-emerald-400'}>
+            {safeMode.enabled ? 'ACTIVE — external writes are blocked' : 'DISABLED — normal integration gates apply'}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              void navigator.clipboard
+                .writeText('sudo systemctl set-environment HERMES_SAFE_MODE=1 && sudo systemctl restart hermes-workspace.service')
+                .then(() => setSafeModeCommandCopied(true))
+                .catch(() => setSafeModeCommandCopied(false))
+            }}
+            className="rounded-lg border border-[var(--theme-border)] px-2.5 py-1.5 text-xs text-[var(--theme-text)] hover:bg-[var(--theme-hover)]"
+          >
+            {safeModeCommandCopied ? 'Command copied' : 'Copy emergency enable command'}
+          </button>
         </div>
         <p className="mt-1 text-xs text-[var(--theme-muted)]">{safeMode.detail}</p>
+        <p className="mt-2 text-[11px] text-[var(--theme-muted)]">
+          Browser requests never change this process-level control. Run the copied command from an authorized shell, then refresh this panel.
+        </p>
       </Panel>
 
       <Panel title="Production change journal">
