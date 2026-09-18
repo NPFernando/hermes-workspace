@@ -4,7 +4,10 @@ import { getProviderUsage } from '../../server/provider-usage'
 import { isAuthenticated } from '../../server/auth-middleware'
 import { safeErrorMessage } from '../../server/rate-limit'
 import { recordAndReadProviderUsageHistory } from '../../server/provider-usage-history'
-import { buildMonthlyUsageBudget } from '../../server/usage-budget'
+import {
+  buildMonthlyUsageBudget,
+  detectUsageAnomalies,
+} from '../../server/usage-budget'
 import type { ProviderUsageHistoryPoint } from '../../server/provider-usage-history'
 
 const REQUEST_TIMEOUT_MS = 5000 // 5 second timeout
@@ -59,6 +62,7 @@ export const Route = createFileRoute('/api/provider-usage')({
             ...payload,
             history,
             monthlyBudget: buildMonthlyUsageBudget(history),
+            anomalies: detectUsageAnomalies(history),
           })
         } catch (err) {
           // Provider usage is optional telemetry. A provider outage or slow
@@ -69,6 +73,7 @@ export const Route = createFileRoute('/api/provider-usage')({
             updatedAt: Date.now(),
             providers: [],
             history: [],
+            anomalies: [],
             degraded: true,
             error: safeErrorMessage(err),
           })
