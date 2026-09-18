@@ -14,9 +14,9 @@ type UserProfile = {
   picture?: string
 }
 
-function expiryLabel(expiresAt: number | null): string {
+function expiryLabel(expiresAt: number | null, now = Date.now()): string {
   if (!expiresAt) return 'Session expiry is managed by the deployment.'
-  const remaining = expiresAt - Date.now()
+  const remaining = expiresAt - now
   if (remaining <= 0) return 'Session expired; sign in again to continue.'
   const hours = Math.floor(remaining / (60 * 60 * 1000))
   if (hours < 48)
@@ -30,6 +30,7 @@ export function AccountSessionSection() {
   const [loading, setLoading] = useState(true)
   const [disconnecting, setDisconnecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [now, setNow] = useState(() => Date.now())
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -62,6 +63,14 @@ export function AccountSessionSection() {
     void refresh()
   }, [refresh])
 
+  // Keep the expiry warning accurate while the settings dialog remains open.
+  // Without this heartbeat, a session could expire while the UI still says it
+  // is valid until some unrelated render occurs.
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 1_000)
+    return () => window.clearInterval(interval)
+  }, [])
+
   const disconnect = async () => {
     setDisconnecting(true)
     setError(null)
@@ -75,6 +84,8 @@ export function AccountSessionSection() {
       setDisconnecting(false)
     }
   }
+
+  const sessionExpired = Boolean(auth?.expiresAt && auth.expiresAt <= now)
 
   return (
     <SettingsSection
@@ -119,16 +130,26 @@ export function AccountSessionSection() {
           {auth?.authenticated && (
             <SettingsRow
               label="Session expiry"
-              description={expiryLabel(auth.expiresAt)}
+              description={expiryLabel(auth.expiresAt, now)}
             >
-              <button
-                type="button"
-                onClick={() => void disconnect()}
-                disabled={disconnecting}
-                className="rounded-lg border border-[var(--theme-danger)]/50 px-3 py-2 text-xs font-semibold text-[var(--theme-danger)] hover:bg-[var(--theme-danger)]/10 disabled:opacity-50"
-              >
-                {disconnecting ? 'Disconnecting…' : 'Sign out'}
-              </button>
+              <div className="flex flex-wrap justify-end gap-2">
+                {sessionExpired && (
+                  <a
+                    href="/login"
+                    className="rounded-lg border border-[var(--theme-accent)]/50 px-3 py-2 text-xs font-semibold text-[var(--theme-accent)] hover:bg-[var(--theme-accent)]/10"
+                  >
+                    Sign in again
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void disconnect()}
+                  disabled={disconnecting}
+                  className="rounded-lg border border-[var(--theme-danger)]/50 px-3 py-2 text-xs font-semibold text-[var(--theme-danger)] hover:bg-[var(--theme-danger)]/10 disabled:opacity-50"
+                >
+                  {disconnecting ? 'Disconnecting…' : 'Sign out'}
+                </button>
+              </div>
             </SettingsRow>
           )}
         </>
