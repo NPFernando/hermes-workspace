@@ -152,6 +152,34 @@ function hasAccessibilityEvidence(report) {
     Array.isArray(report.audit.hiddenFocusable)
 }
 
+function recentAuthenticatedSmokeEvidence(root) {
+  const path = process.env.HERMES_AUTH_E2E_EVIDENCE_PATH ||
+    join(root, '.runtime', 'authenticated-browser-smoke.json')
+  try {
+    const report = JSON.parse(readFileSync(path, 'utf8'))
+    const generatedAt = Date.parse(report.generatedAt)
+    const labels = new Set(
+      Array.isArray(report.checks)
+        ? report.checks.filter((check) => check?.passed === true).map((check) => check.label)
+        : [],
+    )
+    const fresh = Number.isFinite(generatedAt) &&
+      Date.now() - generatedAt >= 0 &&
+      Date.now() - generatedAt <= 48 * 60 * 60 * 1000
+    return {
+      ok: report.ok === true && fresh,
+      labels,
+      detail: report.ok !== true
+        ? 'authenticated smoke did not pass'
+        : !fresh
+          ? 'authenticated smoke evidence is stale'
+          : 'recent authenticated smoke evidence is available',
+    }
+  } catch {
+    return { ok: false, labels: new Set(), detail: 'authenticated smoke evidence is unavailable' }
+  }
+}
+
 export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
   const roots = [
     root,
@@ -239,6 +267,11 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
           : `rotation metadata blocked: ${expired.length} expired; ${untrackedConfigured.length} configured credential(s) untracked`,
       )
     }
+    if (index === 4) {
+      const smoke = recentAuthenticatedSmokeEvidence(root)
+      const verified = smoke.ok && smoke.labels.has('auth-check confirms the authenticated session')
+      return evidence(verified, verified ? 'recent authenticated session and auth UX smoke passed' : `authenticated UX evidence: ${smoke.detail}`)
+    }
     if (index === 8) {
       const verified = hasDeploymentPreview(getDeploymentPreview())
       return evidence(verified, verified ? 'deployment preview is current' : 'deployment preview is unavailable or incomplete')
@@ -269,6 +302,11 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
       const securityStatus = getReadiness()?.checks?.security?.status
       return evidence(privacy?.ok === true && securityStatus === 'pass', `privacy guard: ${privacy?.ok === true ? 'pass' : 'fail/unavailable'}; deployment security evidence: ${securityStatus || 'unavailable'}`)
     }
+    if (index === 13) {
+      const smoke = recentAuthenticatedSmokeEvidence(root)
+      const verified = smoke.ok && smoke.labels.has('ops API returns safe-mode and runtime-build evidence')
+      return evidence(verified, verified ? 'authenticated safe-mode and runtime evidence passed' : `safe-mode evidence: ${smoke.detail}`)
+    }
     if (index === 15) {
       const report = getAccessibility()
       return evidence(serviceActive && hasAccessibilityEvidence(report), serviceActive
@@ -293,6 +331,16 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
       return evidence(verified, verified
         ? 'service history, backup freshness, structured auth evidence, and runtime build identity are coherent'
         : `service history, backup freshness, structured auth evidence, or runtime build identity is missing/degraded`)
+    }
+    if (index === 17) {
+      const smoke = recentAuthenticatedSmokeEvidence(root)
+      const verified = smoke.ok && smoke.labels.has('mobile command search opens Settings')
+      return evidence(verified, verified ? 'authenticated grouped-settings navigation passed' : `settings navigation evidence: ${smoke.detail}`)
+    }
+    if (index === 18) {
+      const smoke = recentAuthenticatedSmokeEvidence(root)
+      const verified = smoke.ok && smoke.labels.has('feature-flag API returns staged rollout decisions')
+      return evidence(verified, verified ? 'authenticated feature-flag rollout smoke passed' : `feature-flag evidence: ${smoke.detail}`)
     }
     if (index === 19) {
       return evidence(false, 'final audit status is derived after all prerequisite items are evaluated')
