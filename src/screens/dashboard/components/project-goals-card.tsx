@@ -30,6 +30,8 @@ type LiveReadiness = {
       detail: string
       expiring?: Array<{ key: string; daysRemaining: number }>
       expired?: Array<string>
+      unconfigured?: Array<string>
+      untracked?: Array<string>
     }
     backups?: {
       status: string
@@ -566,6 +568,20 @@ export function ProjectGoalsCard() {
                     {key} rotation metadata is expired.
                   </p>
                 ))}
+                {liveReadiness.checks.credentialRotation.unconfigured?.map(
+                  (key) => (
+                    <p key={key} className="mt-1 text-[var(--theme-warning)]">
+                      {key} is not configured in the current runtime.
+                    </p>
+                  ),
+                )}
+                {liveReadiness.checks.credentialRotation.untracked?.map(
+                  (key) => (
+                    <p key={key} className="mt-1 text-[var(--theme-warning)]">
+                      {key} is configured but has no rotation metadata yet.
+                    </p>
+                  ),
+                )}
               </div>
             )}
             {liveReadiness.checks?.backups && (
