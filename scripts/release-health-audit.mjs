@@ -27,11 +27,11 @@ function gh(args) {
   }))
 }
 
-function inspect(slug) {
+function inspect(slug, run = gh) {
   try {
-    const metadata = gh(['repo', 'view', slug, '--json', 'defaultBranchRef,pushedAt'])
-    const runs = gh(['run', 'list', '--repo', slug, '--limit', '1', '--json', 'status,conclusion,headSha,workflowName,createdAt'])
-    const pulls = gh(['pr', 'list', '--repo', slug, '--state', 'open', '--limit', '20', '--json', 'number,isDraft,reviewDecision,statusCheckRollup,updatedAt'])
+    const metadata = run(['repo', 'view', slug, '--json', 'defaultBranchRef,pushedAt'])
+    const runs = run(['run', 'list', '--repo', slug, '--limit', '1', '--json', 'status,conclusion,headSha,workflowName,createdAt'])
+    const pulls = run(['pr', 'list', '--repo', slug, '--state', 'open', '--limit', '20', '--json', 'number,isDraft,reviewDecision,statusCheckRollup,updatedAt'])
     const latest = Array.isArray(runs) ? runs[0] : null
     const openPullRequests = Array.isArray(pulls)
       ? pulls.map((pull) => ({
@@ -84,10 +84,17 @@ function inspect(slug) {
   }
 }
 
-const report = {
-  generatedAt: new Date().toISOString(),
-  repositories: repositories.map(inspect),
+export function buildReleaseHealthReport({ repos = repositories, run = gh } = {}) {
+  const report = {
+    generatedAt: new Date().toISOString(),
+    repositories: repos.map((slug) => inspect(slug, run)),
+  }
+  report.ok = report.repositories.length > 0 && report.repositories.every((repo) => repo.status === 'pass')
+  return report
 }
-report.ok = report.repositories.length > 0 && report.repositories.every((repo) => repo.status === 'pass')
-console.log(JSON.stringify(report, null, 2))
-if (!report.ok) process.exitCode = 1
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const report = buildReleaseHealthReport()
+  console.log(JSON.stringify(report, null, 2))
+  if (!report.ok) process.exitCode = 1
+}
