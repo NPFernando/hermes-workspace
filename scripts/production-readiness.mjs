@@ -291,7 +291,13 @@ function configuredKey(key) {
   if (process.env[key]) return true
   const files = [
     join(rootDir, '.env'),
+    '/home/ubuntu/hermes-workspace-live/.env',
     join(process.env.HERMES_HOME || '/home/ubuntu/.hermes', '.env'),
+    process.env.HERMES_OPS_ALERT_ENV_FILE ||
+      join(
+        process.env.HERMES_HOME || '/home/ubuntu/.hermes',
+        'ops-monitor.env',
+      ),
   ]
   return files.some((file) => {
     try {
@@ -303,6 +309,79 @@ function configuredKey(key) {
       return false
     }
   })
+}
+
+/**
+ * Value-blind deployment configuration gate. Presence is checked only; no
+ * credential value is loaded into the report. A password login is sufficient
+ * for the workspace to operate, while Google OAuth is surfaced as degraded
+ * when it is incomplete so operators can see the optional login gap.
+ */
+export function buildConfigurationPreflight({
+  isConfigured = configuredKey,
+} = {}) {
+  const googleClientId = isConfigured('GOOGLE_CLIENT_ID')
+  const googleClientSecret = isConfigured('GOOGLE_CLIENT_SECRET')
+  const passwordAuth = [
+    'HERMES_PASSWORD',
+    'CLAUDE_PASSWORD',
+    'HERMES_E2E_PASSWORD',
+  ].some((key) => isConfigured(key))
+  const googleOAuth = googleClientId && googleClientSecret
+  const oauthMissing = [
+    !googleClientId && 'GOOGLE_CLIENT_ID',
+    !googleClientSecret && 'GOOGLE_CLIENT_SECRET',
+  ].filter(Boolean)
+  const oauthStatus = googleOAuth ? 'pass' : passwordAuth ? 'degraded' : 'fail'
+
+  const databaseConfigured = isConfigured('HERMES_PG_PASSWORD')
+  const databaseStatus = databaseConfigured ? 'pass' : 'fail'
+
+  const webhookConfigured = isConfigured('HERMES_OPS_ALERT_WEBHOOK_URL')
+  const telegramConfigured = [
+    'TELEGRAM_BOT_TOKEN',
+    'TELEGRAM_RELAY_BASE',
+    'HERMES_OPS_ALERT_TELEGRAM_CHAT_ID',
+  ].every((key) => isConfigured(key))
+  const alertsConfigured = webhookConfigured || telegramConfigured
+  const alertsStatus = alertsConfigured ? 'pass' : 'degraded'
+
+  const status = [oauthStatus, databaseStatus].includes('fail')
+    ? 'fail'
+    : [oauthStatus, alertsStatus].includes('degraded')
+      ? 'degraded'
+      : 'pass'
+  const missing = [
+    !databaseConfigured && 'HERMES_PG_PASSWORD',
+    !alertsConfigured &&
+      'HERMES_OPS_ALERT_WEBHOOK_URL or Telegram alert settings',
+  ].filter(Boolean)
+
+  return result(
+    status,
+    status === 'pass'
+      ? 'Core authentication, database, and alert delivery settings are present.'
+      : `Configuration preflight needs attention: ${missing.concat(!googleOAuth ? [`Google OAuth: ${oauthMissing.join(', ')}`] : []).join('; ')}.`,
+    {
+      oauth: {
+        status: oauthStatus,
+        googleConfigured: googleOAuth,
+        passwordAuthConfigured: passwordAuth,
+        missing: oauthMissing,
+      },
+      database: {
+        status: databaseStatus,
+        postgresPasswordConfigured: databaseConfigured,
+      },
+      alerts: {
+        status: alertsStatus,
+        webhookConfigured,
+        telegramConfigured,
+      },
+      evidence:
+        'presence-only environment and supported env-file checks; values excluded',
+    },
+  )
 }
 
 async function backupCheck() {
@@ -512,6 +591,7 @@ export async function buildReadinessReport({
       migrations,
       backups,
       credentialRotation,
+      configurationPreflight,
       forkSync,
       service,
       identity,
@@ -521,6 +601,7 @@ export async function buildReadinessReport({
       migrationCheck(),
       backupCheck(),
       credentialRotationCheck(),
+      Promise.resolve(buildConfigurationPreflight()),
       forkSyncCheck(),
       serviceCheck(),
       deploymentIdentity(),
@@ -555,6 +636,7 @@ export async function buildReadinessReport({
       migrations,
       backups,
       credentialRotation,
+      configurationPreflight,
       forkSync,
       service,
       assets,
