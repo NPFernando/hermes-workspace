@@ -165,6 +165,7 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
   let privacySecurityReport
   let performanceReport
   let releaseHealthReport
+  let rotationReport
   const getReadiness = () => {
     if (readinessReport === undefined) {
       readinessReport = parseJson(run(process.execPath, ['scripts/production-readiness.mjs', '--skip-tests', '--json'], root))
@@ -210,11 +211,33 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
     }
     return releaseHealthReport
   }
+  const getRotationReport = () => {
+    if (rotationReport === undefined) {
+      rotationReport = parseJson(run(process.execPath, ['scripts/secrets-rotation.mjs', 'status'], root))
+    }
+    return rotationReport
+  }
   const liveEvidenceFor = (index) => {
     const evidence = (verified, detail) => ({ verified, detail })
     if (index === 5) {
       const status = getReadiness()?.checks?.configurationPreflight?.status
       return evidence(status === 'pass', `configuration preflight: ${status || 'unavailable'}`)
+    }
+    if (index === 3) {
+      const statuses = getRotationReport()?.status
+      const expired = Array.isArray(statuses)
+        ? statuses.filter((entry) => entry.state === 'expired')
+        : []
+      const untrackedConfigured = Array.isArray(statuses)
+        ? statuses.filter((entry) => entry.configured === true && entry.state === 'untracked')
+        : []
+      const verified = Array.isArray(statuses) && expired.length === 0 && untrackedConfigured.length === 0
+      return evidence(
+        verified,
+        verified
+          ? 'all configured credentials have tracked, current rotation metadata'
+          : `rotation metadata blocked: ${expired.length} expired; ${untrackedConfigured.length} configured credential(s) untracked`,
+      )
     }
     if (index === 8) {
       const verified = hasDeploymentPreview(getDeploymentPreview())
