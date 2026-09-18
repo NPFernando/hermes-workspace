@@ -72,6 +72,7 @@ import { Route as ApiDownloadApkRouteImport } from './routes/api/download-apk'
 import { Route as ApiDrEvidenceRouteImport } from './routes/api/dr-evidence'
 import { Route as ApiEnvResetRouteImport } from './routes/api/env-reset'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
+import { Route as ApiFeatureFlagsRouteImport } from './routes/api/feature-flags'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiFinanceRouteImport } from './routes/api/finance'
 import { Route as ApiFinanceBackupRouteImport } from './routes/api/finance-backup'
@@ -578,6 +579,11 @@ const ApiEnvResetRoute = ApiEnvResetRouteImport.update({
 const ApiEventsRoute = ApiEventsRouteImport.update({
   id: '/api/events',
   path: '/api/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiFeatureFlagsRoute = ApiFeatureFlagsRouteImport.update({
+  id: '/api/feature-flags',
+  path: '/api/feature-flags',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiFilesRoute = ApiFilesRouteImport.update({
@@ -1610,6 +1616,7 @@ export interface FileRoutesByFullPath {
   '/api/dr-evidence': typeof ApiDrEvidenceRoute
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/feature-flags': typeof ApiFeatureFlagsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/finance': typeof ApiFinanceRouteWithChildren
   '/api/finance-backup': typeof ApiFinanceBackupRoute
@@ -1865,6 +1872,7 @@ export interface FileRoutesByTo {
   '/api/dr-evidence': typeof ApiDrEvidenceRoute
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/feature-flags': typeof ApiFeatureFlagsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/finance': typeof ApiFinanceRouteWithChildren
   '/api/finance-backup': typeof ApiFinanceBackupRoute
@@ -2122,6 +2130,7 @@ export interface FileRoutesById {
   '/api/dr-evidence': typeof ApiDrEvidenceRoute
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/feature-flags': typeof ApiFeatureFlagsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/finance': typeof ApiFinanceRouteWithChildren
   '/api/finance-backup': typeof ApiFinanceBackupRoute
@@ -2380,6 +2389,7 @@ export interface FileRouteTypes {
     | '/api/dr-evidence'
     | '/api/env-reset'
     | '/api/events'
+    | '/api/feature-flags'
     | '/api/files'
     | '/api/finance'
     | '/api/finance-backup'
@@ -2635,6 +2645,7 @@ export interface FileRouteTypes {
     | '/api/dr-evidence'
     | '/api/env-reset'
     | '/api/events'
+    | '/api/feature-flags'
     | '/api/files'
     | '/api/finance'
     | '/api/finance-backup'
@@ -2891,6 +2902,7 @@ export interface FileRouteTypes {
     | '/api/dr-evidence'
     | '/api/env-reset'
     | '/api/events'
+    | '/api/feature-flags'
     | '/api/files'
     | '/api/finance'
     | '/api/finance-backup'
@@ -3148,6 +3160,7 @@ export interface RootRouteChildren {
   ApiDrEvidenceRoute: typeof ApiDrEvidenceRoute
   ApiEnvResetRoute: typeof ApiEnvResetRoute
   ApiEventsRoute: typeof ApiEventsRoute
+  ApiFeatureFlagsRoute: typeof ApiFeatureFlagsRoute
   ApiFilesRoute: typeof ApiFilesRoute
   ApiFinanceRoute: typeof ApiFinanceRouteWithChildren
   ApiFinanceBackupRoute: typeof ApiFinanceBackupRoute
@@ -3742,6 +3755,13 @@ declare module '@tanstack/react-router' {
       path: '/api/events'
       fullPath: '/api/events'
       preLoaderRoute: typeof ApiEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/feature-flags': {
+      id: '/api/feature-flags'
+      path: '/api/feature-flags'
+      fullPath: '/api/feature-flags'
+      preLoaderRoute: typeof ApiFeatureFlagsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/files': {
@@ -5404,6 +5424,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDrEvidenceRoute: ApiDrEvidenceRoute,
   ApiEnvResetRoute: ApiEnvResetRoute,
   ApiEventsRoute: ApiEventsRoute,
+  ApiFeatureFlagsRoute: ApiFeatureFlagsRoute,
   ApiFilesRoute: ApiFilesRoute,
   ApiFinanceRoute: ApiFinanceRouteWithChildren,
   ApiFinanceBackupRoute: ApiFinanceBackupRoute,
