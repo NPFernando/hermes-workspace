@@ -111,14 +111,24 @@ CURRENT=$(git rev-parse HEAD)
 TARGET=$(git rev-parse origin/main)
 if [ "$PREVIEW" = "1" ]; then
   changed_files=0
+  changed_runtime_json='[]'
+  migration_json='[]'
   worktree_dirty=false
   [ -n "$WORKTREE_STATUS" ] && worktree_dirty=true
   action=deploy-target
   [ "$CURRENT" = "$TARGET" ] && action=verify-live
   if [ "$CURRENT" != "$TARGET" ]; then
-    changed_files="$(git diff --name-only "$CURRENT" "$TARGET" | wc -l | tr -d ' ')"
+    changed_file_list="$(git diff --name-only "$CURRENT" "$TARGET")"
+    changed_files="$(printf '%s\n' "$changed_file_list" | sed '/^$/d' | wc -l | tr -d ' ')"
+    changed_runtime_json="$(printf '%s\n' "$changed_file_list" | jq -Rsc 'split("\n") | map(select(length > 0 and test("^(src/|public/|server-entry\\.js$|index\\.html$|vite\\.config\\.|package\\.json$|pnpm-lock\\.yaml$|electron/)")))')"
+    migration_json="$(printf '%s\n' "$changed_file_list" | jq -Rsc 'split("\n") | map(select(length > 0 and test("(^|/)(migrations?|schema|.*\\.sql$)"; "i")))')"
   fi
-  printf '%s\n' "{\"preview\":true,\"current\":\"$CURRENT\",\"target\":\"$TARGET\",\"worktreeDirty\":$worktree_dirty,\"changedFiles\":$changed_files,\"action\":\"$action\"}"
+  rollback_target="$PREVIOUS_DEPLOYMENT_COMMIT"
+  [ -n "$rollback_target" ] || rollback_target="$CURRENT"
+  rollback_available=false
+  [ -d dist ] && rollback_available=true
+  rollback_target_json="$(printf '%s' "$rollback_target" | jq -Rsc '.')"
+  printf '%s\n' "{\"preview\":true,\"current\":\"$CURRENT\",\"target\":\"$TARGET\",\"worktreeDirty\":$worktree_dirty,\"changedFiles\":$changed_files,\"changedRuntimeFiles\":$changed_runtime_json,\"migrationFiles\":$migration_json,\"rollbackTarget\":$rollback_target_json,\"rollbackArtifactAvailable\":$rollback_available,\"securityEvidenceRequired\":true,\"action\":\"$action\"}"
   exit 0
 fi
 if [ "$CURRENT" = "$TARGET" ]; then
