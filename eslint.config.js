@@ -25,6 +25,16 @@ export default [
     ],
   },
   {
+    // server-entry.js is a plain Node bootstrap file and is intentionally not
+    // part of the TypeScript project used by the shared parser configuration.
+    // CI lints changed files with --no-ignore, so override the project parser
+    // setting explicitly instead of relying on the ignore list.
+    files: ['server-entry.js'],
+    languageOptions: {
+      parserOptions: { project: false },
+    },
+  },
+  {
     // Block client-side imports of server-only MCP input types.
     // `src/types/mcp-input.ts` may carry secret-bearing fields and must
     // never be referenced from screens or shared components.

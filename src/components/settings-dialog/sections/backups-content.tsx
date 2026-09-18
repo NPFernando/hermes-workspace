@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { SectionHeader, SETTINGS_CARD_CLASS } from './settings-dialog-primitives'
+import { SETTINGS_CARD_CLASS, SectionHeader } from './settings-dialog-primitives'
 
 type BackupCheck = { status?: string; detail?: string }
 type ReadinessResponse = {
