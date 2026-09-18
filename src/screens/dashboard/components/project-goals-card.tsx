@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 
 type GoalState = 'completed' | 'active' | 'blocked' | 'deployed'
@@ -17,7 +17,11 @@ type LiveReadiness = {
   generatedAt: string
   blockers: Array<string>
   warnings: Array<string>
-  checks?: {
+  checks?: Record<string, {
+    status: string
+    detail: string
+    [key: string]: unknown
+  }> & {
     credentialRotation?: {
       status: string
       detail: string
@@ -226,7 +230,7 @@ export function ProjectGoalsCard() {
   const visible =
     filter === 'all' ? GOALS : GOALS.filter((goal) => goal.state === filter)
 
-  const refreshReadiness = async () => {
+  const refreshReadiness = useCallback(async () => {
     setReadinessLoading(true)
     setReadinessError(null)
     try {
@@ -247,7 +251,11 @@ export function ProjectGoalsCard() {
     } finally {
       setReadinessLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    void refreshReadiness()
+  }, [refreshReadiness])
 
   return (
     <section
@@ -362,6 +370,27 @@ export function ProjectGoalsCard() {
                   <p key={key} className="mt-1 text-[var(--theme-danger)]">{key} rotation metadata is expired.</p>
                 ))}
               </div>
+            )}
+            {liveReadiness.checks && (
+              <details className="rounded-md border border-[var(--theme-border)] px-2 py-2">
+                <summary className="cursor-pointer font-semibold text-[var(--theme-text)]">
+                  Repository and deployment checks ({Object.keys(liveReadiness.checks).length})
+                </summary>
+                <div className="mt-2 space-y-1.5">
+                  {Object.entries(liveReadiness.checks).map(([name, check]) => (
+                    <div key={name} className="flex items-start gap-2">
+                      <span className={cn(
+                        'mt-0.5 size-2 shrink-0 rounded-full',
+                        check.status === 'pass' ? 'bg-[var(--theme-success)]' : check.status === 'fail' ? 'bg-[var(--theme-danger)]' : 'bg-[var(--theme-warning)]',
+                      )} aria-hidden="true" />
+                      <span className="min-w-0">
+                        <span className="font-semibold text-[var(--theme-text)]">{name}</span>
+                        <span className="ml-1 text-muted">· {check.detail}</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </details>
             )}
           </div>
         )}
