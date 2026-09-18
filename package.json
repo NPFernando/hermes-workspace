@@ -40,6 +40,7 @@
     "smoke:release": "node scripts/release-smoke.mjs",
     "release:check": "node scripts/release-checklist.mjs",
     "roadmap:audit": "node scripts/roadmap-completion-audit.mjs",
+    "release:health:audit": "node scripts/release-health-audit.mjs",
     "check:bundle": "node scripts/check-bundle-budget.mjs",
     "check:build-integrity": "node scripts/check-build-integrity.mjs",
     "secrets:status": "node scripts/secrets-status.mjs",

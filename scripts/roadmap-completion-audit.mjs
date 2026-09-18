@@ -131,6 +131,7 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
   let accessibilityReport
   let privacySecurityReport
   let performanceReport
+  let releaseHealthReport
   const getReadiness = () => {
     if (readinessReport === undefined) {
       readinessReport = parseJson(run(process.execPath, ['scripts/production-readiness.mjs', '--skip-tests', '--json'], root))
@@ -170,11 +171,18 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
     }
     return performanceReport
   }
+  const getReleaseHealth = () => {
+    if (releaseHealthReport === undefined) {
+      releaseHealthReport = parseJson(run(process.execPath, ['scripts/release-health-audit.mjs'], root))
+    }
+    return releaseHealthReport
+  }
   const liveEvidenceFor = (index) => {
     if (index === 5) return getReadiness()?.checks?.configurationPreflight?.status === 'pass'
     if (index === 8) return hasDeploymentPreview(getDeploymentPreview())
     if (index === 9) return recentPassedDrEvidence()
     if (index === 10) return getPerformance()?.ok === true
+    if (index === 11) return getReleaseHealth()?.ok === true
     if (index === 14) {
       return getPrivacySecurity()?.ok === true && getReadiness()?.checks?.security?.status === 'pass'
     }
