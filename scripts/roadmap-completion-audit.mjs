@@ -44,8 +44,12 @@ function command(file, args, cwd, env = process.env) {
       stdio: ['ignore', 'pipe', 'pipe'],
       env,
     }).trim()
-  } catch {
-    return ''
+  } catch (error) {
+    // Several evidence collectors deliberately exit nonzero when they find a
+    // blocker, while still emitting a complete JSON report on stdout. Keep
+    // that report so the audit can explain the blocker instead of downgrading
+    // it to an unexplained unavailable result.
+    return String(error?.stdout || '').trim()
   }
 }
 
@@ -207,16 +211,47 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
     return releaseHealthReport
   }
   const liveEvidenceFor = (index) => {
-    if (index === 5) return getReadiness()?.checks?.configurationPreflight?.status === 'pass'
-    if (index === 8) return hasDeploymentPreview(getDeploymentPreview())
-    if (index === 9) return recentPassedDrEvidence()
-    if (index === 10) return getPerformance()?.ok === true
-    if (index === 11) return getReleaseHealth()?.ok === true
-    if (index === 12) return recentForkPreviewEvidence()
-    if (index === 14) {
-      return getPrivacySecurity()?.ok === true && getReadiness()?.checks?.security?.status === 'pass'
+    const evidence = (verified, detail) => ({ verified, detail })
+    if (index === 5) {
+      const status = getReadiness()?.checks?.configurationPreflight?.status
+      return evidence(status === 'pass', `configuration preflight: ${status || 'unavailable'}`)
     }
-    if (index === 15) return serviceActive && hasAccessibilityEvidence(getAccessibility())
+    if (index === 8) {
+      const verified = hasDeploymentPreview(getDeploymentPreview())
+      return evidence(verified, verified ? 'deployment preview is current' : 'deployment preview is unavailable or incomplete')
+    }
+    if (index === 9) {
+      const verified = recentPassedDrEvidence()
+      return evidence(verified, verified ? 'recent passed restore evidence found' : 'no recent passed restore evidence found')
+    }
+    if (index === 10) {
+      const report = getPerformance()
+      return evidence(report?.ok === true, report?.ok === true
+        ? `live mobile performance passed (FCP ${report.metrics?.firstContentfulPaintMs ?? '?'} ms, LCP ${report.metrics?.largestContentfulPaintMs ?? '?'} ms)`
+        : 'live mobile performance evidence is unavailable or failed')
+    }
+    if (index === 11) {
+      const report = getReleaseHealth()
+      const blockers = report?.repositories?.flatMap((repo) => repo.blockers || []) || []
+      return evidence(report?.ok === true, report?.ok === true
+        ? 'all configured repositories have passing release evidence'
+        : blockers.length ? `release blockers: ${blockers.slice(0, 3).join('; ')}` : 'cross-repository release evidence is unavailable')
+    }
+    if (index === 12) {
+      const verified = recentForkPreviewEvidence()
+      return evidence(verified, verified ? 'recent scheduled fork preview includes preservation classification' : 'no recent complete fork preservation report found')
+    }
+    if (index === 14) {
+      const privacy = getPrivacySecurity()
+      const securityStatus = getReadiness()?.checks?.security?.status
+      return evidence(privacy?.ok === true && securityStatus === 'pass', `privacy guard: ${privacy?.ok === true ? 'pass' : 'fail/unavailable'}; deployment security evidence: ${securityStatus || 'unavailable'}`)
+    }
+    if (index === 15) {
+      const report = getAccessibility()
+      return evidence(serviceActive && hasAccessibilityEvidence(report), serviceActive
+        ? report?.ok === true ? 'live accessibility smoke passed' : `accessibility smoke failed: ${(report?.failures || []).slice(0, 2).join('; ') || 'evidence incomplete'}`
+        : 'Hermes service is not active')
+    }
     if (index === 16) {
       const statePath = join(root, '.runtime', 'ops-monitor-state.json')
       const authFailuresPath = join(root, '.runtime', 'auth-failures.jsonl')
@@ -227,15 +262,17 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
         state = null
       }
       const backupReady = getReadiness()?.checks?.backups?.status === 'pass'
-      return serviceActive && backupReady && Array.isArray(state?.serviceHealthHistory) &&
+      const verified = serviceActive && backupReady && Array.isArray(state?.serviceHealthHistory) &&
         state.serviceHealthHistory.length > 0 && existsSync(authFailuresPath) &&
         readFileSync(authFailuresPath, 'utf8').trim().length > 0
+      return evidence(verified, verified ? 'service history, backup freshness, and structured auth evidence present' : 'service history, backup freshness, or structured auth evidence is missing')
     }
-    return false
+    return evidence(false, 'no live evidence collector is configured for this roadmap item')
   }
   const items = ROADMAP.map(([title, files, liveRequirement], index) => {
     const implementationPresent = staticEvidence(roots, files)
-    const liveEvidence = liveEvidenceFor(index)
+    const live = liveEvidenceFor(index)
+    const liveEvidence = live.verified
     return {
       id: index + 1,
       title,
@@ -243,6 +280,7 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
       liveEvidence,
       status: liveEvidence ? 'verified' : implementationPresent ? 'implemented-awaiting-live-evidence' : 'missing',
       liveRequirement,
+      liveEvidenceDetail: live.detail,
       evidence: implementationPresent ? files : [],
     }
   })

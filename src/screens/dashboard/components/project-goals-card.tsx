@@ -87,6 +87,7 @@ type RoadmapAudit = {
     liveEvidence: boolean
     status: 'verified' | 'implemented-awaiting-live-evidence' | 'missing'
     liveRequirement: string
+    liveEvidenceDetail: string
     evidence: Array<string>
   }>
 }
@@ -877,6 +878,10 @@ export function ProjectGoalsCard() {
                         {item.implementationPresent ? 'present' : 'missing'} ·{' '}
                         <span className="font-semibold text-[var(--theme-text)]">Live evidence:</span>{' '}
                         {item.liveEvidence ? 'verified' : 'not verified'}
+                      </p>
+                      <p>
+                        <span className="font-semibold text-[var(--theme-text)]">Result:</span>{' '}
+                        {item.liveEvidenceDetail}
                       </p>
                       {item.evidence.length > 0 && (
                         <p>
