@@ -284,11 +284,15 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
       } catch {
         state = null
       }
-      const backupReady = getReadiness()?.checks?.backups?.status === 'pass'
+      const readiness = getReadiness()
+      const backupReady = readiness?.checks?.backups?.status === 'pass'
+      const runtimeBuildReady = readiness?.checks?.deploymentIdentity?.status === 'pass'
       const verified = serviceActive && backupReady && Array.isArray(state?.serviceHealthHistory) &&
         state.serviceHealthHistory.length > 0 && existsSync(authFailuresPath) &&
-        readFileSync(authFailuresPath, 'utf8').trim().length > 0
-      return evidence(verified, verified ? 'service history, backup freshness, and structured auth evidence present' : 'service history, backup freshness, or structured auth evidence is missing')
+        readFileSync(authFailuresPath, 'utf8').trim().length > 0 && runtimeBuildReady
+      return evidence(verified, verified
+        ? 'service history, backup freshness, structured auth evidence, and runtime build identity are coherent'
+        : `service history, backup freshness, structured auth evidence, or runtime build identity is missing/degraded`)
     }
     if (index === 19) {
       return evidence(false, 'final audit status is derived after all prerequisite items are evaluated')
