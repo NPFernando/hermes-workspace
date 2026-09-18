@@ -29,6 +29,7 @@
     "fork-sync:preview": "python3 scripts/fork_sync_scheduled_preview.py",
     "fork-sync:approve": "python3 scripts/fork_sync_approval.py",
     "security:deployment-gate": "node scripts/deployment-security-gate.mjs",
+    "security:privacy": "node scripts/check-privacy-security-regressions.mjs",
     "swarm-queue:provision": "node scripts/provision-swarm-dispatch-queue.mjs",
     "swarm-queue:migrate": "node scripts/migrate-swarm-dispatch-queue.mjs",
     "test:queue:isolated": "bash scripts/test-swarm-queue-isolated.sh",
