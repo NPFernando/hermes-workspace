@@ -11,5 +11,7 @@ describe('roadmap completion audit', () => {
     expect(report.items).toHaveLength(20)
     expect(report.ok).toBe(false)
     expect(report.items.some((item) => item.status === 'implemented-awaiting-live-evidence')).toBe(true)
+    expect(report.items[19].liveEvidence).toBe(false)
+    expect(report.items[19].liveEvidenceDetail).toMatch(/preceding roadmap item/)
   })
 })

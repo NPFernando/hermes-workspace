@@ -267,6 +267,9 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
         readFileSync(authFailuresPath, 'utf8').trim().length > 0
       return evidence(verified, verified ? 'service history, backup freshness, and structured auth evidence present' : 'service history, backup freshness, or structured auth evidence is missing')
     }
+    if (index === 19) {
+      return evidence(false, 'final audit status is derived after all prerequisite items are evaluated')
+    }
     return evidence(false, 'no live evidence collector is configured for this roadmap item')
   }
   const items = ROADMAP.map(([title, files, liveRequirement], index) => {
@@ -284,6 +287,16 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
       evidence: implementationPresent ? files : [],
     }
   })
+  const prerequisiteItems = items.slice(0, -1)
+  const finalItem = items.at(-1)
+  if (finalItem) {
+    const prerequisitesVerified = prerequisiteItems.every((item) => item.status === 'verified')
+    finalItem.liveEvidence = prerequisitesVerified
+    finalItem.status = prerequisitesVerified ? 'verified' : 'implemented-awaiting-live-evidence'
+    finalItem.liveEvidenceDetail = prerequisitesVerified
+      ? 'all preceding roadmap items have current live evidence'
+      : `waiting for ${prerequisiteItems.filter((item) => item.status !== 'verified').length} preceding roadmap item(s) to verify`
+  }
   // A live service is useful context, never proof that every roadmap item is complete.
   return {
     generatedAt: new Date().toISOString(),
