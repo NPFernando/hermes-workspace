@@ -87,4 +87,31 @@ describe('cross-repository release status', () => {
       detail: 'GitHub CLI unavailable',
     })
   })
+
+  it('degrades repositories whose latest workflow evidence is stale', async () => {
+    const report = await getCrossRepositoryReleaseStatus({
+      repositories: [repositories[0]],
+      run: async (args) =>
+        args[0] === 'repo'
+          ? { stdout: JSON.stringify({ defaultBranchRef: { name: 'main' } }), stderr: '' }
+          : args[0] === 'run'
+            ? {
+                stdout: JSON.stringify([
+                  {
+                    workflowName: 'CI',
+                    status: 'completed',
+                    conclusion: 'success',
+                    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+                  },
+                ]),
+                stderr: '',
+              }
+            : { stdout: '[]', stderr: '' },
+    })
+    expect(report.repositories[0]).toMatchObject({
+      status: 'degraded',
+      latestRun: { stale: true },
+      detail: expect.stringContaining('stale'),
+    })
+  })
 })

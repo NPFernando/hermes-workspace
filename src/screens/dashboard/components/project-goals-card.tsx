@@ -61,6 +61,7 @@ type CrossRepositoryReleaseStatus = {
       conclusion: string | null
       headSha: string | null
       createdAt: string | null
+      stale: boolean
     } | null
     openPullRequests: Array<{
       number: number
@@ -810,6 +811,11 @@ export function ProjectGoalsCard() {
                       <p className="mt-1 text-[11px] text-muted">
                         {repository.detail}
                       </p>
+                      {repository.latestRun?.stale && (
+                        <p className="mt-1 text-[11px] font-semibold text-amber-300">
+                          Fresh CI evidence required
+                        </p>
+                      )}
                       {repository.defaultBranch && (
                         <p className="mt-1 text-[11px] text-muted">
                           Branch: {repository.defaultBranch}

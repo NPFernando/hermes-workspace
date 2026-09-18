@@ -1,6 +1,8 @@
 import { execFile as nodeExecFile } from 'node:child_process'
 import { promisify } from 'node:util'
 
+const RELEASE_EVIDENCE_MAX_AGE_MS = 48 * 60 * 60 * 1000
+
 const execFile = promisify(nodeExecFile)
 
 export type ReleaseRepository = {
@@ -20,6 +22,7 @@ export type RepositoryReleaseStatus = ReleaseRepository & {
     conclusion: string | null
     headSha: string | null
     createdAt: string | null
+    stale: boolean
   } | null
   openPullRequests: Array<{
     number: number
@@ -164,6 +167,9 @@ export async function getCrossRepositoryReleaseStatus({
               conclusion: latest.conclusion ?? null,
               headSha: latest.headSha ?? null,
               createdAt: latest.createdAt ?? null,
+              stale:
+                !latest.createdAt ||
+                Date.now() - Date.parse(latest.createdAt) > RELEASE_EVIDENCE_MAX_AGE_MS,
             }
           : null
         const pullRequests = JSON.parse(
@@ -198,6 +204,8 @@ export async function getCrossRepositoryReleaseStatus({
           }))
         const status = !latestRun
           ? 'degraded'
+          : latestRun.stale
+            ? 'degraded'
           : latestRun.status !== 'completed'
             ? 'running'
             : latestRun.conclusion === 'success'
@@ -205,6 +213,8 @@ export async function getCrossRepositoryReleaseStatus({
               : 'fail'
         const detail = !latestRun
           ? 'Repository metadata is available, but no recent workflow run was found.'
+          : latestRun.stale
+            ? `Latest ${latestRun.workflow || 'workflow'} evidence is stale; a fresh run is required.`
           : latestRun.status !== 'completed'
             ? `Latest ${latestRun.workflow || 'workflow'} run is ${latestRun.status || 'in progress'}.`
             : latestRun.conclusion === 'success'

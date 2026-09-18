@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildReleaseHealthReport } from './release-health-audit.mjs'
 
-function runner({ failingPull = false, failedRun = false } = {}) {
+function runner({ failingPull = false, failedRun = false, staleRun = false } = {}) {
   return (args) => {
     if (args[0] === 'repo') {
       return { defaultBranchRef: { name: 'main' }, pushedAt: '2026-09-18T00:00:00Z' }
@@ -12,7 +12,9 @@ function runner({ failingPull = false, failedRun = false } = {}) {
         conclusion: failedRun ? 'failure' : 'success',
         headSha: 'abc123',
         workflowName: 'CI',
-        createdAt: '2026-09-18T00:00:00Z',
+        createdAt: staleRun
+          ? new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+          : '2026-09-18T00:00:00Z',
       }]
     }
     return failingPull
@@ -33,5 +35,12 @@ describe('cross-repository release health audit', () => {
     expect(report.ok).toBe(false)
     expect(report.repositories[0].blockers).toContain('latest workflow is not a completed success')
     expect(report.repositories[0].blockers).toContain('1 open pull request(s) have failing checks')
+  })
+
+  it('rejects stale successful workflow evidence', () => {
+    const report = buildReleaseHealthReport({ repos: ['example/one'], run: runner({ staleRun: true }) })
+    expect(report.ok).toBe(false)
+    expect(report.repositories[0].latestRun.stale).toBe(true)
+    expect(report.repositories[0].blockers).toContain('latest workflow evidence is stale')
   })
 })

@@ -9,6 +9,8 @@
  */
 import { execFileSync } from 'node:child_process'
 
+const MAX_EVIDENCE_AGE_MS = 48 * 60 * 60 * 1000
+
 const repositories = (process.env.HERMES_RELEASE_REPOSITORIES || [
   'NPFernando/fernandofamily-astrology',
   'NPFernando/hermes-workspace',
@@ -47,7 +49,15 @@ function inspect(slug, run = gh) {
         }))
       : []
     const workflowPassed = Boolean(
-      latest && latest.status === 'completed' && latest.conclusion === 'success',
+      latest &&
+        latest.status === 'completed' &&
+        latest.conclusion === 'success' &&
+        latest.createdAt &&
+        Date.now() - Date.parse(latest.createdAt) <= MAX_EVIDENCE_AGE_MS,
+    )
+    const stale = Boolean(
+      latest &&
+        (!latest.createdAt || Date.now() - Date.parse(latest.createdAt) > MAX_EVIDENCE_AGE_MS),
     )
     const failingPrs = openPullRequests.filter((pull) => pull.failingChecks > 0).length
     return {
@@ -62,11 +72,13 @@ function inspect(slug, run = gh) {
             conclusion: latest.conclusion ?? null,
             headSha: latest.headSha ?? null,
             createdAt: latest.createdAt ?? null,
+            stale,
           }
         : null,
       openPullRequests,
       blockers: [
         !latest && 'no workflow run found',
+        stale && 'latest workflow evidence is stale',
         latest && !workflowPassed && 'latest workflow is not a completed success',
         failingPrs > 0 && `${failingPrs} open pull request(s) have failing checks`,
       ].filter(Boolean),
