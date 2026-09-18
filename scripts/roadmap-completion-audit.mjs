@@ -202,7 +202,10 @@ function hasDeploymentPreview(report) {
     Array.isArray(report.changedFileList) &&
     Array.isArray(report.migrationFiles) &&
     report.rollback && typeof report.rollback === 'object' &&
-    report.approval && typeof report.approval === 'object'
+    report.approval && typeof report.approval === 'object' &&
+    report.live && typeof report.live === 'object' &&
+    typeof report.live.serviceActive === 'boolean' &&
+    typeof report.live.coherent === 'boolean'
 }
 
 function hasAccessibilityEvidence(report) {
