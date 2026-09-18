@@ -60,6 +60,7 @@ import { Route as ApiConnectionSettingsRouteImport } from './routes/api/connecti
 import { Route as ApiConnectionStatusRouteImport } from './routes/api/connection-status'
 import { Route as ApiContextUsageRouteImport } from './routes/api/context-usage'
 import { Route as ApiCrewStatusRouteImport } from './routes/api/crew-status'
+import { Route as ApiCrossRepositoryReleaseStatusRouteImport } from './routes/api/cross-repository-release-status'
 import { Route as ApiDebugAnalyzeRouteImport } from './routes/api/debug-analyze'
 import { Route as ApiDemoTradingRouteImport } from './routes/api/demo-trading'
 import { Route as ApiDemoTradingGridRouteImport } from './routes/api/demo-trading-grid'
@@ -517,6 +518,12 @@ const ApiCrewStatusRoute = ApiCrewStatusRouteImport.update({
   path: '/api/crew-status',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCrossRepositoryReleaseStatusRoute =
+  ApiCrossRepositoryReleaseStatusRouteImport.update({
+    id: '/api/cross-repository-release-status',
+    path: '/api/cross-repository-release-status',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiDebugAnalyzeRoute = ApiDebugAnalyzeRouteImport.update({
   id: '/api/debug-analyze',
   path: '/api/debug-analyze',
@@ -1585,6 +1592,7 @@ export interface FileRoutesByFullPath {
   '/api/connection-status': typeof ApiConnectionStatusRoute
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
+  '/api/cross-repository-release-status': typeof ApiCrossRepositoryReleaseStatusRoute
   '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
   '/api/demo-trading': typeof ApiDemoTradingRoute
   '/api/demo-trading-grid': typeof ApiDemoTradingGridRoute
@@ -1838,6 +1846,7 @@ export interface FileRoutesByTo {
   '/api/connection-status': typeof ApiConnectionStatusRoute
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
+  '/api/cross-repository-release-status': typeof ApiCrossRepositoryReleaseStatusRoute
   '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
   '/api/demo-trading': typeof ApiDemoTradingRoute
   '/api/demo-trading-grid': typeof ApiDemoTradingGridRoute
@@ -2093,6 +2102,7 @@ export interface FileRoutesById {
   '/api/connection-status': typeof ApiConnectionStatusRoute
   '/api/context-usage': typeof ApiContextUsageRoute
   '/api/crew-status': typeof ApiCrewStatusRoute
+  '/api/cross-repository-release-status': typeof ApiCrossRepositoryReleaseStatusRoute
   '/api/debug-analyze': typeof ApiDebugAnalyzeRoute
   '/api/demo-trading': typeof ApiDemoTradingRoute
   '/api/demo-trading-grid': typeof ApiDemoTradingGridRoute
@@ -2349,6 +2359,7 @@ export interface FileRouteTypes {
     | '/api/connection-status'
     | '/api/context-usage'
     | '/api/crew-status'
+    | '/api/cross-repository-release-status'
     | '/api/debug-analyze'
     | '/api/demo-trading'
     | '/api/demo-trading-grid'
@@ -2602,6 +2613,7 @@ export interface FileRouteTypes {
     | '/api/connection-status'
     | '/api/context-usage'
     | '/api/crew-status'
+    | '/api/cross-repository-release-status'
     | '/api/debug-analyze'
     | '/api/demo-trading'
     | '/api/demo-trading-grid'
@@ -2856,6 +2868,7 @@ export interface FileRouteTypes {
     | '/api/connection-status'
     | '/api/context-usage'
     | '/api/crew-status'
+    | '/api/cross-repository-release-status'
     | '/api/debug-analyze'
     | '/api/demo-trading'
     | '/api/demo-trading-grid'
@@ -3111,6 +3124,7 @@ export interface RootRouteChildren {
   ApiConnectionStatusRoute: typeof ApiConnectionStatusRoute
   ApiContextUsageRoute: typeof ApiContextUsageRoute
   ApiCrewStatusRoute: typeof ApiCrewStatusRoute
+  ApiCrossRepositoryReleaseStatusRoute: typeof ApiCrossRepositoryReleaseStatusRoute
   ApiDebugAnalyzeRoute: typeof ApiDebugAnalyzeRoute
   ApiDemoTradingRoute: typeof ApiDemoTradingRoute
   ApiDemoTradingGridRoute: typeof ApiDemoTradingGridRoute
@@ -3631,6 +3645,13 @@ declare module '@tanstack/react-router' {
       path: '/api/crew-status'
       fullPath: '/api/crew-status'
       preLoaderRoute: typeof ApiCrewStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/cross-repository-release-status': {
+      id: '/api/cross-repository-release-status'
+      path: '/api/cross-repository-release-status'
+      fullPath: '/api/cross-repository-release-status'
+      preLoaderRoute: typeof ApiCrossRepositoryReleaseStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/debug-analyze': {
@@ -5351,6 +5372,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiConnectionStatusRoute: ApiConnectionStatusRoute,
   ApiContextUsageRoute: ApiContextUsageRoute,
   ApiCrewStatusRoute: ApiCrewStatusRoute,
+  ApiCrossRepositoryReleaseStatusRoute: ApiCrossRepositoryReleaseStatusRoute,
   ApiDebugAnalyzeRoute: ApiDebugAnalyzeRoute,
   ApiDemoTradingRoute: ApiDemoTradingRoute,
   ApiDemoTradingGridRoute: ApiDemoTradingGridRoute,

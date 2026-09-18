@@ -40,6 +40,26 @@ type LiveReadiness = {
   }
 }
 
+type CrossRepositoryReleaseStatus = {
+  generatedAt: string
+  repositories: Array<{
+    id: string
+    label: string
+    slug: string
+    status: 'pass' | 'fail' | 'running' | 'degraded' | 'unavailable'
+    detail: string
+    defaultBranch: string | null
+    pushedAt: string | null
+    latestRun: {
+      workflow: string | null
+      status: string | null
+      conclusion: string | null
+      headSha: string | null
+      createdAt: string | null
+    } | null
+  }>
+}
+
 // Deliberately declarative: this is the operator-facing cross-project
 // checklist. Runtime health and usage remain sourced from the dashboard API;
 // these records capture the human acceptance state that APIs cannot infer.
@@ -228,6 +248,9 @@ export function ProjectGoalsCard() {
   const [liveReadiness, setLiveReadiness] = useState<LiveReadiness | null>(null)
   const [readinessLoading, setReadinessLoading] = useState(false)
   const [readinessError, setReadinessError] = useState<string | null>(null)
+  const [releaseStatus, setReleaseStatus] = useState<CrossRepositoryReleaseStatus | null>(null)
+  const [releaseStatusLoading, setReleaseStatusLoading] = useState(false)
+  const [releaseStatusError, setReleaseStatusError] = useState<string | null>(null)
   const counts = useMemo(
     () =>
       GOALS.reduce<Record<GoalState, number>>(
@@ -262,9 +285,34 @@ export function ProjectGoalsCard() {
     }
   }, [])
 
+  const refreshReleaseStatus = useCallback(async () => {
+    setReleaseStatusLoading(true)
+    setReleaseStatusError(null)
+    try {
+      const response = await fetch('/api/cross-repository-release-status', {
+        headers: { Accept: 'application/json' },
+      })
+      const data = (await response.json()) as {
+        ok?: boolean
+        error?: string
+        generatedAt?: string
+        repositories?: CrossRepositoryReleaseStatus['repositories']
+      }
+      if (!response.ok || !data.ok || !data.generatedAt || !data.repositories) {
+        throw new Error(data.error || `Release status request failed (${response.status})`)
+      }
+      setReleaseStatus({ generatedAt: data.generatedAt, repositories: data.repositories })
+    } catch (error) {
+      setReleaseStatusError(error instanceof Error ? error.message : 'Release status request failed.')
+    } finally {
+      setReleaseStatusLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     void refreshReadiness()
-  }, [refreshReadiness])
+    void refreshReleaseStatus()
+  }, [refreshReadiness, refreshReleaseStatus])
 
   return (
     <section
@@ -329,11 +377,14 @@ export function ProjectGoalsCard() {
           </div>
           <button
             type="button"
-            onClick={() => void refreshReadiness()}
-            disabled={readinessLoading}
+            onClick={() => {
+              void refreshReadiness()
+              void refreshReleaseStatus()
+            }}
+            disabled={readinessLoading || releaseStatusLoading}
             className="min-h-9 rounded-lg border border-[var(--theme-accent)] px-3 py-1.5 text-xs font-semibold text-[var(--theme-text)] disabled:opacity-50"
           >
-            {readinessLoading ? 'Checking…' : 'Refresh evidence'}
+            {readinessLoading || releaseStatusLoading ? 'Checking…' : 'Refresh evidence'}
           </button>
         </div>
         {readinessError && (
@@ -428,6 +479,31 @@ export function ProjectGoalsCard() {
                 </div>
               </details>
             )}
+            <div className="rounded-md border border-[var(--theme-border)] px-2 py-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-semibold text-[var(--theme-text)]">Cross-repository release status</span>
+                {releaseStatus && <span className="text-muted">{new Date(releaseStatus.generatedAt).toLocaleString()}</span>}
+              </div>
+              {releaseStatusError && <p className="mt-1 text-[var(--theme-danger)]">{releaseStatusError}</p>}
+              {!releaseStatus && !releaseStatusError && <p className="mt-1 text-muted">Loading repository evidence…</p>}
+              {releaseStatus && (
+                <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                  {releaseStatus.repositories.map((repository) => (
+                    <div key={repository.id} className="rounded border border-[var(--theme-border)] px-2 py-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-[var(--theme-text)]">{repository.label}</span>
+                        <span className={cn(
+                          'rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
+                          repository.status === 'pass' ? 'bg-emerald-500/15 text-emerald-300' : repository.status === 'fail' ? 'bg-red-500/15 text-red-300' : 'bg-amber-500/15 text-amber-300',
+                        )}>{repository.status}</span>
+                      </div>
+                      <p className="mt-1 text-[11px] text-muted">{repository.detail}</p>
+                      {repository.defaultBranch && <p className="mt-1 text-[11px] text-muted">Branch: {repository.defaultBranch}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
