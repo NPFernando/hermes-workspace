@@ -36,6 +36,29 @@ const ROADMAP = [
   ['final roadmap completion audit', ['roadmap-completion-audit.mjs'], 'This audit itself must return ok=true'],
 ]
 
+const NEXT_ACTIONS = [
+  'Create the dedicated Astrology storage state, configure it as a protected secret, and run the authenticated workflow.',
+  'Configure the encrypted Finance off-site remote and passphrase out-of-band, then run a real round-trip exercise.',
+  'Run the authenticated Hermes smoke after a guarded deployment and retain its sanitized evidence artifact.',
+  'Record value-blind owner/source/expiry metadata for every configured credential; never record secret values.',
+  'Run the authenticated smoke and verify sign-in, session recovery, and account disconnect behavior.',
+  'Resolve every failed production configuration check before requesting deployment approval.',
+  'Run the authenticated smoke and verify provider budgets, trends, limits, and anomaly telemetry.',
+  'Run the authenticated smoke and verify queue priority, pause/retry, dead-letter, and audit fields.',
+  'Review the read-only preview, security evidence, and live coherence; request approval before deployment.',
+  'Run the scheduled disaster-recovery exercise and retain a sanitized passed restore artifact.',
+  'Refresh the Astrology performance evidence after the next production release.',
+  'Resolve failing checks and stale workflows for every configured repository, then refresh release evidence.',
+  'Run the scheduled fork preview and review its conflict and custom-change preservation classification.',
+  'Run the authenticated smoke and verify safe-mode status and preview-only behavior.',
+  'Resolve open security findings and produce current privacy/security regression evidence.',
+  'Deploy a coherent asset set, then rerun the browser accessibility smoke.',
+  'Run a fresh monitor sample after deployment and verify correlation, backup freshness, auth logs, and build identity.',
+  'Run the authenticated smoke and verify grouped Settings navigation.',
+  'Run the authenticated smoke and verify staged feature-flag decisions.',
+  'Resolve every preceding roadmap item and rerun this fail-closed audit.',
+]
+
 function command(file, args, cwd, env = process.env) {
   try {
     return execFileSync(file, args, {
@@ -476,6 +499,7 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
       status: liveEvidence ? 'verified' : implementationPresent ? 'implemented-awaiting-live-evidence' : 'missing',
       liveRequirement,
       liveEvidenceDetail: live.detail,
+      nextAction: NEXT_ACTIONS[index],
       evidence: implementationPresent ? files : [],
     }
   })

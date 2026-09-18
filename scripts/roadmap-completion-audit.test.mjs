@@ -16,6 +16,7 @@ describe('roadmap completion audit', () => {
     expect(report.items.some((item) => item.status === 'implemented-awaiting-live-evidence')).toBe(true)
     expect(report.items[19].liveEvidence).toBe(false)
     expect(report.items[19].liveEvidenceDetail).toMatch(/preceding roadmap item/)
+    expect(report.items[0].nextAction).toMatch(/Astrology storage state/)
   })
 
   it('verifies credential rotation only when configured credentials are tracked and current', () => {
