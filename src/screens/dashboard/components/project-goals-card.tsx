@@ -368,6 +368,7 @@ export function ProjectGoalsCard() {
     null,
   )
   const [roadmapAudit, setRoadmapAudit] = useState<RoadmapAudit | null>(null)
+  const [showAllRoadmapBlockers, setShowAllRoadmapBlockers] = useState(false)
   const [roadmapAuditLoading, setRoadmapAuditLoading] = useState(false)
   const [roadmapAuditError, setRoadmapAuditError] = useState<string | null>(null)
   const [featureFlags, setFeatureFlags] = useState<FeatureFlagSnapshot | null>(null)
@@ -389,6 +390,12 @@ export function ProjectGoalsCard() {
     filter === 'all'
       ? liveGoals
       : liveGoals.filter((goal) => goal.state === filter)
+  const incompleteRoadmapItems = roadmapAudit?.items.filter(
+    (item) => item.status !== 'verified',
+  ) ?? []
+  const displayedRoadmapItems = showAllRoadmapBlockers
+    ? incompleteRoadmapItems
+    : incompleteRoadmapItems.slice(0, 5)
 
   const refreshReadiness = useCallback(async () => {
     setReadinessLoading(true)
@@ -875,10 +882,7 @@ export function ProjectGoalsCard() {
               </span>
             </div>
             <div className="mt-2 space-y-1">
-              {roadmapAudit.items
-                .filter((item) => item.status !== 'verified')
-                .slice(0, 5)
-                .map((item) => (
+              {displayedRoadmapItems.map((item) => (
                   <details key={item.id} className="rounded border border-[var(--theme-border)] px-2 py-1.5 text-[11px] text-muted">
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-2">
                       <span className="truncate">{item.id}. {item.title}</span>
@@ -911,6 +915,18 @@ export function ProjectGoalsCard() {
                   </details>
                 ))}
             </div>
+            {incompleteRoadmapItems.length > 5 && (
+              <button
+                type="button"
+                className="mt-2 text-[11px] text-accent-400 hover:underline"
+                aria-expanded={showAllRoadmapBlockers}
+                onClick={() => setShowAllRoadmapBlockers((expanded) => !expanded)}
+              >
+                {showAllRoadmapBlockers
+                  ? 'Show fewer roadmap blockers'
+                  : `Show all ${incompleteRoadmapItems.length} roadmap blockers`}
+              </button>
+            )}
             <p className="mt-2 text-[10px] text-muted">
               Checked {new Date(roadmapAudit.generatedAt).toLocaleString()}; implementation files never count as completion proof.
             </p>
