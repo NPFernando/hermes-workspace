@@ -228,6 +228,42 @@ try {
         Array.isArray(body?.waiting) && Array.isArray(body?.recent),
       label: 'queue API returns an authenticated recovery snapshot',
     },
+    {
+      path: '/api/secret-rotation',
+      valid: (body) =>
+        body?.ok === true &&
+        Array.isArray(body?.statuses) &&
+        body?.summary &&
+        typeof body.summary.expired === 'number' &&
+        typeof body.summary.untracked === 'number',
+      label: 'credential rotation API returns value-blind expiry evidence',
+    },
+    {
+      path: '/api/feature-flags',
+      valid: (body) =>
+        body?.ok === true &&
+        Array.isArray(body?.flags) &&
+        body.flags.length > 0 &&
+        body.flags.every(
+          (flag) =>
+            typeof flag?.name === 'string' &&
+            typeof flag?.enabled === 'boolean' &&
+            typeof flag?.rolloutPercent === 'number' &&
+            typeof flag?.enabledForSubject === 'boolean',
+        ),
+      label: 'feature-flag API returns staged rollout decisions',
+    },
+    {
+      path: '/api/ops-observability',
+      valid: (body) =>
+        body?.ok === true &&
+        body?.safeMode &&
+        typeof body.safeMode.enabled === 'boolean' &&
+        body?.runtimeBuild &&
+        ['pass', 'degraded'].includes(body.runtimeBuild.status) &&
+        typeof body.runtimeBuild.detail === 'string',
+      label: 'ops API returns safe-mode and runtime-build evidence',
+    },
   ]
   for (const api of authenticatedApiChecks) {
     const result = await page.evaluate(async (path) => {
