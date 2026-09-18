@@ -27,6 +27,44 @@ export type DifyWorkflow = {
   publicOnly: true
 }
 
+/**
+ * A version is a server-configured workflow mapping. Dify does not expose a
+ * portable version selector through the run API, so each entry may point at a
+ * version-specific API base/key environment variable. The key itself never
+ * leaves the server.
+ */
+export type DifyWorkflowVersion = {
+  workflowId: string
+  version: string
+  name: string
+  description?: string
+  provider: string
+  apiBaseUrl?: string
+  apiKeyEnv?: string
+  publicOnly: true
+}
+
+export type DifyWorkflowChange = {
+  field: 'name' | 'description' | 'provider' | 'apiBaseUrl' | 'apiKeyEnv'
+  before: string | null
+  after: string | null
+}
+
+export type DifyWorkflowComparison = {
+  workflowId: string
+  fromVersion: string
+  toVersion: string
+  changes: Array<DifyWorkflowChange>
+}
+
+export type DifyRollbackRecord = {
+  workflowId: string
+  version: string
+  requestedAt: string
+  requestedBy: 'authenticated-operator'
+  note: string
+}
+
 export type DifyExecution = {
   id: string
   workflowId: string
@@ -44,6 +82,10 @@ export type DifyIntegration = {
   enabled: boolean
   configured: boolean
   workflows: Array<DifyWorkflow>
+  versions: Array<DifyWorkflowVersion>
+  rollbackEnabled: boolean
+  activeVersions: Record<string, string>
+  rollbackHistory: Array<DifyRollbackRecord>
   history: Array<DifyExecution>
   privacy: {
     mode: 'public-only'
@@ -60,6 +102,7 @@ type DifyInternalConfig = {
   apiBaseUrl: string | null
   apiKey: string | null
   workflows: Array<DifyWorkflow>
+  versions: Array<DifyWorkflowVersion>
 }
 
 const HISTORY_LIMIT = 100
@@ -69,6 +112,7 @@ const SENSITIVE_FIELD =
   /(birth|location|address|finance|account|bank|branch|wallet|payment|card|tax|income|salary|transaction|repo|repository|path|password|secret|token|cookie|session|email|phone|medical|health|private|credential|api.?key)/i
 const SENSITIVE_TEXT =
   /\b(date of birth|birth date|home address|account number|bank account|password|api key|secret key|social security|private repository|phone number|email address)\b|(?:^|\s)(?:~\/|\/home\/|\/Users\/)/i
+const VERSION_STATE_LIMIT = 100
 
 function safeHttpUrl(raw: string | undefined): string | null {
   if (!raw?.trim()) return null
@@ -137,6 +181,64 @@ function parseWorkflows(): Array<DifyWorkflow> {
   }
 }
 
+function parseWorkflowVersions(): Array<DifyWorkflowVersion> {
+  const raw = process.env.DIFY_WORKFLOW_VERSIONS_JSON?.trim()
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .map((value): DifyWorkflowVersion | null => {
+        if (!value || typeof value !== 'object' || Array.isArray(value))
+          return null
+        const row = value as Record<string, unknown>
+        const workflowId =
+          typeof row.workflowId === 'string' ? row.workflowId.trim() : ''
+        const version =
+          typeof row.version === 'string' ? row.version.trim() : ''
+        const name = typeof row.name === 'string' ? row.name.trim() : ''
+        if (
+          !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/.test(workflowId) ||
+          !/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(version) ||
+          !name ||
+          name.length > 120
+        )
+          return null
+        const description =
+          typeof row.description === 'string'
+            ? row.description.trim().slice(0, 400)
+            : undefined
+        const provider =
+          typeof row.provider === 'string' && row.provider.trim()
+            ? row.provider.trim().slice(0, 80)
+            : 'Dify'
+        const apiBaseUrl =
+          typeof row.apiBaseUrl === 'string'
+            ? safeHttpUrl(row.apiBaseUrl)
+            : null
+        const apiKeyEnv =
+          typeof row.apiKeyEnv === 'string' &&
+          /^[A-Z][A-Z0-9_]{0,79}$/.test(row.apiKeyEnv.trim())
+            ? row.apiKeyEnv.trim()
+            : undefined
+        return {
+          workflowId,
+          version,
+          name,
+          ...(description ? { description } : {}),
+          provider,
+          ...(apiBaseUrl ? { apiBaseUrl } : {}),
+          ...(apiKeyEnv ? { apiKeyEnv } : {}),
+          publicOnly: true,
+        }
+      })
+      .filter((value): value is DifyWorkflowVersion => Boolean(value))
+      .slice(0, 256)
+  } catch {
+    return []
+  }
+}
+
 function internalConfig(): DifyInternalConfig {
   const url = safeHttpUrl(
     process.env.DIFY_WORKBENCH_URL || process.env.DIFY_BASE_URL,
@@ -154,6 +256,7 @@ function internalConfig(): DifyInternalConfig {
     apiBaseUrl,
     apiKey,
     workflows: parseWorkflows(),
+    versions: parseWorkflowVersions(),
   }
 }
 
@@ -216,6 +319,163 @@ export async function getDifyStatus(fetchImpl = fetch): Promise<DifyStatus> {
 
 function historyPath(): string {
   return join(getStateDir(), 'dify-execution-history.json')
+}
+
+function versionStatePath(): string {
+  return join(getStateDir(), 'dify-workflow-state.json')
+}
+
+type DifyVersionState = {
+  activeVersions: Record<string, string>
+  rollbackHistory: Array<DifyRollbackRecord>
+}
+
+function readVersionState(file = versionStatePath()): DifyVersionState {
+  try {
+    if (!existsSync(file)) return { activeVersions: {}, rollbackHistory: [] }
+    const parsed = JSON.parse(readFileSync(file, 'utf8')) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+      return { activeVersions: {}, rollbackHistory: [] }
+    const row = parsed as Record<string, unknown>
+    const activeVersions: Record<string, string> = {}
+    if (row.activeVersions && typeof row.activeVersions === 'object') {
+      for (const [workflowId, version] of Object.entries(
+        row.activeVersions as Record<string, unknown>,
+      )) {
+        if (
+          /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/.test(workflowId) &&
+          typeof version === 'string' &&
+          /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(version)
+        )
+          activeVersions[workflowId] = version
+      }
+    }
+    const rollbackHistory = Array.isArray(row.rollbackHistory)
+      ? (row.rollbackHistory.slice(0, VERSION_STATE_LIMIT) as Array<DifyRollbackRecord>)
+      : []
+    return { activeVersions, rollbackHistory }
+  } catch {
+    return { activeVersions: {}, rollbackHistory: [] }
+  }
+}
+
+function writeVersionState(
+  state: DifyVersionState,
+  file = versionStatePath(),
+): void {
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 })
+  const temp = `${file}.${process.pid}.${Date.now()}.tmp`
+  writeFileSync(temp, JSON.stringify(state, null, 2) + '\n', { mode: 0o600 })
+  renameSync(temp, file)
+  try {
+    chmodSync(file, 0o600)
+  } catch {
+    /* best effort on Windows */
+  }
+}
+
+function versionFor(
+  config: DifyInternalConfig,
+  workflowId: string,
+  version: string | undefined,
+): DifyWorkflowVersion | null {
+  return (
+    config.versions.find(
+      (item) =>
+        item.workflowId === workflowId &&
+        (!version || item.version === version),
+    ) ?? null
+  )
+}
+
+function activeWorkflow(
+  config: DifyInternalConfig,
+  workflow: DifyWorkflow,
+  state: DifyVersionState,
+): { workflow: DifyWorkflow; apiBaseUrl: string | null; apiKey: string | null } {
+  const selectedVersion = versionFor(
+    config,
+    workflow.id,
+    state.activeVersions[workflow.id] ?? workflow.version,
+  )
+  if (!selectedVersion)
+    return {
+      workflow,
+      apiBaseUrl: config.apiBaseUrl,
+      apiKey: config.apiKey,
+    }
+  return {
+    workflow: {
+      ...workflow,
+      name: selectedVersion.name,
+      ...(selectedVersion.description
+        ? { description: selectedVersion.description }
+        : {}),
+      version: selectedVersion.version,
+      provider: selectedVersion.provider,
+    },
+    apiBaseUrl: selectedVersion.apiBaseUrl ?? config.apiBaseUrl,
+    apiKey: selectedVersion.apiKeyEnv
+      ? process.env[selectedVersion.apiKeyEnv]?.trim() || null
+      : config.apiKey,
+  }
+}
+
+export function compareDifyWorkflowVersions(
+  workflowId: string,
+  fromVersion: string,
+  toVersion: string,
+): DifyWorkflowComparison {
+  const config = internalConfig()
+  const from = versionFor(config, workflowId, fromVersion)
+  const to = versionFor(config, workflowId, toVersion)
+  if (!from || !to) throw new Error('Both Dify workflow versions must be configured.')
+  const changes: Array<DifyWorkflowChange> = []
+  for (const field of [
+    'name',
+    'description',
+    'provider',
+    'apiBaseUrl',
+    'apiKeyEnv',
+  ] as const) {
+    const before = from[field] ?? null
+    const after = to[field] ?? null
+    if (before !== after) changes.push({ field, before, after })
+  }
+  return { workflowId, fromVersion, toVersion, changes }
+}
+
+export function rollbackDifyWorkflow(
+  workflowId: string,
+  version: string,
+  note: string,
+): DifyIntegration {
+  const config = internalConfig()
+  if (!config.enabled || !enabledEnv('DIFY_API_ENABLED'))
+    throw new Error('Dify API workflows are disabled.')
+  if (!enabledEnv('DIFY_WORKFLOW_ROLLBACK_ENABLED'))
+    throw new Error('Dify workflow rollback is disabled by server policy.')
+  if (!versionFor(config, workflowId, version))
+    throw new Error('The requested Dify workflow version is not configured.')
+  const cleanNote = note.trim()
+  if (cleanNote.length < 8 || cleanNote.length > 500)
+    throw new Error('Rollback note must be between 8 and 500 characters.')
+  const state = readVersionState()
+  const record: DifyRollbackRecord = {
+    workflowId,
+    version,
+    requestedAt: new Date().toISOString(),
+    requestedBy: 'authenticated-operator',
+    note: cleanNote,
+  }
+  writeVersionState({
+    activeVersions: { ...state.activeVersions, [workflowId]: version },
+    rollbackHistory: [record, ...state.rollbackHistory].slice(
+      0,
+      VERSION_STATE_LIMIT,
+    ),
+  })
+  return getDifyIntegration()
 }
 
 function readHistory(file = historyPath()): Array<DifyExecution> {
@@ -295,13 +555,23 @@ function integrationStatus(
   config: DifyInternalConfig,
   history: Array<DifyExecution>,
 ): DifyIntegration {
+  const versionState = readVersionState()
   const configured = Boolean(
     config.apiBaseUrl && config.apiKey && config.workflows.length > 0,
   )
   return {
     enabled: config.enabled && enabledEnv('DIFY_API_ENABLED'),
     configured,
-    workflows: config.workflows,
+    workflows: config.workflows.map(
+      (workflow) => activeWorkflow(config, workflow, versionState).workflow,
+    ),
+    versions: config.versions.map(({ apiBaseUrl: _apiBaseUrl, apiKeyEnv: _apiKeyEnv, ...version }) => version),
+    rollbackEnabled:
+      config.enabled &&
+      enabledEnv('DIFY_API_ENABLED') &&
+      enabledEnv('DIFY_WORKFLOW_ROLLBACK_ENABLED'),
+    activeVersions: versionState.activeVersions,
+    rollbackHistory: versionState.rollbackHistory,
     history,
     privacy: {
       mode: 'public-only',
@@ -387,12 +657,17 @@ export async function runDifyWorkflow(
   options?: DifyWorkflowRunOptions,
 ): Promise<{ execution: DifyExecution; outputs: unknown }> {
   const config = internalConfig()
-  const workflow = config.workflows.find((item) => item.id === workflowId)
+  const configuredWorkflow = config.workflows.find((item) => item.id === workflowId)
+  const state = readVersionState()
+  const resolved = configuredWorkflow
+    ? activeWorkflow(config, configuredWorkflow, state)
+    : null
+  const workflow = resolved?.workflow
   if (
     !config.enabled ||
     !enabledEnv('DIFY_API_ENABLED') ||
-    !config.apiBaseUrl ||
-    !config.apiKey ||
+    !resolved?.apiBaseUrl ||
+    !resolved.apiKey ||
     !workflow
   )
     throw new Error(
@@ -412,10 +687,10 @@ export async function runDifyWorkflow(
     requestSignal = signal
     for (let attempt = 0; attempt <= retries; attempt += 1) {
       try {
-        const response = await fetchImpl(`${config.apiBaseUrl}/workflows/run`, {
+        const response = await fetchImpl(`${resolved.apiBaseUrl}/workflows/run`, {
           method: 'POST',
           headers: {
-            authorization: `Bearer ${config.apiKey}`,
+            authorization: `Bearer ${resolved.apiKey}`,
             'content-type': 'application/json',
             accept: 'application/json',
           },

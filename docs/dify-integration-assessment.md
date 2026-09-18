@@ -25,6 +25,23 @@ Before adding an API workflow, document exact fields, retention, deletion,
 logs, model-provider transfers, backup/restore, and access controls. Keep any
 Dify application key server-side and behind a separate feature flag.
 
+## Workflow version comparison and rollback
+
+Hermes can maintain a small server-side version catalog using
+`DIFY_WORKFLOW_VERSIONS_JSON`. Each entry contains a workflow ID, version,
+public display metadata, and optionally a version-specific API base URL and
+API-key environment variable. The UI compares those configured mappings and
+stores only metadata in the local state file.
+
+Rollback is disabled unless `DIFY_WORKFLOW_ROLLBACK_ENABLED` is explicitly
+enabled in addition to `DIFY_API_ENABLED`. An authenticated operator must
+provide a reason of 8–500 characters. The rollback changes the active Hermes
+mapping, records an append-only bounded audit history, and does not mutate the
+external Dify service or send workflow inputs during the operation. Configure
+separate version-specific Dify applications/keys when an actual provider-side
+version switch is required; keys are referenced by environment-variable name
+and never returned by the API.
+
 ## Operations
 
 The Dify deployment is a separate service with its own upgrades, backups,
