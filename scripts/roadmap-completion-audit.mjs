@@ -102,6 +102,43 @@ function recentForkPreviewEvidence() {
   }
 }
 
+function astrologyAuthSmokeEvidence(run) {
+  try {
+    const output = run('gh', [
+      'run',
+      'list',
+      '--repo',
+      'NPFernando/fernandofamily-astrology',
+      '--workflow',
+      'authenticated-production-smoke.yml',
+      '--limit',
+      '1',
+      '--json',
+      'status,conclusion,createdAt,headSha',
+    ])
+    const latest = parseJson(output)?.[0]
+    const createdAt = Date.parse(latest?.createdAt ?? '')
+    const fresh = Number.isFinite(createdAt) &&
+      Date.now() - createdAt >= 0 &&
+      Date.now() - createdAt <= 48 * 60 * 60 * 1000
+    const verified = latest?.status === 'completed' &&
+      latest?.conclusion === 'success' &&
+      fresh &&
+      typeof latest?.headSha === 'string' &&
+      latest.headSha.length > 0
+    return {
+      verified,
+      detail: verified
+        ? 'recent Astrology authenticated-production-smoke workflow passed'
+        : latest?.status === 'completed' && latest?.conclusion === 'success'
+          ? 'Astrology authenticated smoke evidence is stale'
+          : 'no recent successful Astrology authenticated smoke workflow found',
+    }
+  } catch {
+    return { verified: false, detail: 'Astrology authenticated smoke workflow evidence is unavailable' }
+  }
+}
+
 function findFile(root, target, depth = 0) {
   if (depth > 5 || !existsSync(root)) return false
   try {
@@ -247,6 +284,10 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
   }
   const liveEvidenceFor = (index) => {
     const evidence = (verified, detail) => ({ verified, detail })
+    if (index === 0) {
+      const smoke = astrologyAuthSmokeEvidence(run)
+      return evidence(smoke.verified, smoke.detail)
+    }
     if (index === 5) {
       const status = getReadiness()?.checks?.configurationPreflight?.status
       return evidence(status === 'pass', `configuration preflight: ${status || 'unavailable'}`)

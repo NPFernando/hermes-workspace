@@ -46,4 +46,22 @@ describe('roadmap completion audit', () => {
     expect(report.items[17].liveEvidence).toBe(false)
     expect(report.items[18].liveEvidence).toBe(false)
   })
+
+  it('requires a fresh successful Astrology authenticated-smoke workflow', () => {
+    const run = (file, args) => {
+      if (file === 'systemctl') return 'active'
+      if (file === 'git') return 'test-head'
+      if (file === 'gh' && args[0] === 'run') {
+        return JSON.stringify([{
+          status: 'completed',
+          conclusion: 'success',
+          createdAt: new Date().toISOString(),
+          headSha: 'astrology-test-head',
+        }])
+      }
+      return ''
+    }
+    const report = buildRoadmapAudit({ root: process.cwd(), run })
+    expect(report.items[0]).toMatchObject({ status: 'verified', liveEvidence: true })
+  })
 })
