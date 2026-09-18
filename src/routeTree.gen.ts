@@ -109,6 +109,7 @@ import { Route as ApiProductionReadinessRouteImport } from './routes/api/product
 import { Route as ApiProviderUsageRouteImport } from './routes/api/provider-usage'
 import { Route as ApiRiskCheckRouteImport } from './routes/api/risk-check'
 import { Route as ApiRouteSisterRouteImport } from './routes/api/route-sister'
+import { Route as ApiSecretRotationRouteImport } from './routes/api/secret-rotation'
 import { Route as ApiSendRouteImport } from './routes/api/send'
 import { Route as ApiSendStreamRouteImport } from './routes/api/send-stream'
 import { Route as ApiSessionHistoryRouteImport } from './routes/api/session-history'
@@ -764,6 +765,11 @@ const ApiRiskCheckRoute = ApiRiskCheckRouteImport.update({
 const ApiRouteSisterRoute = ApiRouteSisterRouteImport.update({
   id: '/api/route-sister',
   path: '/api/route-sister',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSecretRotationRoute = ApiSecretRotationRouteImport.update({
+  id: '/api/secret-rotation',
+  path: '/api/secret-rotation',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSendRoute = ApiSendRouteImport.update({
@@ -1653,6 +1659,7 @@ export interface FileRoutesByFullPath {
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/risk-check': typeof ApiRiskCheckRoute
   '/api/route-sister': typeof ApiRouteSisterRoute
+  '/api/secret-rotation': typeof ApiSecretRotationRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
@@ -1909,6 +1916,7 @@ export interface FileRoutesByTo {
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/risk-check': typeof ApiRiskCheckRoute
   '/api/route-sister': typeof ApiRouteSisterRoute
+  '/api/secret-rotation': typeof ApiSecretRotationRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
@@ -2167,6 +2175,7 @@ export interface FileRoutesById {
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/risk-check': typeof ApiRiskCheckRoute
   '/api/route-sister': typeof ApiRouteSisterRoute
+  '/api/secret-rotation': typeof ApiSecretRotationRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
@@ -2426,6 +2435,7 @@ export interface FileRouteTypes {
     | '/api/provider-usage'
     | '/api/risk-check'
     | '/api/route-sister'
+    | '/api/secret-rotation'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
@@ -2682,6 +2692,7 @@ export interface FileRouteTypes {
     | '/api/provider-usage'
     | '/api/risk-check'
     | '/api/route-sister'
+    | '/api/secret-rotation'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
@@ -2939,6 +2950,7 @@ export interface FileRouteTypes {
     | '/api/provider-usage'
     | '/api/risk-check'
     | '/api/route-sister'
+    | '/api/secret-rotation'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
@@ -3197,6 +3209,7 @@ export interface RootRouteChildren {
   ApiProviderUsageRoute: typeof ApiProviderUsageRoute
   ApiRiskCheckRoute: typeof ApiRiskCheckRoute
   ApiRouteSisterRoute: typeof ApiRouteSisterRoute
+  ApiSecretRotationRoute: typeof ApiSecretRotationRoute
   ApiSendRoute: typeof ApiSendRoute
   ApiSendStreamRoute: typeof ApiSendStreamRoute
   ApiSessionHistoryRoute: typeof ApiSessionHistoryRoute
@@ -4014,6 +4027,13 @@ declare module '@tanstack/react-router' {
       path: '/api/route-sister'
       fullPath: '/api/route-sister'
       preLoaderRoute: typeof ApiRouteSisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/secret-rotation': {
+      id: '/api/secret-rotation'
+      path: '/api/secret-rotation'
+      fullPath: '/api/secret-rotation'
+      preLoaderRoute: typeof ApiSecretRotationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/send': {
@@ -5461,6 +5481,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProviderUsageRoute: ApiProviderUsageRoute,
   ApiRiskCheckRoute: ApiRiskCheckRoute,
   ApiRouteSisterRoute: ApiRouteSisterRoute,
+  ApiSecretRotationRoute: ApiSecretRotationRoute,
   ApiSendRoute: ApiSendRoute,
   ApiSendStreamRoute: ApiSendStreamRoute,
   ApiSessionHistoryRoute: ApiSessionHistoryRoute,

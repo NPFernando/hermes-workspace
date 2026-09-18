@@ -147,7 +147,7 @@ export function writeRotation(
   chmodSync(auditPath, 0o600)
 }
 
-function configuredKeys() {
+export function configuredSecretKeys() {
   const files = [
     '/home/ubuntu/hermes-workspace-live/.env',
     '/home/ubuntu/.hermes/.env',
@@ -183,7 +183,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
           warning:
             'Metadata only; secret values are never displayed or loaded.',
           status: rotationStatus(metadata, {
-            configuredKeys: configuredKeys(),
+            configuredKeys: configuredSecretKeys(),
           }),
         },
         null,
