@@ -45,6 +45,7 @@ import {
   readProviderBudgetConfig,
 } from '../../server/provider-scheduling-policy'
 import { safeErrorMessage } from '../../server/rate-limit'
+import { assertExternalWritesEnabled } from '../../server/safe-mode'
 import type { ProviderScheduleDecision } from '../../server/provider-scheduling-policy'
 import type { SwarmRosterWorker } from '../../server/swarm-roster'
 import type { ParsedSwarmCheckpoint } from '../../server/swarm-checkpoints'
@@ -1757,6 +1758,7 @@ export async function dispatchSwarmAssignments(
   body: DispatchRequest,
   context: DispatchExecutionContext = {},
 ) {
+  assertExternalWritesEnabled('swarm agent dispatch')
   const serialDispatch = body.dispatchMode === 'serial'
   let assignments = parseAssignments(body.assignments)
   const promptRaw = typeof body.prompt === 'string' ? body.prompt : ''

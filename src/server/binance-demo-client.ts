@@ -8,6 +8,7 @@
  */
 import crypto from 'node:crypto'
 import { recordConnectivityOutcome } from './connectivity-breaker'
+import { assertExternalWritesEnabled } from './safe-mode'
 
 const ALLOWED_DEMO_HOSTS = new Set([
   'demo-api.binance.com',
@@ -242,6 +243,9 @@ abstract class SignedBinanceClient implements BinanceExecutionClient {
     path: string,
     params: Record<string, string | number> = {},
   ): Promise<any> {
+    if (method !== 'GET') {
+      assertExternalWritesEnabled(`Binance ${method} ${path}`)
+    }
     this.assertBaseUrl(this.base)
     const timestamp = Date.now()
     const search = new URLSearchParams({

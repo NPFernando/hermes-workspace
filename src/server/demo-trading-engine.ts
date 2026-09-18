@@ -71,6 +71,7 @@ import {
   readFinanceStore,
   writeFinanceStore,
 } from './finance-store'
+import { isSafeModeEnabled } from './safe-mode'
 import {
   detectStrategyDecay,
   parseStrategyBaselines,
@@ -1081,6 +1082,7 @@ function hermesBin(): string {
   return _hermesBin
 }
 function sendTradeAlert(message: string): void {
+  if (isSafeModeEnabled()) return
   if (!TRADE_ALERTS_ENABLED) return
   // Never send (or spawn) during tests, and never block the trading cycle on it:
   // fire-and-forget a detached child so a slow/hung `hermes send` can't stall trading.

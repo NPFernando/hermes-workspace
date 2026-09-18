@@ -9,6 +9,7 @@ import {
 import { dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { getStateDir } from './workspace-state-dir'
+import { assertExternalWritesEnabled } from './safe-mode'
 
 export type DifyStatus = {
   enabled: boolean
@@ -450,6 +451,7 @@ export function rollbackDifyWorkflow(
   version: string,
   note: string,
 ): DifyIntegration {
+  assertExternalWritesEnabled('Dify workflow rollback')
   const config = internalConfig()
   if (!config.enabled || !enabledEnv('DIFY_API_ENABLED'))
     throw new Error('Dify API workflows are disabled.')
@@ -656,6 +658,7 @@ export async function runDifyWorkflow(
   file?: string,
   options?: DifyWorkflowRunOptions,
 ): Promise<{ execution: DifyExecution; outputs: unknown }> {
+  assertExternalWritesEnabled('Dify workflow run')
   const config = internalConfig()
   const configuredWorkflow = config.workflows.find((item) => item.id === workflowId)
   const state = readVersionState()
