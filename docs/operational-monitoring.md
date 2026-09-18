@@ -63,3 +63,15 @@ With this opt-in configuration, the monitor reads `TELEGRAM_BOT_TOKEN` and
 `TELEGRAM_RELAY_BASE` from the existing mode-0600 `~/.hermes/.env` at runtime.
 It never copies either secret into the monitor environment, repository, or
 alert state. A generic webhook takes precedence when both transports are set.
+
+To validate the configured transport without sending a message or writing
+cooldown state, run:
+
+```bash
+node scripts/ops-monitor.mjs /home/ubuntu/hermes-workspace-live --test-alert
+```
+
+The test mode defaults to a no-network dry run. To deliberately send one
+synthetic warning, add `--send` and set
+`HERMES_OPS_ALERT_TEST_CONFIRM=1` in the same command. This separate
+confirmation prevents an accidental notification during routine monitoring.

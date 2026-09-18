@@ -128,6 +128,22 @@ describe('operational monitor', () => {
     await expect(notifyOperationalAlerts(status, { fetchImpl })).resolves.toMatchObject({ configured: false, sent: 0 })
   })
 
+  it('validates a configured webhook in dry-run mode without calling it or writing cooldown state', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'hermes-ops-alert-dry-run-'))
+    const statePath = join(root, 'alerts.json')
+    const status = { issues: [{ code: 'memory_growth', level: 'warning', detail: 'synthetic test' }] }
+    let calls = 0
+    const result = await notifyOperationalAlerts(status, {
+      webhookUrl: 'https://alerts.example.test/hook',
+      statePath,
+      dryRun: true,
+      fetchImpl: async () => { calls += 1; return { ok: true } },
+    })
+    expect(result).toMatchObject({ configured: true, dryRun: true, sent: 0, failed: 0 })
+    expect(calls).toBe(0)
+    await expect(readFile(statePath, 'utf8')).rejects.toThrow()
+  })
+
   it('delivers alertable findings through the opt-in Telegram relay', async () => {
     const root = await mkdtemp(join(tmpdir(), 'hermes-ops-telegram-'))
     const requests = []
