@@ -239,6 +239,20 @@ try {
       label: 'queue API returns an authenticated recovery snapshot',
     },
     {
+      path: '/api/cross-repository-release-status',
+      valid: (body) =>
+        body?.ok === true &&
+        typeof body.generatedAt === 'string' &&
+        Array.isArray(body.repositories) &&
+        body.repositories.length > 0 &&
+        body.repositories.every(
+          (repository) =>
+            typeof repository?.slug === 'string' &&
+            ['pass', 'fail', 'running', 'degraded', 'unavailable'].includes(repository?.status),
+        ),
+      label: 'unified release dashboard API returns repository evidence',
+    },
+    {
       path: '/api/secret-rotation',
       valid: (body) =>
         body?.ok === true &&

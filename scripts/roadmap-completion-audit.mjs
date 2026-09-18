@@ -318,6 +318,11 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
         ? 'recent encrypted Finance off-site round trip passed'
         : 'no recent passed encrypted Finance off-site round trip found')
     }
+    if (index === 2) {
+      const smoke = recentAuthenticatedSmokeEvidence(root)
+      const verified = smoke.ok && smoke.labels.has('unified release dashboard API returns repository evidence')
+      return evidence(verified, verified ? 'authenticated unified release dashboard evidence passed' : `unified dashboard evidence: ${smoke.detail}`)
+    }
     if (index === 5) {
       const status = getReadiness()?.checks?.configurationPreflight?.status
       return evidence(status === 'pass', `configuration preflight: ${status || 'unavailable'}`)
