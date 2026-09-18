@@ -8,6 +8,7 @@
  *  - Ops cron job health                                      (cron/jobs.json)
  */
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { AiUsagePanel } from './components/ai-usage-panel'
 import { AgentControlPlane } from './components/agent-control-plane'
 
@@ -98,9 +99,25 @@ interface DeploymentJournalEntry {
     reference?: string | null
   }
 }
+interface ServiceHealthHistoryEntry {
+  checkedAt: number
+  activeState: string
+  pid: string
+  result: string | null
+  residentMemoryKb: number | null
+  oomDetected: boolean
+  issueCodes: Array<string>
+}
 interface SafeModeStatus {
   enabled: boolean
   source: 'HERMES_SAFE_MODE' | 'disabled'
+  detail: string
+}
+interface RuntimeBuildIdentity {
+  status: 'pass' | 'degraded'
+  servedBuild: string | null
+  artifactBuild: string | null
+  markerMatchesHead: boolean
   detail: string
 }
 interface FinanceStorageSmokeCronOutput {
@@ -189,8 +206,10 @@ interface OpsPayload {
   financeStorageMonitor: FinanceStorageMonitorSummary | null
   financeStorageSmokeCron: FinanceStorageSmokeCronSummary | null
   deploymentJournal: Array<DeploymentJournalEntry>
+  serviceHealthHistory: Array<ServiceHealthHistoryEntry>
   safeMode: SafeModeStatus
   headroom: HeadroomStats | null
+  runtimeBuild: RuntimeBuildIdentity
 }
 
 function money(v: number | null | undefined): string {
@@ -466,6 +485,7 @@ function ProductionReadinessPanel() {
 }
 
 export function OpsCostScreen() {
+  const [safeModeCommandCopied, setSafeModeCommandCopied] = useState(false)
   const opsQuery = useQuery({
     queryKey: ['ops-observability'],
     queryFn: async () => {
@@ -541,8 +561,10 @@ export function OpsCostScreen() {
     financeStorageMonitor,
     financeStorageSmokeCron,
     deploymentJournal,
+    serviceHealthHistory,
     headroom,
     safeMode,
+    runtimeBuild,
   } = opsQuery.data
   const runwayDays =
     cost?.remaining != null &&
@@ -589,11 +611,43 @@ export function OpsCostScreen() {
       <OperationalHealthPanel />
       <ProductionReadinessPanel />
 
+      <Panel title="Runtime release identity">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className={runtimeBuild.status === 'pass' ? 'text-emerald-400' : 'text-amber-400'}>
+            {runtimeBuild.status === 'pass' ? 'COHERENT' : 'DEGRADED'}
+          </span>
+          <span className="font-mono text-[11px] text-[var(--theme-muted)]">
+            served {runtimeBuild.servedBuild ?? 'unknown'}
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-[var(--theme-muted)]">{runtimeBuild.detail}</p>
+        <p className="mt-1 text-[11px] text-[var(--theme-muted)]">
+          artifact {runtimeBuild.artifactBuild ?? 'missing'} · marker {runtimeBuild.markerMatchesHead ? 'matches HEAD' : 'does not match HEAD'}
+        </p>
+      </Panel>
+
       <Panel title="External-write safe mode">
-        <div className={safeMode.enabled ? 'text-amber-400' : 'text-emerald-400'}>
-          {safeMode.enabled ? 'ACTIVE — external writes are blocked' : 'DISABLED — normal integration gates apply'}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className={safeMode.enabled ? 'text-amber-400' : 'text-emerald-400'}>
+            {safeMode.enabled ? 'ACTIVE — external writes are blocked' : 'DISABLED — normal integration gates apply'}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              void navigator.clipboard
+                .writeText('sudo systemctl set-environment HERMES_SAFE_MODE=1 && sudo systemctl restart hermes-workspace.service')
+                .then(() => setSafeModeCommandCopied(true))
+                .catch(() => setSafeModeCommandCopied(false))
+            }}
+            className="rounded-lg border border-[var(--theme-border)] px-2.5 py-1.5 text-xs text-[var(--theme-text)] hover:bg-[var(--theme-hover)]"
+          >
+            {safeModeCommandCopied ? 'Command copied' : 'Copy emergency enable command'}
+          </button>
         </div>
         <p className="mt-1 text-xs text-[var(--theme-muted)]">{safeMode.detail}</p>
+        <p className="mt-2 text-[11px] text-[var(--theme-muted)]">
+          Browser requests never change this process-level control. Run the copied command from an authorized shell, then refresh this panel.
+        </p>
       </Panel>
 
       <Panel title="Production change journal">
@@ -619,6 +673,27 @@ export function OpsCostScreen() {
           </div>
         ) : (
           <p className="text-sm text-[var(--theme-muted)]">No successful deployment entries recorded yet.</p>
+        )}
+      </Panel>
+
+      <Panel title="Service health history">
+        {serviceHealthHistory.length > 0 ? (
+          <div className="space-y-1 text-xs">
+            {serviceHealthHistory.slice(0, 12).map((sample) => (
+              <div key={`${sample.checkedAt}-${sample.pid}`} className="flex flex-wrap items-center justify-between gap-2 rounded border border-[var(--theme-border,rgba(128,128,128,0.2))] px-2 py-1.5">
+                <time dateTime={new Date(sample.checkedAt).toISOString()} className="text-[var(--theme-muted)]">
+                  {new Date(sample.checkedAt).toLocaleString()}
+                </time>
+                <span className={sample.activeState === 'active' && !sample.oomDetected ? 'text-emerald-400' : 'text-[var(--theme-danger)]'}>
+                  {sample.activeState} · PID {sample.pid}
+                  {sample.oomDetected ? ' · OOM evidence' : ''}
+                  {sample.issueCodes.length > 0 ? ` · ${sample.issueCodes.join(', ')}` : ''}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-[var(--theme-muted)]">No persisted monitor samples yet.</p>
         )}
       </Panel>
 

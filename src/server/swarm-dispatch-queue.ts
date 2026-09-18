@@ -18,7 +18,13 @@ const JOB_LEASE_MS = 15_000
 const LEASE_HEARTBEAT_MS = 1_000
 
 export type SwarmDispatchQueueStatus =
-  'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'interrupted'
+  | 'pending'
+  | 'paused'
+  | 'running'
+  | 'succeeded'
+  | 'failed'
+  | 'cancelled'
+  | 'interrupted'
 
 export type SwarmDispatchQueueJob<TPayload = Record<string, unknown>> = {
   id: string
@@ -29,6 +35,7 @@ export type SwarmDispatchQueueJob<TPayload = Record<string, unknown>> = {
   result: unknown
   error: string | null
   cancelRequestedAt: number | null
+  pausedAt: number | null
   queuedAt: number
   startedAt: number | null
   finishedAt: number | null
@@ -46,6 +53,7 @@ export type SwarmDispatchQueueItem = {
   priority: number
   status: SwarmDispatchQueueStatus
   cancelRequestedAt: number | null
+  pausedAt: number | null
   leaseExpiresAt: number | null
   deadLetterAt: number | null
   retryOfJobId: string | null
@@ -94,6 +102,7 @@ type QueueRow = {
   error: string | null
   lease_token: string | null
   cancel_requested_at: Date | string | null
+  paused_at: Date | string | null
   queued_at: Date | string
   started_at: Date | string | null
   finished_at: Date | string | null
@@ -301,6 +310,7 @@ function mapJob<TPayload = Record<string, unknown>>(
     result: row.result,
     error: row.error,
     cancelRequestedAt: toMillis(row.cancel_requested_at),
+    pausedAt: toMillis(row.paused_at),
     queuedAt: toMillis(row.queued_at) ?? Date.now(),
     startedAt: toMillis(row.started_at),
     finishedAt: toMillis(row.finished_at),
@@ -401,7 +411,7 @@ export async function enqueueSwarmDispatch(
                    SELECT priority, queued_at, id FROM ${TABLE} WHERE id = $1::uuid
                  )
                  SELECT count(*)::text AS position FROM ${TABLE} AS jobs, target
-                 WHERE jobs.status = 'pending'
+                 WHERE jobs.status IN ('pending', 'paused')
                    AND (jobs.priority, jobs.queued_at, jobs.id) >= (target.priority, target.queued_at, target.id)`,
                 [job.id],
               )
@@ -416,7 +426,7 @@ export async function enqueueSwarmDispatch(
       }
     }
     const pending = await client.query<{ count: string }>(
-      `SELECT count(*)::text AS count FROM ${TABLE} WHERE status = 'pending'`,
+      `SELECT count(*)::text AS count FROM ${TABLE} WHERE status IN ('pending', 'paused')`,
     )
     if (Number(pending.rows[0]?.count ?? 0) >= MAX_PENDING) {
       await client.query('ROLLBACK')
@@ -426,7 +436,7 @@ export async function enqueueSwarmDispatch(
       `INSERT INTO ${TABLE} (id, status, assignment_count, priority, payload, submission_key)
        VALUES ($1, 'pending', $2, $3, $4::jsonb, $5)
        RETURNING id, status, assignment_count, payload, result, error,
-        priority, lease_token, cancel_requested_at, queued_at, started_at, finished_at,
+        priority, lease_token, cancel_requested_at, paused_at, queued_at, started_at, finished_at,
          lease_expires_at, dead_letter_at, retry_of_job_id`,
       [
         id,
@@ -441,7 +451,7 @@ export async function enqueueSwarmDispatch(
          SELECT priority, queued_at, id FROM ${TABLE} WHERE id = $1::uuid
        )
        SELECT count(*)::text AS position FROM ${TABLE} AS jobs, target
-       WHERE jobs.status = 'pending'
+       WHERE jobs.status IN ('pending', 'paused')
          AND (jobs.priority, jobs.queued_at, jobs.id) >= (target.priority, target.queued_at, target.id)`,
       [id],
     )
@@ -554,7 +564,7 @@ export async function retrySwarmDispatchQueueJob(
                  SELECT priority, queued_at, id FROM ${TABLE} WHERE id = $1::uuid
                )
                SELECT count(*)::text AS position FROM ${TABLE} AS jobs, target
-               WHERE jobs.status = 'pending'
+               WHERE jobs.status IN ('pending', 'paused')
                  AND (jobs.priority, jobs.queued_at, jobs.id) >= (target.priority, target.queued_at, target.id)`,
               [existing.id],
             )
@@ -579,7 +589,7 @@ export async function retrySwarmDispatchQueueJob(
     }
 
     const pending = await client.query<{ count: string }>(
-      `SELECT count(*)::text AS count FROM ${TABLE} WHERE status = 'pending'`,
+      `SELECT count(*)::text AS count FROM ${TABLE} WHERE status IN ('pending', 'paused')`,
     )
     if (Number(pending.rows[0]?.count ?? 0) >= MAX_PENDING) {
       throw new SwarmDispatchQueueFullError()
@@ -589,7 +599,7 @@ export async function retrySwarmDispatchQueueJob(
       `INSERT INTO ${TABLE} (id, status, assignment_count, priority, payload, retry_of_job_id)
        VALUES ($1::uuid, 'pending', $2, $3, $4::jsonb, $5::uuid)
        RETURNING id, status, assignment_count, payload, result, error,
-        priority, lease_token, cancel_requested_at, queued_at, started_at, finished_at,
+        priority, lease_token, cancel_requested_at, paused_at, queued_at, started_at, finished_at,
          lease_expires_at, dead_letter_at, retry_of_job_id`,
       [
         retryId,
@@ -604,7 +614,7 @@ export async function retrySwarmDispatchQueueJob(
          SELECT priority, queued_at, id FROM ${TABLE} WHERE id = $1::uuid
        )
        SELECT count(*)::text AS position FROM ${TABLE} AS jobs, target
-       WHERE jobs.status = 'pending'
+       WHERE jobs.status IN ('pending', 'paused')
        AND (jobs.priority, jobs.queued_at, jobs.id) >= (target.priority, target.queued_at, target.id)`,
       [retryId],
     )
@@ -651,8 +661,8 @@ export async function getSwarmDispatchQueueJob(
 ): Promise<SwarmDispatchQueueJob | null> {
   const pg = await ensureSchema()
   const result = await pg.query<QueueRow>(
-    `SELECT id, status, assignment_count, payload, result, error,
-       priority, lease_token, cancel_requested_at, queued_at, started_at, finished_at,
+      `SELECT id, status, assignment_count, payload, result, error,
+       priority, lease_token, cancel_requested_at, paused_at, queued_at, started_at, finished_at,
        lease_expires_at, dead_letter_at, retry_of_job_id
      FROM ${TABLE} WHERE id = $1::uuid`,
     [id],
@@ -668,6 +678,7 @@ export async function waitForSwarmDispatchQueueJob(
     const job = await getSwarmDispatchQueueJob(id)
     if (
       !job ||
+      job.status === 'paused' ||
       job.status === 'succeeded' ||
       job.status === 'failed' ||
       job.status === 'cancelled' ||
@@ -684,11 +695,12 @@ export async function cancelSwarmDispatchQueueJob(
   const pg = await ensureSchema()
   const result = await pg.query<{ status: SwarmDispatchQueueStatus }>(
     `UPDATE ${TABLE}
-       SET status = CASE WHEN status = 'pending' THEN 'cancelled' ELSE status END,
+       SET status = CASE WHEN status IN ('pending', 'paused') THEN 'cancelled' ELSE status END,
            cancel_requested_at = COALESCE(cancel_requested_at, clock_timestamp()),
-           finished_at = CASE WHEN status = 'pending' THEN clock_timestamp() ELSE finished_at END,
+           paused_at = CASE WHEN status = 'paused' THEN NULL ELSE paused_at END,
+           finished_at = CASE WHEN status IN ('pending', 'paused') THEN clock_timestamp() ELSE finished_at END,
            updated_at = clock_timestamp()
-     WHERE id = $1::uuid AND status IN ('pending', 'running')
+     WHERE id = $1::uuid AND status IN ('pending', 'paused', 'running')
      RETURNING status`,
     [id],
   )
@@ -702,19 +714,19 @@ export async function getSwarmDispatchQueueSnapshot(): Promise<SwarmDispatchQueu
   const [active, waiting, recent, retryAudits] = await Promise.all([
     pg.query<QueueRow>(
       `SELECT id, status, assignment_count, payload, result, error,
-         priority, lease_token, cancel_requested_at, queued_at, started_at, finished_at,
+         priority, lease_token, cancel_requested_at, paused_at, queued_at, started_at, finished_at,
          lease_expires_at, dead_letter_at, retry_of_job_id
        FROM ${TABLE} WHERE status = 'running' ORDER BY started_at LIMIT 1`,
     ),
     pg.query<QueueRow>(
       `SELECT id, status, assignment_count, payload, result, error,
-         lease_token, cancel_requested_at, queued_at, started_at, finished_at,
+         lease_token, cancel_requested_at, paused_at, queued_at, started_at, finished_at,
          lease_expires_at, dead_letter_at, retry_of_job_id
-       FROM ${TABLE} WHERE status = 'pending' ORDER BY priority DESC, queued_at, id LIMIT 50`,
+       FROM ${TABLE} WHERE status IN ('pending', 'paused') ORDER BY priority DESC, queued_at, id LIMIT 50`,
     ),
     pg.query<QueueRow>(
       `SELECT id, status, assignment_count, payload, result, error,
-         lease_token, cancel_requested_at, queued_at, started_at, finished_at,
+         lease_token, cancel_requested_at, paused_at, queued_at, started_at, finished_at,
          lease_expires_at, dead_letter_at, retry_of_job_id
        FROM ${TABLE} WHERE status IN ('succeeded', 'failed', 'cancelled', 'interrupted')
        ORDER BY finished_at DESC NULLS LAST LIMIT 20`,
@@ -746,6 +758,7 @@ export async function getSwarmDispatchQueueSnapshot(): Promise<SwarmDispatchQueu
       priority: job.priority,
       status: job.status,
       cancelRequestedAt: job.cancelRequestedAt,
+      pausedAt: job.pausedAt,
       leaseExpiresAt: job.leaseExpiresAt,
       deadLetterAt: job.deadLetterAt,
       retryOfJobId: job.retryOfJobId,
@@ -767,6 +780,39 @@ export async function getSwarmDispatchQueueSnapshot(): Promise<SwarmDispatchQueu
       approvedAt: toMillis(row.approved_at) ?? Date.now(),
     })),
   }
+}
+
+export async function pauseSwarmDispatchQueueJob(
+  id: string,
+): Promise<{ found: boolean; status: SwarmDispatchQueueStatus | null }> {
+  const pg = await ensureSchema()
+  const result = await pg.query<{ status: SwarmDispatchQueueStatus }>(
+    `UPDATE ${TABLE}
+       SET status = 'paused', paused_at = COALESCE(paused_at, clock_timestamp()),
+           updated_at = clock_timestamp()
+     WHERE id = $1::uuid AND status = 'pending'
+     RETURNING status`,
+    [id],
+  )
+  if (result.rows[0]) return { found: true, status: result.rows[0].status }
+  const existing = await getSwarmDispatchQueueJob(id)
+  return { found: Boolean(existing), status: existing?.status ?? null }
+}
+
+export async function resumeSwarmDispatchQueueJob(
+  id: string,
+): Promise<{ found: boolean; status: SwarmDispatchQueueStatus | null }> {
+  const pg = await ensureSchema()
+  const result = await pg.query<{ status: SwarmDispatchQueueStatus }>(
+    `UPDATE ${TABLE}
+       SET status = 'pending', paused_at = NULL, updated_at = clock_timestamp()
+     WHERE id = $1::uuid AND status = 'paused'
+     RETURNING status`,
+    [id],
+  )
+  if (result.rows[0]) return { found: true, status: result.rows[0].status }
+  const existing = await getSwarmDispatchQueueJob(id)
+  return { found: Boolean(existing), status: existing?.status ?? null }
 }
 
 type ClaimedQueueJob = { job: SwarmDispatchQueueJob; leaseToken: string }
@@ -794,7 +840,7 @@ async function claimNextJob(
        RETURNING jobs.id, jobs.status, jobs.assignment_count, jobs.payload, jobs.result,
          jobs.error, jobs.priority, jobs.lease_token, jobs.cancel_requested_at, jobs.queued_at,
          jobs.started_at, jobs.finished_at, jobs.lease_expires_at,
-         jobs.dead_letter_at, jobs.retry_of_job_id`,
+         jobs.dead_letter_at, jobs.retry_of_job_id, jobs.paused_at`,
       [leaseToken, JOB_LEASE_MS],
     )
     await client.query('COMMIT')

@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getCrossRepositoryReleaseStatus,
-} from './cross-repository-release-status'
+import { getCrossRepositoryReleaseStatus } from './cross-repository-release-status'
 import type { ReleaseRepository } from './cross-repository-release-status'
 
 const repositories: Array<ReleaseRepository> = [
@@ -13,13 +11,59 @@ describe('cross-repository release status', () => {
   it('normalizes metadata and the latest workflow into operator-safe statuses', async () => {
     const report = await getCrossRepositoryReleaseStatus({
       repositories,
-      run: async (args) => args[0] === 'repo'
-        ? { stdout: JSON.stringify({ defaultBranchRef: { name: 'main' }, pushedAt: '2026-09-18T00:00:00Z' }), stderr: '' }
-        : { stdout: JSON.stringify([{ workflowName: 'CI', status: 'completed', conclusion: 'success', headSha: 'abc123', createdAt: '2026-09-18T01:00:00Z' }]), stderr: '' },
+      run: async (args) =>
+        args[0] === 'repo'
+          ? {
+              stdout: JSON.stringify({
+                defaultBranchRef: { name: 'main' },
+                pushedAt: '2026-09-18T00:00:00Z',
+              }),
+              stderr: '',
+            }
+          : args[0] === 'run'
+            ? {
+                stdout: JSON.stringify([
+                  {
+                    workflowName: 'CI',
+                    status: 'completed',
+                    conclusion: 'success',
+                    headSha: 'abc123',
+                    createdAt: '2026-09-18T01:00:00Z',
+                  },
+                ]),
+                stderr: '',
+              }
+            : {
+                stdout: JSON.stringify([
+                  {
+                    number: 12,
+                    url: 'https://github.com/NPFernando/hermes-workspace/pull/12',
+                    title: 'Improve checks',
+                    isDraft: false,
+                    reviewDecision: 'APPROVED',
+                    statusCheckRollup: [],
+                    updatedAt: '2026-09-18T02:00:00Z',
+                  },
+                ]),
+                stderr: '',
+              },
     })
     expect(report.repositories).toEqual([
-      expect.objectContaining({ id: 'hermes', status: 'pass', defaultBranch: 'main', latestRun: expect.objectContaining({ conclusion: 'success' }) }),
+      expect.objectContaining({
+        id: 'hermes',
+        status: 'pass',
+        defaultBranch: 'main',
+        latestRun: expect.objectContaining({ conclusion: 'success' }),
+      }),
       expect.objectContaining({ id: 'harp', status: 'pass' }),
+    ])
+    expect(report.repositories[0].openPullRequests).toEqual([
+      expect.objectContaining({
+        number: 12,
+        url: 'https://github.com/NPFernando/hermes-workspace/pull/12',
+        reviewDecision: 'APPROVED',
+        failingChecks: 0,
+      }),
     ])
   })
 
@@ -27,13 +71,47 @@ describe('cross-repository release status', () => {
     const report = await getCrossRepositoryReleaseStatus({
       repositories,
       run: async (args) => {
-        if (args.includes('NPFernando/harp-control-plane')) throw new Error('GitHub CLI unavailable')
+        if (args.includes('NPFernando/harp-control-plane'))
+          throw new Error('GitHub CLI unavailable')
         return args[0] === 'repo'
-          ? { stdout: JSON.stringify({ defaultBranchRef: { name: 'main' } }), stderr: '' }
+          ? {
+              stdout: JSON.stringify({ defaultBranchRef: { name: 'main' } }),
+              stderr: '',
+            }
           : { stdout: '[]', stderr: '' }
       },
     })
     expect(report.repositories[0].status).toBe('degraded')
-    expect(report.repositories[1]).toMatchObject({ status: 'unavailable', detail: 'GitHub CLI unavailable' })
+    expect(report.repositories[1]).toMatchObject({
+      status: 'unavailable',
+      detail: 'GitHub CLI unavailable',
+    })
+  })
+
+  it('degrades repositories whose latest workflow evidence is stale', async () => {
+    const report = await getCrossRepositoryReleaseStatus({
+      repositories: [repositories[0]],
+      run: async (args) =>
+        args[0] === 'repo'
+          ? { stdout: JSON.stringify({ defaultBranchRef: { name: 'main' } }), stderr: '' }
+          : args[0] === 'run'
+            ? {
+                stdout: JSON.stringify([
+                  {
+                    workflowName: 'CI',
+                    status: 'completed',
+                    conclusion: 'success',
+                    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+                  },
+                ]),
+                stderr: '',
+              }
+            : { stdout: '[]', stderr: '' },
+    })
+    expect(report.repositories[0]).toMatchObject({
+      status: 'degraded',
+      latestRun: { stale: true },
+      detail: expect.stringContaining('stale'),
+    })
   })
 })

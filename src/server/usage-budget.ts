@@ -29,6 +29,76 @@ export type MonthlyUsageBudget = {
   message: string
 }
 
+export type UsageAnomaly = {
+  provider: string
+  displayName: string
+  label: string
+  measure: 'quota' | 'spend'
+  day: string
+  used: number
+  baseline: number
+  ratio: number
+  severity: 'warning' | 'critical'
+  message: string
+}
+
+export type UsageHistorySample = {
+  day: string
+  provider: string
+  displayName: string
+  label: string
+  measure: 'quota' | 'spend'
+  used: number
+}
+
+/**
+ * Detect large latest-day spikes against the same provider/metric's recent
+ * aggregate baseline. The detector needs at least three prior samples and
+ * never treats missing data as zero, avoiding false alerts after outages.
+ */
+export function detectUsageAnomalies(
+  samples: Array<UsageHistorySample>,
+  options: { minimumRatio?: number; criticalRatio?: number } = {},
+): Array<UsageAnomaly> {
+  const minimumRatio = options.minimumRatio ?? 2.25
+  const criticalRatio = options.criticalRatio ?? 3
+  const groups = new Map<string, Array<UsageHistorySample>>()
+  for (const sample of samples) {
+    if (!Number.isFinite(sample.used) || sample.used < 0) continue
+    const key = `${sample.provider}:${sample.label}:${sample.measure}`
+    const group = groups.get(key) ?? []
+    group.push(sample)
+    groups.set(key, group)
+  }
+  const anomalies: Array<UsageAnomaly> = []
+  for (const group of groups.values()) {
+    const ordered = [...group].sort((a, b) => a.day.localeCompare(b.day))
+    if (ordered.length < 4) continue
+    const latest = ordered.at(-1)!
+    const prior = ordered.slice(Math.max(0, ordered.length - 8), -1)
+    if (prior.length < 3) continue
+    const baseline =
+      prior.reduce((sum, sample) => sum + sample.used, 0) / prior.length
+    if (baseline <= 0) continue
+    const ratio = latest.used / baseline
+    if (ratio < minimumRatio) continue
+    const severity = ratio >= criticalRatio ? 'critical' : 'warning'
+    anomalies.push({
+      provider: latest.provider,
+      displayName: latest.displayName,
+      label: latest.label,
+      measure: latest.measure,
+      day: latest.day,
+      used: latest.used,
+      baseline,
+      ratio,
+      severity,
+      message: `${latest.displayName} ${latest.label} is ${ratio.toFixed(1)}× its recent baseline.`,
+    })
+  }
+  return anomalies.sort((a, b) => b.ratio - a.ratio).slice(0, 12)
+}
+
 function finitePositive(value: unknown): number | null {
   const parsed = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null

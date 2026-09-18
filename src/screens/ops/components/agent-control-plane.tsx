@@ -8,6 +8,15 @@ type QueueSnapshot = {
   recent: Array<{ id: string; status: string; deadLetterAt: number | null }>
 }
 
+type DrEvidence = {
+  file: string
+  generatedAt: string | null
+  mode: 'plan' | 'run' | null
+  nonDestructive: boolean | null
+  ok: boolean | null
+  results: Array<{ name: string; status: string; detail: string | null }>
+}
+
 type WorkerHealth = {
   checkedAt: number
   workers: Array<unknown>
@@ -156,6 +165,11 @@ export function AgentControlPlane() {
     queryFn: () => fetchJson<SessionHealth>('/api/workspace-session-health'),
     refetchInterval: 30_000,
   })
+  const drEvidence = useQuery({
+    queryKey: ['agent-control-plane', 'dr-evidence'],
+    queryFn: () => fetchJson<{ ok: boolean; evidence: Array<DrEvidence> }>('/api/dr-evidence'),
+    refetchInterval: 60_000,
+  })
 
   const ready = harp.data?.report
   const blockers = ready?.blockers ?? []
@@ -234,6 +248,39 @@ export function AgentControlPlane() {
           >
             Open queue controls →
           </a>
+        </SummaryCard>
+
+        <SummaryCard title="Disaster recovery">
+          {drEvidence.isError ? (
+            <Value>Unavailable · recovery evidence API could not be read</Value>
+          ) : drEvidence.data ? (
+            <>
+              <Value>
+                {drEvidence.data.evidence.length > 0
+                  ? `${drEvidence.data.evidence[0].ok === true ? 'Passing' : 'Review required'} · latest exercise`
+                  : 'No exercise evidence recorded'}
+              </Value>
+              {drEvidence.data.evidence[0] ? (
+                <p className="mt-1 text-xs text-[var(--theme-muted)]">
+                  {drEvidence.data.evidence[0].generatedAt
+                    ? new Date(drEvidence.data.evidence[0].generatedAt).toLocaleString()
+                    : 'Unknown date'}{' '}
+                  · {drEvidence.data.evidence[0].results.length} checks
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <Value>Loading recovery evidence…</Value>
+          )}
+          {drEvidence.data?.evidence[0] ? (
+            <a
+              className="mt-3 inline-block text-xs text-accent-400 hover:underline"
+              href={`/api/dr-evidence?file=${encodeURIComponent(drEvidence.data.evidence[0].file)}`}
+              download={drEvidence.data.evidence[0].file}
+            >
+              Download sanitized evidence →
+            </a>
+          ) : null}
         </SummaryCard>
 
         <SummaryCard title="Agent health">

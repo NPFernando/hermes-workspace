@@ -13,8 +13,9 @@
  * already used by 20+ server modules). Each section is independently try/caught so
  * one failing source degrades to `null` instead of failing the whole payload.
  */
-import { execFile } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
 import { promisify } from 'node:util'
+import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
@@ -655,6 +656,8 @@ export function getFinanceStorageMonitorSummary(
 
 export interface DeploymentJournalEntry {
   at: string
+  /** Correlates the deployment with service and release evidence when available. */
+  deploymentId?: string | null
   commit: string
   previousCommit: string | null
   build: string
@@ -672,6 +675,38 @@ export interface DeploymentJournalEntry {
     status: string
     actor?: string | null
     reference?: string | null
+  }
+}
+
+export interface ServiceHealthHistoryEntry {
+  checkedAt: number
+  activeState: string
+  pid: string
+  result: string | null
+  residentMemoryKb: number | null
+  oomDetected: boolean
+  issueCodes: Array<string>
+}
+
+export function getServiceHealthHistory(
+  options: { path?: string; limit?: number } = {},
+): Array<ServiceHealthHistoryEntry> {
+  const path = options.path ?? join(process.cwd(), '.runtime', 'ops-monitor-state.json')
+  const limit = Math.max(1, Math.min(48, options.limit ?? 24))
+  if (!existsSync(path)) return []
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as { serviceHealthHistory?: unknown }
+    if (!Array.isArray(parsed.serviceHealthHistory)) return []
+    return parsed.serviceHealthHistory
+      .filter((entry): entry is ServiceHealthHistoryEntry => {
+        if (!entry || typeof entry !== 'object') return false
+        const value = entry as Partial<ServiceHealthHistoryEntry>
+        return typeof value.checkedAt === 'number' && typeof value.activeState === 'string' && typeof value.pid === 'string' && Array.isArray(value.issueCodes)
+      })
+      .slice(-limit)
+      .reverse()
+  } catch {
+    return []
   }
 }
 
@@ -694,6 +729,7 @@ export function getDeploymentJournal(
       })
       .filter((entry) => {
         if (typeof entry.at !== 'string' || typeof entry.commit !== 'string') return false
+        if (entry.deploymentId != null && typeof entry.deploymentId !== 'string') return false
         if (entry.links != null && typeof entry.links !== 'object') return false
         if (entry.approval != null && typeof entry.approval !== 'object') return false
         return true
@@ -720,9 +756,79 @@ export interface OpsObservability {
   financeStorageMonitor: FinanceStorageMonitorSummary | null
   financeStorageSmokeCron: FinanceStorageSmokeCronSummary | null
   deploymentJournal: Array<DeploymentJournalEntry>
+  serviceHealthHistory: Array<ServiceHealthHistoryEntry>
   /** Local Headroom compression proxy stats; null when the proxy isn't running. */
   headroom: HeadroomStats | null
   safeMode: SafeModeStatus
+  runtimeBuild: RuntimeBuildIdentity
+}
+
+export interface RuntimeBuildIdentity {
+  status: 'pass' | 'degraded'
+  servedBuild: string | null
+  artifactBuild: string | null
+  buildMarker: string | null
+  head: string | null
+  markerMatchesHead: boolean
+  artifactMatchesServed: boolean
+  detail: string
+}
+
+export function getRuntimeBuildIdentity(
+  root = process.cwd(),
+): RuntimeBuildIdentity {
+  const readText = (path: string): string | null => {
+    try {
+      const value = readFileSync(path, 'utf8').trim()
+      return value || null
+    } catch {
+      return null
+    }
+  }
+  const buildMarker = readText(join(root, '.runtime', 'build-commit'))
+  const artifactPath = join(root, 'dist', 'server', 'server.js')
+  let artifactBuild: string | null = null
+  try {
+    artifactBuild = createHash('sha256')
+      .update(readFileSync(artifactPath))
+      .digest('hex')
+      .slice(0, 16)
+  } catch {
+    artifactBuild = null
+  }
+  let head: string | null = null
+  try {
+    head = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim() || null
+  } catch {
+    head = null
+  }
+  const servedBuild = process.env.HERMES_RUNTIME_BUILD_ID?.trim() || null
+  const markerMatchesHead = Boolean(buildMarker && head && buildMarker === head)
+  const artifactMatchesServed = Boolean(servedBuild && artifactBuild && servedBuild === artifactBuild)
+  const status = markerMatchesHead && artifactMatchesServed ? 'pass' : 'degraded'
+  const detail = status === 'pass'
+    ? 'The running process, compiled artifact, and deployment marker agree.'
+    : !servedBuild
+      ? 'The running process identity is unavailable; restart after a guarded build to capture it.'
+      : !artifactBuild
+        ? 'The compiled server artifact is missing or unreadable.'
+        : !artifactMatchesServed
+          ? 'The running process is serving a different artifact than the one on disk.'
+          : 'The deployment marker does not match the current checkout.'
+  return {
+    status,
+    servedBuild,
+    artifactBuild,
+    buildMarker,
+    head,
+    markerMatchesHead,
+    artifactMatchesServed,
+    detail,
+  }
 }
 
 export async function getOpsObservability(): Promise<OpsObservability> {
@@ -756,7 +862,9 @@ export async function getOpsObservability(): Promise<OpsObservability> {
     financeStorageMonitor: getFinanceStorageMonitorSummary(),
     financeStorageSmokeCron: getFinanceStorageSmokeCronSummary(),
     deploymentJournal: getDeploymentJournal(),
+    serviceHealthHistory: getServiceHealthHistory(),
     headroom,
     safeMode: getSafeModeStatus(),
+    runtimeBuild: getRuntimeBuildIdentity(),
   }
 }

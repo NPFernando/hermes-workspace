@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import {
+  getSessionExpiry,
   isAuthenticated,
   isPasswordProtectionEnabled,
 } from '../../server/auth-middleware'
@@ -16,7 +17,7 @@ export const Route = createFileRoute('/api/auth-check')({
         const authenticated = isAuthenticated(request)
 
         if (authRequired && !authenticated) {
-          return json({ authenticated: false, authRequired })
+          return json({ authenticated: false, authRequired, expiresAt: null })
         }
 
         // This endpoint is intentionally limited to session state. Gateway
@@ -27,6 +28,7 @@ export const Route = createFileRoute('/api/auth-check')({
         return json({
           authenticated,
           authRequired,
+          expiresAt: authenticated ? getSessionExpiry(request) : null,
         })
       },
     },

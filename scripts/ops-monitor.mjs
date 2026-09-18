@@ -167,6 +167,16 @@ export async function collectOperationalStatus({
   if (previous.pid && serviceShow.pid !== '0' && previous.pid !== serviceShow.pid) issues.push({ level: 'warning', code: 'pid_changed', detail: `Service PID changed from ${previous.pid} to ${serviceShow.pid}.` })
   const parkedStashes = stashLines ? stashLines.split(/\r?\n/).filter(Boolean).length : 0
   if (parkedStashes) issues.push({ level: 'warning', code: 'parked_stashes', detail: `${parkedStashes} parked git stash entr${parkedStashes === 1 ? 'y' : 'ies'} found.` })
+  const healthSample = {
+    checkedAt: now,
+    activeState: serviceShow.activeState,
+    pid: serviceShow.pid,
+    result: serviceShow.result || null,
+    residentMemoryKb,
+    oomDetected: Boolean(oomLog.trim()) || serviceShow.oomKilled,
+    issueCodes: issues.map((issue) => issue.code),
+  }
+  const serviceHealthHistory = [...(Array.isArray(previous.serviceHealthHistory) ? previous.serviceHealthHistory : []), healthSample].slice(-48)
   await mkdir(resolve(statePath, '..'), { recursive: true })
   const activeSince = serviceShow.activeEnterTimestamp ? parseSystemdTimestamp(serviceShow.activeEnterTimestamp) : NaN
   const uptimeSeconds = Number.isFinite(activeSince) && activeSince <= now ? Math.floor((now - activeSince) / 1000) : null
@@ -177,6 +187,7 @@ export async function collectOperationalStatus({
     pid: serviceShow.pid,
     residentMemoryKb,
     memoryGrowthSamples,
+    serviceHealthHistory,
     lastRestartAt: restartResult.restarted ? now : Number(previous.lastRestartAt || 0),
   }, null, 2) + '\n', { mode: 0o600 })
   return {
@@ -188,6 +199,7 @@ export async function collectOperationalStatus({
     service: { ...serviceShow, uptimeSeconds, residentMemoryKb, memoryGrowthKb, memoryGrowthPercent, oomDetected: Boolean(oomLog.trim()) || serviceShow.oomKilled },
     buildMtimeMs,
     deploymentHistory,
+    serviceHealthHistory,
     recentErrorLines: errorLog.trim() ? errorLog.trim().split(/\r?\n/).slice(-20) : [],
     parkedStashes,
     restart: restartResult,

@@ -69,8 +69,10 @@ import { Route as ApiDemoTradingRebalanceRouteImport } from './routes/api/demo-t
 import { Route as ApiDifyIntegrationRouteImport } from './routes/api/dify-integration'
 import { Route as ApiDifyStatusRouteImport } from './routes/api/dify-status'
 import { Route as ApiDownloadApkRouteImport } from './routes/api/download-apk'
+import { Route as ApiDrEvidenceRouteImport } from './routes/api/dr-evidence'
 import { Route as ApiEnvResetRouteImport } from './routes/api/env-reset'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
+import { Route as ApiFeatureFlagsRouteImport } from './routes/api/feature-flags'
 import { Route as ApiFilesRouteImport } from './routes/api/files'
 import { Route as ApiFinanceRouteImport } from './routes/api/finance'
 import { Route as ApiFinanceBackupRouteImport } from './routes/api/finance-backup'
@@ -106,7 +108,9 @@ import { Route as ApiPreviewFileRouteImport } from './routes/api/preview-file'
 import { Route as ApiProductionReadinessRouteImport } from './routes/api/production-readiness'
 import { Route as ApiProviderUsageRouteImport } from './routes/api/provider-usage'
 import { Route as ApiRiskCheckRouteImport } from './routes/api/risk-check'
+import { Route as ApiRoadmapAuditRouteImport } from './routes/api/roadmap-audit'
 import { Route as ApiRouteSisterRouteImport } from './routes/api/route-sister'
+import { Route as ApiSecretRotationRouteImport } from './routes/api/secret-rotation'
 import { Route as ApiSendRouteImport } from './routes/api/send'
 import { Route as ApiSendStreamRouteImport } from './routes/api/send-stream'
 import { Route as ApiSessionHistoryRouteImport } from './routes/api/session-history'
@@ -564,6 +568,11 @@ const ApiDownloadApkRoute = ApiDownloadApkRouteImport.update({
   path: '/api/download-apk',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDrEvidenceRoute = ApiDrEvidenceRouteImport.update({
+  id: '/api/dr-evidence',
+  path: '/api/dr-evidence',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiEnvResetRoute = ApiEnvResetRouteImport.update({
   id: '/api/env-reset',
   path: '/api/env-reset',
@@ -572,6 +581,11 @@ const ApiEnvResetRoute = ApiEnvResetRouteImport.update({
 const ApiEventsRoute = ApiEventsRouteImport.update({
   id: '/api/events',
   path: '/api/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiFeatureFlagsRoute = ApiFeatureFlagsRouteImport.update({
+  id: '/api/feature-flags',
+  path: '/api/feature-flags',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiFilesRoute = ApiFilesRouteImport.update({
@@ -749,9 +763,19 @@ const ApiRiskCheckRoute = ApiRiskCheckRouteImport.update({
   path: '/api/risk-check',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiRoadmapAuditRoute = ApiRoadmapAuditRouteImport.update({
+  id: '/api/roadmap-audit',
+  path: '/api/roadmap-audit',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiRouteSisterRoute = ApiRouteSisterRouteImport.update({
   id: '/api/route-sister',
   path: '/api/route-sister',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSecretRotationRoute = ApiSecretRotationRouteImport.update({
+  id: '/api/secret-rotation',
+  path: '/api/secret-rotation',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSendRoute = ApiSendRouteImport.update({
@@ -1601,8 +1625,10 @@ export interface FileRoutesByFullPath {
   '/api/dify-integration': typeof ApiDifyIntegrationRoute
   '/api/dify-status': typeof ApiDifyStatusRoute
   '/api/download-apk': typeof ApiDownloadApkRoute
+  '/api/dr-evidence': typeof ApiDrEvidenceRoute
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/feature-flags': typeof ApiFeatureFlagsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/finance': typeof ApiFinanceRouteWithChildren
   '/api/finance-backup': typeof ApiFinanceBackupRoute
@@ -1638,7 +1664,9 @@ export interface FileRoutesByFullPath {
   '/api/production-readiness': typeof ApiProductionReadinessRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/risk-check': typeof ApiRiskCheckRoute
+  '/api/roadmap-audit': typeof ApiRoadmapAuditRoute
   '/api/route-sister': typeof ApiRouteSisterRoute
+  '/api/secret-rotation': typeof ApiSecretRotationRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
@@ -1855,8 +1883,10 @@ export interface FileRoutesByTo {
   '/api/dify-integration': typeof ApiDifyIntegrationRoute
   '/api/dify-status': typeof ApiDifyStatusRoute
   '/api/download-apk': typeof ApiDownloadApkRoute
+  '/api/dr-evidence': typeof ApiDrEvidenceRoute
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/feature-flags': typeof ApiFeatureFlagsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/finance': typeof ApiFinanceRouteWithChildren
   '/api/finance-backup': typeof ApiFinanceBackupRoute
@@ -1892,7 +1922,9 @@ export interface FileRoutesByTo {
   '/api/production-readiness': typeof ApiProductionReadinessRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/risk-check': typeof ApiRiskCheckRoute
+  '/api/roadmap-audit': typeof ApiRoadmapAuditRoute
   '/api/route-sister': typeof ApiRouteSisterRoute
+  '/api/secret-rotation': typeof ApiSecretRotationRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
@@ -2111,8 +2143,10 @@ export interface FileRoutesById {
   '/api/dify-integration': typeof ApiDifyIntegrationRoute
   '/api/dify-status': typeof ApiDifyStatusRoute
   '/api/download-apk': typeof ApiDownloadApkRoute
+  '/api/dr-evidence': typeof ApiDrEvidenceRoute
   '/api/env-reset': typeof ApiEnvResetRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/feature-flags': typeof ApiFeatureFlagsRoute
   '/api/files': typeof ApiFilesRoute
   '/api/finance': typeof ApiFinanceRouteWithChildren
   '/api/finance-backup': typeof ApiFinanceBackupRoute
@@ -2148,7 +2182,9 @@ export interface FileRoutesById {
   '/api/production-readiness': typeof ApiProductionReadinessRoute
   '/api/provider-usage': typeof ApiProviderUsageRoute
   '/api/risk-check': typeof ApiRiskCheckRoute
+  '/api/roadmap-audit': typeof ApiRoadmapAuditRoute
   '/api/route-sister': typeof ApiRouteSisterRoute
+  '/api/secret-rotation': typeof ApiSecretRotationRoute
   '/api/send': typeof ApiSendRoute
   '/api/send-stream': typeof ApiSendStreamRoute
   '/api/session-history': typeof ApiSessionHistoryRoute
@@ -2368,8 +2404,10 @@ export interface FileRouteTypes {
     | '/api/dify-integration'
     | '/api/dify-status'
     | '/api/download-apk'
+    | '/api/dr-evidence'
     | '/api/env-reset'
     | '/api/events'
+    | '/api/feature-flags'
     | '/api/files'
     | '/api/finance'
     | '/api/finance-backup'
@@ -2405,7 +2443,9 @@ export interface FileRouteTypes {
     | '/api/production-readiness'
     | '/api/provider-usage'
     | '/api/risk-check'
+    | '/api/roadmap-audit'
     | '/api/route-sister'
+    | '/api/secret-rotation'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
@@ -2622,8 +2662,10 @@ export interface FileRouteTypes {
     | '/api/dify-integration'
     | '/api/dify-status'
     | '/api/download-apk'
+    | '/api/dr-evidence'
     | '/api/env-reset'
     | '/api/events'
+    | '/api/feature-flags'
     | '/api/files'
     | '/api/finance'
     | '/api/finance-backup'
@@ -2659,7 +2701,9 @@ export interface FileRouteTypes {
     | '/api/production-readiness'
     | '/api/provider-usage'
     | '/api/risk-check'
+    | '/api/roadmap-audit'
     | '/api/route-sister'
+    | '/api/secret-rotation'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
@@ -2877,8 +2921,10 @@ export interface FileRouteTypes {
     | '/api/dify-integration'
     | '/api/dify-status'
     | '/api/download-apk'
+    | '/api/dr-evidence'
     | '/api/env-reset'
     | '/api/events'
+    | '/api/feature-flags'
     | '/api/files'
     | '/api/finance'
     | '/api/finance-backup'
@@ -2914,7 +2960,9 @@ export interface FileRouteTypes {
     | '/api/production-readiness'
     | '/api/provider-usage'
     | '/api/risk-check'
+    | '/api/roadmap-audit'
     | '/api/route-sister'
+    | '/api/secret-rotation'
     | '/api/send'
     | '/api/send-stream'
     | '/api/session-history'
@@ -3133,8 +3181,10 @@ export interface RootRouteChildren {
   ApiDifyIntegrationRoute: typeof ApiDifyIntegrationRoute
   ApiDifyStatusRoute: typeof ApiDifyStatusRoute
   ApiDownloadApkRoute: typeof ApiDownloadApkRoute
+  ApiDrEvidenceRoute: typeof ApiDrEvidenceRoute
   ApiEnvResetRoute: typeof ApiEnvResetRoute
   ApiEventsRoute: typeof ApiEventsRoute
+  ApiFeatureFlagsRoute: typeof ApiFeatureFlagsRoute
   ApiFilesRoute: typeof ApiFilesRoute
   ApiFinanceRoute: typeof ApiFinanceRouteWithChildren
   ApiFinanceBackupRoute: typeof ApiFinanceBackupRoute
@@ -3170,7 +3220,9 @@ export interface RootRouteChildren {
   ApiProductionReadinessRoute: typeof ApiProductionReadinessRoute
   ApiProviderUsageRoute: typeof ApiProviderUsageRoute
   ApiRiskCheckRoute: typeof ApiRiskCheckRoute
+  ApiRoadmapAuditRoute: typeof ApiRoadmapAuditRoute
   ApiRouteSisterRoute: typeof ApiRouteSisterRoute
+  ApiSecretRotationRoute: typeof ApiSecretRotationRoute
   ApiSendRoute: typeof ApiSendRoute
   ApiSendStreamRoute: typeof ApiSendStreamRoute
   ApiSessionHistoryRoute: typeof ApiSessionHistoryRoute
@@ -3710,6 +3762,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDownloadApkRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/dr-evidence': {
+      id: '/api/dr-evidence'
+      path: '/api/dr-evidence'
+      fullPath: '/api/dr-evidence'
+      preLoaderRoute: typeof ApiDrEvidenceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/env-reset': {
       id: '/api/env-reset'
       path: '/api/env-reset'
@@ -3722,6 +3781,13 @@ declare module '@tanstack/react-router' {
       path: '/api/events'
       fullPath: '/api/events'
       preLoaderRoute: typeof ApiEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/feature-flags': {
+      id: '/api/feature-flags'
+      path: '/api/feature-flags'
+      fullPath: '/api/feature-flags'
+      preLoaderRoute: typeof ApiFeatureFlagsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/files': {
@@ -3969,11 +4035,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiRiskCheckRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/roadmap-audit': {
+      id: '/api/roadmap-audit'
+      path: '/api/roadmap-audit'
+      fullPath: '/api/roadmap-audit'
+      preLoaderRoute: typeof ApiRoadmapAuditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/route-sister': {
       id: '/api/route-sister'
       path: '/api/route-sister'
       fullPath: '/api/route-sister'
       preLoaderRoute: typeof ApiRouteSisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/secret-rotation': {
+      id: '/api/secret-rotation'
+      path: '/api/secret-rotation'
+      fullPath: '/api/secret-rotation'
+      preLoaderRoute: typeof ApiSecretRotationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/send': {
@@ -5381,8 +5461,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDifyIntegrationRoute: ApiDifyIntegrationRoute,
   ApiDifyStatusRoute: ApiDifyStatusRoute,
   ApiDownloadApkRoute: ApiDownloadApkRoute,
+  ApiDrEvidenceRoute: ApiDrEvidenceRoute,
   ApiEnvResetRoute: ApiEnvResetRoute,
   ApiEventsRoute: ApiEventsRoute,
+  ApiFeatureFlagsRoute: ApiFeatureFlagsRoute,
   ApiFilesRoute: ApiFilesRoute,
   ApiFinanceRoute: ApiFinanceRouteWithChildren,
   ApiFinanceBackupRoute: ApiFinanceBackupRoute,
@@ -5418,7 +5500,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProductionReadinessRoute: ApiProductionReadinessRoute,
   ApiProviderUsageRoute: ApiProviderUsageRoute,
   ApiRiskCheckRoute: ApiRiskCheckRoute,
+  ApiRoadmapAuditRoute: ApiRoadmapAuditRoute,
   ApiRouteSisterRoute: ApiRouteSisterRoute,
+  ApiSecretRotationRoute: ApiSecretRotationRoute,
   ApiSendRoute: ApiSendRoute,
   ApiSendStreamRoute: ApiSendStreamRoute,
   ApiSessionHistoryRoute: ApiSessionHistoryRoute,

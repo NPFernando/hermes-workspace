@@ -24,4 +24,16 @@ describe('release smoke', () => {
     const fetchImpl = async () => response(200, shell, { 'content-type': 'text/html', 'x-workspace-build': 'old-build' })
     await expect(runReleaseSmoke('http://example.test', fetchImpl, 'new-build')).rejects.toThrow(/build mismatch/)
   })
+
+  it('explains missing assets as a stale build-manifest diagnosis', async () => {
+    const fetchImpl = async (url) => {
+      const target = String(url)
+      return target.endsWith('/assets/index.js')
+        ? response(404, '')
+        : response(200, shell, { 'content-type': 'text/html', 'x-workspace-build': 'build-1' })
+    }
+    await expect(runReleaseSmoke('http://example.test', fetchImpl, 'build-1')).rejects.toThrow(
+      /stale build manifest.*guarded deployment flow/,
+    )
+  })
 })

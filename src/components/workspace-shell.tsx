@@ -78,7 +78,11 @@ export function shouldAdoptInitialAuthStatus(
   initialAuthStatus: AuthStatus | null | undefined,
   connectionVerified: boolean,
 ): boolean {
-  return initialAuthStatus !== null && initialAuthStatus !== undefined && !connectionVerified
+  return (
+    initialAuthStatus !== null &&
+    initialAuthStatus !== undefined &&
+    !connectionVerified
+  )
 }
 
 export function WorkspaceShell({
@@ -222,6 +226,39 @@ export function WorkspaceShell({
       cancelled = true
     }
   }, [connectionVerified])
+
+  // Detect an expired/revoked session while the user is working. Without a
+  // heartbeat, the shell could remain visible after the server has started
+  // returning unauthenticated responses until the next full reload.
+  useEffect(() => {
+    if (
+      typeof window === 'undefined' ||
+      !connectionVerified ||
+      !authStatus?.authRequired
+    ) {
+      return
+    }
+    let cancelled = false
+    const checkSession = async () => {
+      try {
+        const status = await fetchClaudeAuthStatus(3000)
+        if (!cancelled) setAuthStatus(status)
+      } catch {
+        // A transient network failure must not sign the user out. The next
+        // interval or visibility event will retry.
+      }
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void checkSession()
+    }
+    const interval = window.setInterval(() => void checkSession(), 60_000)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [authStatus?.authRequired, connectionVerified])
 
   // Derive active session from URL
   const mobilePageTitle = (() => {
