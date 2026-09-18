@@ -122,7 +122,10 @@ export function runPrivacySecurityGuard({ includeAstrology = true } = {}) {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const report = runPrivacySecurityGuard()
-  if (!report.ok) {
+  if (process.argv.includes('--json')) {
+    console.log(JSON.stringify(report, null, 2))
+    if (!report.ok) process.exitCode = 1
+  } else if (!report.ok) {
     console.error(`Privacy/security regression check FAILED:\n${report.failures.join('\n')}`)
     process.exitCode = 1
   } else {

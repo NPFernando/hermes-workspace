@@ -124,6 +124,7 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
   let readinessReport
   let deploymentPreview
   let accessibilityReport
+  let privacySecurityReport
   const getReadiness = () => {
     if (readinessReport === undefined) {
       readinessReport = parseJson(run(process.execPath, ['scripts/production-readiness.mjs', '--skip-tests', '--json'], root))
@@ -142,10 +143,19 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
     }
     return accessibilityReport
   }
+  const getPrivacySecurity = () => {
+    if (privacySecurityReport === undefined) {
+      privacySecurityReport = parseJson(run(process.execPath, ['scripts/check-privacy-security-regressions.mjs', '--json'], root))
+    }
+    return privacySecurityReport
+  }
   const liveEvidenceFor = (index) => {
     if (index === 5) return getReadiness()?.checks?.configurationPreflight?.status === 'pass'
     if (index === 8) return hasDeploymentPreview(getDeploymentPreview())
     if (index === 9) return recentPassedDrEvidence()
+    if (index === 14) {
+      return getPrivacySecurity()?.ok === true && getReadiness()?.checks?.security?.status === 'pass'
+    }
     if (index === 15) return serviceActive && hasAccessibilityEvidence(getAccessibility())
     if (index === 16) {
       const statePath = join(root, '.runtime', 'ops-monitor-state.json')
