@@ -192,6 +192,18 @@ if [ "$PREVIEW" = "1" ]; then
   [ -n "$rollback_target" ] || rollback_target="$CURRENT"
   rollback_available=false
   [ -d dist ] && rollback_available=true
+  preview_service="${HERMES_SERVICE_NAME:-hermes-workspace.service}"
+  live_service_active=false
+  [ "$(systemctl is-active "$preview_service" 2>/dev/null || true)" = "active" ] && live_service_active=true
+  live_marker=""
+  [ -f "$BUILD_MARKER" ] && live_marker="$(tr -d '\r\n' < "$BUILD_MARKER")"
+  live_served_build="$(curl -fsSIL --max-time 3 http://127.0.0.1:3000/ 2>/dev/null | awk -F': *' 'tolower($1) == "x-workspace-build" { gsub("\r", "", $2); print $2; exit }' || true)"
+  live_artifact_build=""
+  [ -f dist/server/server.js ] && live_artifact_build="$(artifact_build_id)"
+  live_coherent=false
+  if [ "$live_service_active" = true ] && [ "$live_marker" = "$CURRENT" ] && [ -n "$live_served_build" ] && [ "$live_served_build" = "$live_artifact_build" ]; then
+    live_coherent=true
+  fi
   rollback_target_json="$(printf '%s' "$rollback_target" | jq -Rsc '.')"
   approval_status="${DEPLOY_APPROVAL_STATUS:-not-requested}"
   approval_actor="${DEPLOY_APPROVAL_ACTOR:-}"
@@ -209,13 +221,18 @@ if [ "$PREVIEW" = "1" ]; then
     --arg currentImageTag "$current_image_tag" \
     --arg targetImageTag "$target_image_tag" \
     --arg deploymentId "$DEPLOYMENT_CORRELATION_ID" \
+    --arg liveMarker "$live_marker" \
+    --arg liveServedBuild "$live_served_build" \
+    --arg liveArtifactBuild "$live_artifact_build" \
+    --argjson liveServiceActive "$live_service_active" \
+    --argjson liveCoherent "$live_coherent" \
     --argjson changedFileList "$changed_file_list_json" \
     --argjson changedRuntimeFiles "$changed_runtime_json" \
     --argjson migrationFiles "$migration_json" \
     --argjson worktreeDirty "$worktree_dirty" \
     --argjson changedFiles "$changed_files" \
     --argjson rollbackArtifactAvailable "$rollback_available" \
-    --arg service "${HERMES_SERVICE_NAME:-hermes-workspace.service}" \
+    --arg service "$preview_service" \
     '{
       preview: true,
       action: $action,
@@ -235,6 +252,13 @@ if [ "$PREVIEW" = "1" ]; then
         target: $rollbackTarget,
         artifactAvailable: $rollbackArtifactAvailable,
         service: $service
+      },
+      live: {
+        serviceActive: $liveServiceActive,
+        deploymentMarker: (if $liveMarker == "" then null else $liveMarker end),
+        servedBuild: (if $liveServedBuild == "" then null else $liveServedBuild end),
+        artifactBuild: (if $liveArtifactBuild == "" then null else $liveArtifactBuild end),
+        coherent: $liveCoherent
       },
       approval: {
         required: ($current != $target),
