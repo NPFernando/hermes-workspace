@@ -98,6 +98,15 @@ interface DeploymentJournalEntry {
     reference?: string | null
   }
 }
+interface ServiceHealthHistoryEntry {
+  checkedAt: number
+  activeState: string
+  pid: string
+  result: string | null
+  residentMemoryKb: number | null
+  oomDetected: boolean
+  issueCodes: Array<string>
+}
 interface SafeModeStatus {
   enabled: boolean
   source: 'HERMES_SAFE_MODE' | 'disabled'
@@ -189,6 +198,7 @@ interface OpsPayload {
   financeStorageMonitor: FinanceStorageMonitorSummary | null
   financeStorageSmokeCron: FinanceStorageSmokeCronSummary | null
   deploymentJournal: Array<DeploymentJournalEntry>
+  serviceHealthHistory: Array<ServiceHealthHistoryEntry>
   safeMode: SafeModeStatus
   headroom: HeadroomStats | null
 }
@@ -541,6 +551,7 @@ export function OpsCostScreen() {
     financeStorageMonitor,
     financeStorageSmokeCron,
     deploymentJournal,
+    serviceHealthHistory,
     headroom,
     safeMode,
   } = opsQuery.data
@@ -619,6 +630,27 @@ export function OpsCostScreen() {
           </div>
         ) : (
           <p className="text-sm text-[var(--theme-muted)]">No successful deployment entries recorded yet.</p>
+        )}
+      </Panel>
+
+      <Panel title="Service health history">
+        {serviceHealthHistory.length > 0 ? (
+          <div className="space-y-1 text-xs">
+            {serviceHealthHistory.slice(0, 12).map((sample) => (
+              <div key={`${sample.checkedAt}-${sample.pid}`} className="flex flex-wrap items-center justify-between gap-2 rounded border border-[var(--theme-border,rgba(128,128,128,0.2))] px-2 py-1.5">
+                <time dateTime={new Date(sample.checkedAt).toISOString()} className="text-[var(--theme-muted)]">
+                  {new Date(sample.checkedAt).toLocaleString()}
+                </time>
+                <span className={sample.activeState === 'active' && !sample.oomDetected ? 'text-emerald-400' : 'text-[var(--theme-danger)]'}>
+                  {sample.activeState} · PID {sample.pid}
+                  {sample.oomDetected ? ' · OOM evidence' : ''}
+                  {sample.issueCodes.length > 0 ? ` · ${sample.issueCodes.join(', ')}` : ''}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-[var(--theme-muted)]">No persisted monitor samples yet.</p>
         )}
       </Panel>
 
