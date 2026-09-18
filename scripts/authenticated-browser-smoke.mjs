@@ -8,8 +8,13 @@
  *
  * Set AUTH_E2E_EXPECTED_BUILD to the build header captured before a rollback
  * to prove the authenticated browser is served by the restored artifact.
+ * Set AUTH_E2E_EVIDENCE_PATH to write a sanitized, value-free JSON evidence
+ * artifact after the run; passwords, cookies, page text, and tokens are never
+ * written.
  */
 import { chromium } from 'playwright'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { dirname } from 'node:path'
 
 const baseUrl = (
   process.env.AUTH_E2E_BASE_URL ||
@@ -53,9 +58,14 @@ const page = await context.newPage()
 page.setDefaultNavigationTimeout(90_000)
 let failures = 0
 const pageErrors = []
+const evidenceChecks = []
 page.on('pageerror', (error) => pageErrors.push(error.message))
 
 function check(condition, message) {
+  evidenceChecks.push({
+    label: message.split(' (url=')[0].replace(/: .+$/, ''),
+    passed: Boolean(condition),
+  })
   if (condition) console.log(`✅ ${message}`)
   else {
     console.error(`❌ ${message}`)
@@ -358,6 +368,23 @@ try {
 } finally {
   await context.close()
   await browser.close()
+}
+
+const evidencePath = process.env.AUTH_E2E_EVIDENCE_PATH?.trim()
+if (evidencePath) {
+  mkdirSync(dirname(evidencePath), { recursive: true, mode: 0o700 })
+  writeFileSync(
+    evidencePath,
+    `${JSON.stringify({
+      version: 1,
+      generatedAt: new Date().toISOString(),
+      baseUrl,
+      expectedBuild,
+      ok: failures === 0,
+      checks: evidenceChecks,
+    }, null, 2)}\n`,
+    { mode: 0o600 },
+  )
 }
 
 process.exitCode = failures > 0 ? 1 : 0
