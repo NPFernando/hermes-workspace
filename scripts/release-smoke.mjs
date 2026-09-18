@@ -11,7 +11,15 @@ export async function runReleaseSmoke(baseUrl, fetchImpl = fetch, expectedBuild 
   if (expectedBuild && root.headers.get('x-workspace-build') !== expectedBuild) {
     throw new Error(`build mismatch: expected ${expectedBuild}, got ${root.headers.get('x-workspace-build') || 'missing'}`)
   }
-  const assets = await runAssetIntegrity(baseUrl, fetchImpl)
+  let assets
+  try {
+    assets = await runAssetIntegrity(baseUrl, fetchImpl)
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new Error(
+      `${detail}; the service may be serving a stale build manifest — use the guarded deployment flow to rebuild and restart it`,
+    )
+  }
   const auth = await fetchImpl(`${baseUrl}/api/auth-check`, { cache: 'no-store' })
   if (![200, 401, 503].includes(auth.status)) throw new Error(`auth-check returned unexpected HTTP ${auth.status}`)
   const contentType = auth.headers.get('content-type') || ''
