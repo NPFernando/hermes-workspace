@@ -327,6 +327,16 @@ export function buildRoadmapAudit({ root = DEFAULT_REPO, run = command } = {}) {
       const status = getReadiness()?.checks?.configurationPreflight?.status
       return evidence(status === 'pass', `configuration preflight: ${status || 'unavailable'}`)
     }
+    if (index === 6) {
+      const smoke = recentAuthenticatedSmokeEvidence(root)
+      const verified = smoke.ok && smoke.labels.has('provider usage API returns budgets and anomaly telemetry')
+      return evidence(verified, verified ? 'authenticated provider usage budget and anomaly telemetry passed' : `provider usage evidence: ${smoke.detail}`)
+    }
+    if (index === 7) {
+      const smoke = recentAuthenticatedSmokeEvidence(root)
+      const verified = smoke.ok && smoke.labels.has('queue API exposes durable priority retry and dead-letter controls')
+      return evidence(verified, verified ? 'authenticated queue control evidence passed' : `queue control evidence: ${smoke.detail}`)
+    }
     if (index === 3) {
       const statuses = getRotationReport()?.status
       const expired = Array.isArray(statuses)

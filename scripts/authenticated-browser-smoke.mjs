@@ -233,10 +233,33 @@ try {
       label: 'Dify status API returns an authenticated provider result',
     },
     {
+      path: '/api/provider-usage',
+      valid: (body) =>
+        body?.ok === true &&
+        Array.isArray(body?.providers) &&
+        Array.isArray(body?.history) &&
+        Array.isArray(body?.anomalies) &&
+        body?.monthlyBudget &&
+        typeof body.monthlyBudget === 'object',
+      label: 'provider usage API returns budgets and anomaly telemetry',
+    },
+    {
       path: '/api/swarm-dispatch',
       valid: (body) =>
-        Array.isArray(body?.waiting) && Array.isArray(body?.recent),
-      label: 'queue API returns an authenticated recovery snapshot',
+        body?.mode === 'postgres' &&
+        (body?.active === null || typeof body?.active === 'object') &&
+        Array.isArray(body?.waiting) &&
+        Array.isArray(body?.recent) &&
+        Array.isArray(body?.retryAudits) &&
+        [...(body.waiting || []), ...(body.recent || [])].every(
+          (item) =>
+            typeof item?.priority === 'number' &&
+            typeof item?.assignmentCount === 'number' &&
+            ['pending', 'paused', 'running', 'succeeded', 'failed', 'cancelled', 'interrupted'].includes(item?.status) &&
+            ('deadLetterAt' in item) &&
+            ('retryOfJobId' in item),
+        ),
+      label: 'queue API exposes durable priority retry and dead-letter controls',
     },
     {
       path: '/api/cross-repository-release-status',

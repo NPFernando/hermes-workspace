@@ -46,6 +46,8 @@ describe('roadmap completion audit', () => {
     })
     expect(report.items[4].liveEvidence).toBe(false)
     expect(report.items[2].liveEvidence).toBe(false)
+    expect(report.items[6].liveEvidence).toBe(false)
+    expect(report.items[7].liveEvidence).toBe(false)
     expect(report.items[13].liveEvidence).toBe(false)
     expect(report.items[17].liveEvidence).toBe(false)
     expect(report.items[18].liveEvidence).toBe(false)
