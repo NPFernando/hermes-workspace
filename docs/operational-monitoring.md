@@ -28,14 +28,22 @@ systemctl list-timers hermes-workspace-monitor.timer
 
 The monitor persists only its last observed PID and timestamp under
 `.runtime/ops-monitor-state.json` (mode `0600`), including the last resident
-memory sample. A memory-growth warning requires both a 64 MiB increase and a
-25% increase by default; tune those thresholds with
+memory sample and consecutive high-growth count. A memory-growth warning requires
+both a 64 MiB increase and a 25% increase by default; tune those thresholds with
 `HERMES_OPS_MEMORY_GROWTH_MIN_KB` and
-`HERMES_OPS_MEMORY_GROWTH_WARN_PERCENT`. It never restarts services, deploys
-code, changes git state, or sends data outside the host. A critical finding
+`HERMES_OPS_MEMORY_GROWTH_WARN_PERCENT`. A separate restart candidate requires a
+256 MiB increase, a 50% increase, and three consecutive samples by default. Tune
+those thresholds with `HERMES_OPS_MEMORY_RESTART_MIN_KB`,
+`HERMES_OPS_MEMORY_RESTART_PERCENT`, and
+`HERMES_OPS_MEMORY_RESTART_CONSECUTIVE`. Restart is disabled by default. To
+permit a guarded non-interactive `sudo -n systemctl restart hermes-workspace` after
+the restart threshold is reached, explicitly set
+`HERMES_OPS_MEMORY_RESTART_ENABLED=1`; the one-hour cooldown can be tuned with
+`HERMES_OPS_MEMORY_RESTART_COOLDOWN_SECONDS`. A critical finding
 gives the oneshot a non-zero exit status so it is visible through
 `systemctl status` and the journal; warning findings remain visible in the
-JSON report without causing a false deployment failure.
+JSON report without causing a false deployment failure. Restart attempts and
+failures are recorded in the JSON report and state file.
 
 ## Optional operator alerts
 
