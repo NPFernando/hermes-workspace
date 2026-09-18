@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Editor } from '@monaco-editor/react'
 import { createFileRoute } from '@tanstack/react-router'
 import { HugeiconsIcon } from '@hugeicons/react'
 import {
@@ -20,6 +19,7 @@ import { usePageTitle } from '@/hooks/use-page-title'
 import { FileExplorerSidebar } from '@/components/file-explorer'
 import { resolveTheme, useSettings } from '@/hooks/use-settings'
 import { safeErrorMessage } from '@/lib/error-utils'
+import { LazyMonacoEditor } from '@/components/lazy-monaco-editor'
 
 const PLACEHOLDER_VALUE = `// Files workspace
 // Click a file in the tree to load it into this editor.
@@ -385,7 +385,7 @@ function FilesRoute() {
                 <ScrollAreaCorner />
               </ScrollAreaRoot>
             ) : (
-              <Editor
+              <LazyMonacoEditor
                 height="100%"
                 theme={resolvedTheme === 'dark' ? 'vs-dark' : 'vs-light'}
                 language={editorLanguage}
