@@ -83,7 +83,11 @@ type RoadmapAudit = {
   items: Array<{
     id: number
     title: string
+    implementationPresent: boolean
+    liveEvidence: boolean
     status: 'verified' | 'implemented-awaiting-live-evidence' | 'missing'
+    liveRequirement: string
+    evidence: Array<string>
   }>
 }
 
@@ -856,10 +860,32 @@ export function ProjectGoalsCard() {
                 .filter((item) => item.status !== 'verified')
                 .slice(0, 5)
                 .map((item) => (
-                  <div key={item.id} className="flex items-center justify-between gap-2 text-[11px] text-muted">
-                    <span className="truncate">{item.id}. {item.title}</span>
-                    <span className="shrink-0">{item.status === 'missing' ? 'missing' : 'live evidence pending'}</span>
-                  </div>
+                  <details key={item.id} className="rounded border border-[var(--theme-border)] px-2 py-1.5 text-[11px] text-muted">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-2">
+                      <span className="truncate">{item.id}. {item.title}</span>
+                      <span className="shrink-0">
+                        {item.status === 'missing' ? 'missing' : 'live evidence pending'}
+                      </span>
+                    </summary>
+                    <div className="mt-1.5 space-y-1 leading-relaxed">
+                      <p>
+                        <span className="font-semibold text-[var(--theme-text)]">Required:</span>{' '}
+                        {item.liveRequirement}
+                      </p>
+                      <p>
+                        <span className="font-semibold text-[var(--theme-text)]">Implementation:</span>{' '}
+                        {item.implementationPresent ? 'present' : 'missing'} ·{' '}
+                        <span className="font-semibold text-[var(--theme-text)]">Live evidence:</span>{' '}
+                        {item.liveEvidence ? 'verified' : 'not verified'}
+                      </p>
+                      {item.evidence.length > 0 && (
+                        <p>
+                          <span className="font-semibold text-[var(--theme-text)]">Artifacts:</span>{' '}
+                          {item.evidence.join(', ')}
+                        </p>
+                      )}
+                    </div>
+                  </details>
                 ))}
             </div>
             <p className="mt-2 text-[10px] text-muted">
