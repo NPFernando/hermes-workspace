@@ -328,6 +328,9 @@ export type ValidationRunProgress = {
   lastCycleRan: boolean | null
   lastCycleReason: string | null
   currentExposureQuote: number
+  lastSuccessfulCycleAt?: string | null
+  consecutiveFailures?: number
+  nextRetryAt?: string | null
 }
 
 export type ValidationRunEvidence = {
@@ -345,6 +348,7 @@ export type ValidationRun = {
   executionMode: 'paper' | 'testnet'
   strategies: Array<string>
   autoRun: boolean
+  cycleIntervalMinutes?: number
   status: ValidationRunStatus
   budgets: ValidationRunBudgets
   baseline: ValidationRunBaseline
@@ -469,6 +473,8 @@ export type FinancePayload = {
     executionAccount: string
     paperShadowEnabled: boolean
     livePerOrderCapUsdt: number
+    liveAllocationCapUsdt?: number
+    liveDailyLossCapUsdt?: number
     liveBinanceApproved: boolean
     ibkrStatus: string
   }
@@ -505,6 +511,20 @@ export type FinancePayload = {
     maxDrawdown: number
     totalFeesQuote: number
   }
+  strategyScorecard: Array<{
+    strategyId: string
+    totalTrades: number
+    totalPnlQuote: number
+    winRate: number
+    profitFactor: number
+    expectancyQuote: number
+    sharpeLikeReturn: number
+    maxDrawdown: number
+    averageHoldingMinutes: number
+    averageSlippageQuote: number | null
+    executionModeCounts: Record<string, number>
+    confidence: 'low' | 'medium' | 'high'
+  }>
   decisionQuality: DecisionQualityReport
   paperDecisionQuality: PaperDecisionQualityReport
   learning: LearningReport
@@ -523,6 +543,24 @@ export type FinancePayload = {
     active: Array<ValidationRunView>
     history: Array<ValidationRun>
   }
+  testnetExecutionProbe: {
+    latest?: {
+      id: string
+      status: 'completed' | 'stopped' | 'unavailable'
+      roundTripsRequested: number
+      roundTripsCompleted: number
+      feesQuote: number
+      averageSlippagePct: number | null
+      error: string | null
+      detail: string
+    }
+    history?: Array<unknown>
+    aggregate?: {
+      completedRoundTrips: number
+      feesQuote: number
+      completedRuns: number
+    }
+  } | null
   validationReconciliation: {
     active: Array<ValidationReconciliation>
     history: Array<ValidationReconciliation>
@@ -532,6 +570,16 @@ export type FinancePayload = {
     executionMode?: string
     status: 'completed' | 'blocked' | 'data_error'
     reason: string | null
+    capitalProtection?: {
+      action: 'normal' | 'lock_profit_reduce_exposure' | 'pause_after_loss_manual_review'
+      newEntriesAllowed: boolean
+      reduceExposure: boolean
+      exposureMultiplier: number
+      manualReviewRequired: boolean
+      withdrawalEligible: boolean
+      recommendedWithdrawalQuote: number
+      detail: string
+    }
     symbols: Array<{
       symbol: string
       candles: number
@@ -582,6 +630,26 @@ export type FinancePayload = {
       approval: { status: string; expiresAt: string | null } | null
     }
   }
+  userDataStream: {
+    enabled: boolean
+    running: boolean
+    armed: boolean
+    connected: boolean
+    environment: 'testnet' | 'live' | null
+    lastConnectedAt: string | null
+    lastEventAt: string | null
+    lastError: string | null
+  }
+  tradingAccountReconciliation: {
+    checkedAt: string
+    executionMode: 'paper' | 'testnet' | 'live' | null
+    status: 'aligned' | 'drift_detected' | 'unavailable' | 'not_applicable'
+    localPositionCount: number
+    localTradeCount24h: number
+    exchangeAssetCount: number
+    mismatches: Array<string>
+    detail: string
+  } | null
   alerts: Array<{
     level: 'info' | 'warning' | 'critical'
     title: string

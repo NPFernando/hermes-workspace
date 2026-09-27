@@ -87,6 +87,9 @@ export interface ValidationRunProgress {
   lastCycleRan: boolean | null
   lastCycleReason: string | null
   currentExposureQuote: number
+  lastSuccessfulCycleAt?: string | null
+  consecutiveFailures?: number
+  nextRetryAt?: string | null
 }
 
 export interface ValidationRunErrorEntry {
@@ -113,6 +116,8 @@ export interface ValidationRun {
   strategies: Array<string>
   /** When true, the server advances this run on the normal validation cadence. */
   autoRun: boolean
+  /** Bounded per-run cadence; the scheduler polls more frequently and runs only when due. */
+  cycleIntervalMinutes?: number
   status: ValidationRunStatus
   budgets: ValidationRunBudgets
   baseline: ValidationRunBaseline
@@ -157,7 +162,7 @@ export interface ValidationRunReconciliation {
 const HISTORY_CAP = 50
 const ERRORS_CAP = 50
 
-const MAX_DURATION_MS = 14 * 24 * 60 * 60 * 1000 // 14 days
+const MAX_DURATION_MS = 30 * 24 * 60 * 60 * 1000 // 30 days, matching the evidence freshness window
 const MIN_DURATION_MS = 60_000 // 1 minute
 const MAX_CYCLES = 500
 const MAX_TRADES = 300
@@ -167,19 +172,38 @@ function emptyState(): ValidationRunState {
   return { active: [], history: [] }
 }
 
+function normalizeValidationRun(run: ValidationRun): ValidationRun {
+  const progress = run.progress ?? ({} as ValidationRunProgress)
+  const lastCycleAt = progress.lastCycleAt ?? null
+  const lastCycleRan = progress.lastCycleRan ?? null
+  return {
+    ...run,
+    autoRun: run.autoRun === true,
+    progress: {
+      ...progress,
+      lastCycleAt,
+      lastCycleRan,
+      lastSuccessfulCycleAt:
+        progress.lastSuccessfulCycleAt ??
+        (lastCycleRan === true ? lastCycleAt : null),
+      consecutiveFailures: progress.consecutiveFailures ?? 0,
+      nextRetryAt: progress.nextRetryAt ?? null,
+    },
+  }
+}
+
 function loadState(): ValidationRunState {
   const db = readFinanceStore()
-  if (!db || !db.settings || typeof db.settings !== 'object') {
-    return emptyState()
-  }
   const raw = (db.settings as Record<string, unknown>).validationRuns
   if (!raw || typeof raw !== 'object') return emptyState()
   const state = raw as Partial<ValidationRunState>
   return {
     active: Array.isArray(state.active)
-      ? state.active.map((run) => ({ ...run, autoRun: run.autoRun === true }))
+      ? state.active.map((run) => normalizeValidationRun(run as ValidationRun))
       : [],
-    history: Array.isArray(state.history) ? state.history : [],
+    history: Array.isArray(state.history)
+      ? state.history.map((run) => normalizeValidationRun(run as ValidationRun))
+      : [],
   }
 }
 
@@ -372,6 +396,7 @@ export interface StartValidationRunInput {
   budgets: unknown
   notes?: unknown
   autoRun?: unknown
+  cycleIntervalMinutes?: unknown
 }
 
 export interface StartValidationRunResult {
@@ -400,7 +425,7 @@ export async function startValidationRun(
   const db = readFinanceStore()
   const settings = db.settings as Record<string, unknown>
   const resolvedMode = executionModeForTradingMode(
-    db.settings.tradingMode as string,
+    db.settings.tradingMode,
   )
   if (resolvedMode === 'live' || resolvedMode === null) {
     throw new Error(
@@ -467,6 +492,12 @@ export async function startValidationRun(
       'budgets.maxExposureQuote',
     ),
   }
+  const cycleIntervalMinutes = normalizeBudget(
+    input.cycleIntervalMinutes ?? DEFAULT_CYCLE_INTERVAL_MINUTES,
+    MIN_CYCLE_INTERVAL_MINUTES,
+    MAX_CYCLE_INTERVAL_MINUTES,
+    'cycleIntervalMinutes',
+  )
 
   const state = loadState()
   const conflict = state.active.find((r) => r.stage === stage)
@@ -498,6 +529,7 @@ export async function startValidationRun(
     executionMode: resolvedMode,
     strategies,
     autoRun: input.autoRun === true,
+    cycleIntervalMinutes,
     status: 'active',
     budgets,
     baseline,
@@ -509,6 +541,9 @@ export async function startValidationRun(
       lastCycleRan: null,
       lastCycleReason: null,
       currentExposureQuote: 0,
+      lastSuccessfulCycleAt: null,
+      consecutiveFailures: 0,
+      nextRetryAt: null,
     },
     evidence: {
       ledgerRecordIds: [],
@@ -567,12 +602,33 @@ export interface RunValidationCycleResult {
 }
 
 const RACE_REASON = 'a trading cycle is already in progress'
-const AUTO_CYCLE_INTERVAL_MS = 20 * 60_000
-const AUTO_CYCLE_STALE_AFTER_MS = AUTO_CYCLE_INTERVAL_MS + 60_000
+const DEFAULT_CYCLE_INTERVAL_MINUTES = 20
+const MIN_CYCLE_INTERVAL_MINUTES = 5
+const MAX_CYCLE_INTERVAL_MINUTES = 120
+const AUTO_CYCLE_POLL_INTERVAL_MS = 60_000
+const AUTO_CYCLE_STALE_AFTER_MS =
+  MAX_CYCLE_INTERVAL_MINUTES * 60_000 + AUTO_CYCLE_POLL_INTERVAL_MS
 const AUTO_CYCLE_RECOVERY_COOLDOWN_MS = 5 * 60_000
 let validationAutomationTimer: ReturnType<typeof setInterval> | null = null
 let validationAutomationTickInProgress = false
 let validationAutomationLastTickAt = 0
+
+function automaticRunDue(run: ValidationRun, now: number): boolean {
+  const retryAt = run.progress.nextRetryAt
+    ? Date.parse(run.progress.nextRetryAt)
+    : Number.NaN
+  if (Number.isFinite(retryAt) && now < retryAt) return false
+  const lastAttempt = run.progress.lastCycleAt
+    ? Date.parse(run.progress.lastCycleAt)
+    : Number.NaN
+  if (!Number.isFinite(lastAttempt)) return true
+  const intervalMinutes =
+    typeof run.cycleIntervalMinutes === 'number' &&
+    Number.isFinite(run.cycleIntervalMinutes)
+      ? run.cycleIntervalMinutes
+      : DEFAULT_CYCLE_INTERVAL_MINUTES
+  return now - lastAttempt >= intervalMinutes * 60_000
+}
 
 async function runAutomaticValidationTick(source: 'startup' | 'interval' | 'recovery') {
   if (validationAutomationTickInProgress) return
@@ -583,7 +639,10 @@ async function runAutomaticValidationTick(source: 'startup' | 'interval' | 'reco
     source,
   })
   try {
-    const active = reviewValidationRuns().active.filter((run) => run.autoRun)
+    const now = Date.now()
+    const active = reviewValidationRuns().active.filter(
+      (run) => run.autoRun && automaticRunDue(run, now),
+    )
     for (const run of active) {
       try {
         await runValidationCycle(run.stage)
@@ -607,11 +666,12 @@ async function runAutomaticValidationTick(source: 'startup' | 'interval' | 'reco
 export function ensureValidationRunAutomation(): void {
   if (validationAutomationTimer) return
   appendAuditLog('validation_run_automation_started', {
-    cadenceMs: AUTO_CYCLE_INTERVAL_MS,
+    pollIntervalMs: AUTO_CYCLE_POLL_INTERVAL_MS,
+    defaultCycleIntervalMinutes: DEFAULT_CYCLE_INTERVAL_MINUTES,
   })
   validationAutomationTimer = setInterval(
     () => void runAutomaticValidationTick('interval'),
-    AUTO_CYCLE_INTERVAL_MS,
+    AUTO_CYCLE_POLL_INTERVAL_MS,
   )
   validationAutomationTimer.unref()
   void runAutomaticValidationTick('startup')
@@ -662,7 +722,7 @@ export async function runValidationCycle(
 
   const db = readFinanceStore()
   const resolvedMode = executionModeForTradingMode(
-    db.settings.tradingMode as string,
+    db.settings.tradingMode,
   )
   if (resolvedMode !== run.executionMode) {
     return {
@@ -692,7 +752,7 @@ export async function runValidationCycle(
   const cycle = await runTradingCycle({
     force: options.force === true,
     client: options.client,
-    config: { enabledStrategies: run.strategies } as never,
+    config: { enabledStrategies: run.strategies },
   })
 
   if (cycle.diagnostics) {
@@ -789,6 +849,24 @@ export async function runValidationCycle(
       lastCycleRan: cycle.ran,
       lastCycleReason: cycle.reason ?? null,
       currentExposureQuote: currentExposureQuote(run.executionMode, run.strategies),
+      lastSuccessfulCycleAt: cycle.ran
+        ? cycle.ranAt
+        : (run.progress.lastSuccessfulCycleAt ?? null),
+      consecutiveFailures:
+        cycle.ran || cycle.reason === RACE_REASON
+          ? 0
+          : (run.progress.consecutiveFailures ?? 0) + 1,
+      nextRetryAt:
+        cycle.ran || cycle.reason === RACE_REASON
+          ? null
+          : new Date(
+              now +
+                Math.min(
+                  30 * 60_000,
+                  5 * 60_000 *
+                    2 ** Math.min(3, run.progress.consecutiveFailures ?? 0),
+                ),
+            ).toISOString(),
     },
     evidence: {
       ledgerRecordIds: [...run.evidence.ledgerRecordIds, ...ledgerIds].slice(

@@ -91,6 +91,6 @@ describe('getTradingSummary', () => {
     expect(grid?.reason).toMatch(/executionMode/)
 
     const council = summary.engines.find((e) => e.id === 'council')
-    expect(council?.armState).toBe('live')
+    expect(council?.armState).toBe('sandbox')
   })
 })

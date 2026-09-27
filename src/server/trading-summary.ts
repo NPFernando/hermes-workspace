@@ -11,15 +11,15 @@
  */
 import { readFinanceStore } from './finance-store'
 import {
-  decisionQualityReport,
   getEngineState,
+  getFullEngineHistory,
   getLiveMonitor,
 } from './demo-trading-engine'
 import { getGridEngineState } from './grid-paper-engine'
 import { getRebalanceState } from './rebalance-engine'
 import { getLlmSignalState } from './llm-signal-engine'
 
-export type TradingEngineArmState = 'live' | 'paper' | 'gated' | 'disabled'
+export type TradingEngineArmState = 'live' | 'sandbox' | 'paper' | 'gated' | 'disabled'
 
 export interface TradingEngineStatus {
   id: 'council' | 'grid' | 'rebalance' | 'llm'
@@ -36,6 +36,12 @@ export interface TradingSummary {
   emergencyKillSwitch: boolean
   todayPnlQuote: number
   totalPnlQuote: number
+  paperPnlQuote: number
+  sandboxPnlQuote: number
+  livePnlQuote: number
+  paperTrades: number
+  sandboxTrades: number
+  liveTrades: number
   openPositions: number
   winRate: number | null
   engines: Array<TradingEngineStatus>
@@ -43,6 +49,15 @@ export interface TradingSummary {
 
 function isToday(dateIso: string | undefined, today: string): boolean {
   return typeof dateIso === 'string' && dateIso.startsWith(today)
+}
+
+function executionStage(
+  executionMode: string | undefined,
+): 'paper' | 'sandbox' | 'live' {
+  if (executionMode === 'paper' || executionMode === 'shadow_paper')
+    return 'paper'
+  if (executionMode === 'live') return 'live'
+  return 'sandbox'
 }
 
 export function getTradingSummary(): TradingSummary {
@@ -55,7 +70,20 @@ export function getTradingSummary(): TradingSummary {
   // Council — no per-engine enabled toggle exists; gated purely by
   // tradingMode/kill switch, so it's always "enabled" for arm-state purposes.
   const engineState = getEngineState()
-  const quality = decisionQualityReport()
+  const engineHistory = getFullEngineHistory()
+  const councilStageTotals = {
+    paper: { pnl: 0, trades: 0 },
+    sandbox: { pnl: 0, trades: 0 },
+    live: { pnl: 0, trades: 0 },
+  }
+  for (const trade of [
+    ...engineHistory.trades,
+    ...engineHistory.archivedTrades,
+  ]) {
+    const stage = executionStage(trade.executionMode)
+    councilStageTotals[stage].pnl += trade.pnlQuote
+    councilStageTotals[stage].trades += 1
+  }
 
   // Grid — same as council, no per-engine enabled toggle in its config.
   const grid = getGridEngineState()
@@ -105,8 +133,14 @@ export function getTradingSummary(): TradingSummary {
     ) {
       return {
         state: 'paper',
-        reason: `own executionMode is "${ownExecutionMode}" (independent of the global tradingMode)`,
+        reason:
+          ownExecutionMode === 'paper'
+            ? 'own executionMode is "paper"; paper-authoritative accounting (independent of the global tradingMode)'
+            : `own executionMode is "${ownExecutionMode}" (independent of the global tradingMode)`,
       }
+    }
+    if (tradingMode === 'testnet_execute') {
+      return { state: 'sandbox', reason: 'running in Binance testnet' }
     }
     if (tradingMode === 'paper_trade' || tradingMode === 'observe_only') {
       return { state: 'paper', reason: `running in ${tradingMode}` }
@@ -126,8 +160,8 @@ export function getTradingSummary(): TradingSummary {
       armState: councilArm.state,
       reason: councilArm.reason,
       todayPnlQuote: engineState.dailyPnlQuote,
-      totalPnlQuote: quality.metrics.totalPnlQuote,
-      totalTrades: quality.metrics.totalTrades,
+      totalPnlQuote: engineState.totalRealizedPnlQuote,
+      totalTrades: engineHistory.trades.length,
     },
     {
       id: 'grid',
@@ -159,18 +193,21 @@ export function getTradingSummary(): TradingSummary {
   ]
 
   const todayPnlQuote = engineState.dailyPnlQuote + gridTodayPnl + llmTodayPnl
-  const totalPnlQuote =
-    quality.metrics.totalPnlQuote + grid.performance.totalPnlQuote + llmTotalPnl
+  const paperPnlQuote =
+    councilStageTotals.paper.pnl + grid.performance.totalPnlQuote
+  const sandboxPnlQuote = councilStageTotals.sandbox.pnl + llmTotalPnl
+  const livePnlQuote = councilStageTotals.live.pnl
+  const totalPnlQuote = paperPnlQuote + sandboxPnlQuote + livePnlQuote
   const openPositions =
     engineState.positions.length +
     grid.states.filter((s) => s.levels.some((l) => l.held)).length
 
-  const totalWinTrades =
-    quality.metrics.totalTrades * quality.metrics.winRate +
-    grid.performance.wins +
-    llmWins
+  const councilWins = engineHistory.trades.filter(
+    (trade) => trade.pnlQuote > 0,
+  ).length
+  const totalWinTrades = councilWins + grid.performance.wins + llmWins
   const totalTradesWithOutcome =
-    quality.metrics.totalTrades +
+    engineHistory.trades.length +
     grid.performance.totalTrades +
     llmClosedTrades.length
   const winRate =
@@ -181,6 +218,12 @@ export function getTradingSummary(): TradingSummary {
     emergencyKillSwitch,
     todayPnlQuote,
     totalPnlQuote,
+    paperPnlQuote,
+    sandboxPnlQuote,
+    livePnlQuote,
+    paperTrades: councilStageTotals.paper.trades + grid.performance.totalTrades,
+    sandboxTrades: councilStageTotals.sandbox.trades + llmClosedTrades.length,
+    liveTrades: councilStageTotals.live.trades,
     openPositions,
     winRate,
     engines,
@@ -202,9 +245,13 @@ export interface AccountOverview {
   /** False if the balance fetch failed (network hiccup/rate limit) — the UI
    * should show "unavailable" rather than a misleading $0 in that case. */
   balanceFetchOk: boolean
+  reconciliation: {
+    status: 'not_applicable' | 'aligned' | 'drift_detected' | 'unavailable'
+    detail: string
+  }
   baseline: AccountBaseline | null
   /** Free balance, not currently deployed in any open position. */
-  availableQuote: number
+  availableQuote: number | null
   /** Currently deployed across all 4 engines' open positions. */
   deployedQuote: number
   /** Mark-to-market P/L on currently open positions (council only — grid/llm
@@ -215,7 +262,7 @@ export interface AccountOverview {
   realizedPnlQuote: number
   todayPnlQuote: number
   /** available + deployed + unrealized. */
-  equityQuote: number
+  equityQuote: number | null
   /** equityQuote - baseline.equityQuote, or null if no baseline recorded yet. */
   netVsBaselineQuote: number | null
   /** Counts only — see getEngineState()'s archivedPositions/archivedTrades
@@ -279,22 +326,38 @@ export async function getAccountOverview(): Promise<AccountOverview> {
     .reduce((sum, trade) => sum + (trade.pnlQuote ?? 0), 0)
   const todayPnlQuote = engineState.dailyPnlQuote + gridTodayPnl + llmTodayPnl
 
-  const equityQuote =
-    monitor.quoteBalance + deployedQuote + monitor.openUnrealizedPnlQuote
+  // A failed exchange read is unknown, not zero. Treating an unavailable
+  // balance as zero manufactures a loss and can mislead risk decisions.
+  const accountValuesAvailable = monitor.balanceFetchOk
+  const equityQuote = accountValuesAvailable
+    ? monitor.quoteBalance + deployedQuote + monitor.openUnrealizedPnlQuote
+    : null
 
+  const liveAccount =
+    tradingMode === 'live_manual_approval' ||
+    tradingMode === 'live_monitored' ||
+    tradingMode === 'live_auto_trade'
   return {
-    label: 'Binance Sandbox (Testnet) — Paper-Trade Validation',
+    label: liveAccount
+      ? 'Binance Live Account — Real-Money Monitoring'
+      : tradingMode === 'testnet_execute'
+        ? 'Binance Sandbox (Testnet) — Validation'
+        : 'Paper Trading — Simulated Account',
     tradingMode,
     clientAvailable: monitor.clientAvailable,
     balanceFetchOk: monitor.balanceFetchOk,
+    reconciliation: monitor.reconciliation,
     baseline,
-    availableQuote: monitor.quoteBalance,
+    availableQuote: accountValuesAvailable ? monitor.quoteBalance : null,
     deployedQuote,
     unrealizedPnlQuote: monitor.openUnrealizedPnlQuote,
     realizedPnlQuote,
     todayPnlQuote,
     equityQuote,
-    netVsBaselineQuote: baseline ? equityQuote - baseline.equityQuote : null,
+    netVsBaselineQuote:
+      baseline && equityQuote !== null
+        ? equityQuote - baseline.equityQuote
+        : null,
     archivedPositionsCount: engineState.archivedPositions.length,
     archivedTradesCount: engineState.archivedTrades.length,
     asOfMs: monitor.asOfMs,

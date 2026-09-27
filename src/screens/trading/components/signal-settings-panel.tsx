@@ -45,6 +45,22 @@ export function SignalSettingsPanel({
     typeof demoTrading.strategyGuardMaxPnlQuote === 'number'
       ? demoTrading.strategyGuardMaxPnlQuote
       : 0
+  const strategyGuardMaxDailyLossQuote =
+    typeof demoTrading.strategyGuardMaxDailyLossQuote === 'number'
+      ? demoTrading.strategyGuardMaxDailyLossQuote
+      : 25
+  const strategyGuardMaxDrawdownQuote =
+    typeof demoTrading.strategyGuardMaxDrawdownQuote === 'number'
+      ? demoTrading.strategyGuardMaxDrawdownQuote
+      : 50
+  const strategyGuardMaxSlippageQuote =
+    typeof demoTrading.strategyGuardMaxSlippageQuote === 'number'
+      ? demoTrading.strategyGuardMaxSlippageQuote
+      : -0.5
+  const strategyGuardApiErrorLimit =
+    typeof demoTrading.strategyGuardApiErrorLimit === 'number'
+      ? demoTrading.strategyGuardApiErrorLimit
+      : 3
   const strategyGuardAction =
     demoTrading.strategyGuardAction === 'disabled' ? 'disabled' : 'reduce_size'
 
@@ -55,6 +71,18 @@ export function SignalSettingsPanel({
   )
   const [guardLossRateInput, setGuardLossRateInput] = useState(
     String(strategyGuardLossRateThreshold * 100),
+  )
+  const [guardDailyLossInput, setGuardDailyLossInput] = useState(
+    String(strategyGuardMaxDailyLossQuote),
+  )
+  const [guardDrawdownInput, setGuardDrawdownInput] = useState(
+    String(strategyGuardMaxDrawdownQuote),
+  )
+  const [guardSlippageInput, setGuardSlippageInput] = useState(
+    String(strategyGuardMaxSlippageQuote),
+  )
+  const [guardApiErrorsInput, setGuardApiErrorsInput] = useState(
+    String(strategyGuardApiErrorLimit),
   )
 
   function setConfig(config: Record<string, unknown>, busyKey: string) {
@@ -197,6 +225,10 @@ export function SignalSettingsPanel({
                         (guardLossRateInput.trim() === ''
                           ? 40
                           : Number(guardLossRateInput)) / 100,
+                      strategyGuardMaxDailyLossQuote: Number(guardDailyLossInput),
+                      strategyGuardMaxDrawdownQuote: Number(guardDrawdownInput),
+                      strategyGuardMaxSlippageQuote: Number(guardSlippageInput),
+                      strategyGuardApiErrorLimit: Number(guardApiErrorsInput),
                     },
                     'strategy-guard-thresholds',
                   )
@@ -209,6 +241,22 @@ export function SignalSettingsPanel({
                 Also requires total P&amp;L ≤{' '}
                 {formatUsdt(strategyGuardMaxPnlQuote)}.
               </span>
+              <label className="flex items-center gap-2 text-[var(--theme-muted)]">
+                Daily loss
+                <input type="number" value={guardDailyLossInput} onChange={(e) => setGuardDailyLossInput(e.target.value)} className={inputClass} />
+              </label>
+              <label className="flex items-center gap-2 text-[var(--theme-muted)]">
+                Drawdown
+                <input type="number" value={guardDrawdownInput} onChange={(e) => setGuardDrawdownInput(e.target.value)} className={inputClass} />
+              </label>
+              <label className="flex items-center gap-2 text-[var(--theme-muted)]">
+                Slippage ≤
+                <input type="number" value={guardSlippageInput} onChange={(e) => setGuardSlippageInput(e.target.value)} className={inputClass} />
+              </label>
+              <label className="flex items-center gap-2 text-[var(--theme-muted)]">
+                API errors
+                <input type="number" min={1} value={guardApiErrorsInput} onChange={(e) => setGuardApiErrorsInput(e.target.value)} className={inputClass} />
+              </label>
             </div>
           </div>
         </div>

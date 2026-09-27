@@ -74,6 +74,16 @@ describe('BinanceDemoClient construction guards', () => {
       DemoEnvironmentError,
     )
   })
+
+  it('builds signed user-data subscription parameters without exposing the secret', () => {
+    const client = new BinanceDemoClient(base)
+    const params = client.buildUserDataStreamSubscribeParams()
+    expect(params.apiKey).toBe('demo-key')
+    expect(params.recvWindow).toBe(10_000)
+    expect(typeof params.timestamp).toBe('number')
+    expect(params.signature).toMatch(/^[a-f0-9]{64}$/)
+    expect(JSON.stringify(params)).not.toContain('demo-secret')
+  })
 })
 
 describe('BinanceDemoClient requests hit the normalized demo base', () => {
@@ -164,6 +174,84 @@ describe('BinanceDemoClient kline parsing', () => {
         takerBuyVolume: 12.5,
       },
     ])
+  })
+})
+
+describe('Binance order reconciliation', () => {
+  it('serializes a stable client order ID and recovers a known order', async () => {
+    const fetchImpl = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes('/api/v3/order') && init?.method === 'GET') {
+        return new Response(
+          JSON.stringify({
+            symbol: 'BTCUSDT',
+            orderId: 77,
+            status: 'FILLED',
+            side: 'BUY',
+            type: 'MARKET',
+            executedQty: '0.01',
+            cummulativeQuoteQty: '500',
+            transactTime: 123,
+            fills: [],
+          }),
+          { status: 200 },
+        )
+      }
+      return new Response(
+        JSON.stringify({
+          symbol: 'BTCUSDT',
+          orderId: 77,
+          status: 'FILLED',
+          side: 'BUY',
+          type: 'MARKET',
+          executedQty: '0.01',
+          cummulativeQuoteQty: '500',
+          transactTime: 123,
+          fills: [],
+        }),
+        { status: 200 },
+      )
+    }) as unknown as typeof fetch
+    const client = new BinanceDemoClient({
+      apiKey: 'k',
+      apiSecret: 's',
+      baseUrl: 'https://demo-api.binance.com',
+      fetchImpl,
+    })
+    const input = {
+      symbol: 'BTCUSDT' as const,
+      side: 'BUY' as const,
+      type: 'MARKET' as const,
+      quoteOrderQty: 500,
+      newClientOrderId: 'hermes_buy_0123456789abcdef',
+    }
+    await client.placeOrder(input)
+    const recovered = await client.getOrderByClientOrderId(
+      input.symbol,
+      input.newClientOrderId,
+    )
+    expect(recovered?.orderId).toBe(77)
+    const recoveryUrl = (fetchImpl as any).mock.calls[1][0] as string
+    expect(recoveryUrl).toContain('origClientOrderId=hermes_buy_0123456789abcdef')
+  })
+
+  it('rejects unsafe client order IDs before making a request', async () => {
+    const fetchImpl = vi.fn() as unknown as typeof fetch
+    const client = new BinanceDemoClient({
+      apiKey: 'k',
+      apiSecret: 's',
+      baseUrl: 'https://demo-api.binance.com',
+      fetchImpl,
+    })
+    await expect(
+      client.placeOrder({
+        symbol: 'BTCUSDT',
+        side: 'BUY',
+        type: 'MARKET',
+        quoteOrderQty: 500,
+        newClientOrderId: 'unsafe id',
+      }),
+    ).rejects.toThrow(/newClientOrderId/)
+    expect(fetchImpl).not.toHaveBeenCalled()
   })
 })
 

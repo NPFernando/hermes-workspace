@@ -103,6 +103,48 @@ describe('checkOrderProposal', () => {
     expect(v.blocks.some((b) => b.rule === 'balance_floor')).toBe(true)
   })
 
+  it('blocks when portfolio total exposure would breach the cap', () => {
+    const config = {
+      ...DEFAULT_GUARDIAN_CONFIG,
+      maxTotalExposureQuote: 40,
+    }
+    const v = checkOrderProposal(
+      proposal,
+      { ...baseCtx, totalExposureQuote: 30 },
+      config,
+    )
+    expect(v.allowed).toBe(false)
+    expect(v.blocks.some((b) => b.rule === 'total_exposure_cap')).toBe(true)
+  })
+
+  it('allows total exposure under the portfolio cap', () => {
+    const config = {
+      ...DEFAULT_GUARDIAN_CONFIG,
+      maxTotalExposureQuote: 100,
+    }
+    const v = checkOrderProposal(
+      proposal,
+      { ...baseCtx, totalExposureQuote: 30 },
+      config,
+    )
+    expect(v.blocks.some((b) => b.rule === 'total_exposure_cap')).toBe(false)
+  })
+
+  it('blocks exact-symbol concentration even when total exposure is available', () => {
+    const config = {
+      ...DEFAULT_GUARDIAN_CONFIG,
+      maxTotalExposureQuote: 200,
+      maxSymbolExposureQuote: 40,
+    }
+    const v = checkOrderProposal(
+      proposal,
+      { ...baseCtx, totalExposureQuote: 30, symbolExposureQuote: 30 },
+      config,
+    )
+    expect(v.allowed).toBe(false)
+    expect(v.blocks.some((b) => b.rule === 'symbol_exposure_cap')).toBe(true)
+  })
+
   it('ignores bucket exposure when correlationBucketsEnabled is off (default)', () => {
     const v = checkOrderProposal(proposal, {
       ...baseCtx,

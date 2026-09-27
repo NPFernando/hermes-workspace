@@ -58,17 +58,8 @@ export function TradingControls({
 
   function selectMode(modeId: string) {
     if (modeId === 'live_manual_approval') {
-      const confirmed = window.confirm(
-        'Arm Binance live manual mode?\n\nThis can place real spot orders after the cutoff is disarmed. Orders are capped and mirrored to paper shadow tracking.',
-      )
-      if (!confirmed) return
-      void post(
-        {
-          action: 'arm_live_binance',
-          approval: 'I_APPROVE_BINANCE_LIVE_TRADING',
-          livePerOrderCapUsdt: 10,
-        },
-        'mode-live_manual_approval',
+      window.alert(
+        'Live activation is intentionally staged. Use the “Live execution readiness” card above to assess gates, request approval, approve, and activate live.',
       )
       return
     }

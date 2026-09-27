@@ -17,6 +17,7 @@
  * paper records before the external order path is allowed to continue.
  */
 import { spawn, spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import {
@@ -54,7 +55,13 @@ import {
   dayKey,
   weekKey,
 } from './trading-guardian'
-import { crossEngineBucketExposureQuote } from './exposure-aggregator'
+import { resolveLiveRiskCaps } from './trading-live-risk'
+import { evaluateCapitalProtection } from './trading-capital-rules'
+import { evaluateStrategyQuarantine } from './trading-strategy-quarantine'
+import {
+  crossEngineBucketExposureQuote,
+  crossEngineSymbolExposureQuote,
+} from './exposure-aggregator'
 import { sendAlert } from './alerts'
 import { isConnectivityBreakerTripped } from './connectivity-breaker'
 import {
@@ -91,6 +98,7 @@ import type {
   StrategyScore,
 } from './trading-strategies'
 import type { GuardianBlock, GuardianConfig } from './trading-guardian'
+import type { CapitalProtectionDecision } from './trading-capital-rules'
 import type {
   BinanceExecutionClient,
   BinanceExecutionEnvironment,
@@ -247,6 +255,10 @@ export interface EngineConfig {
   strategyGuardMinClosedTrades: number
   strategyGuardLossRateThreshold: number
   strategyGuardMaxPnlQuote: number
+  strategyGuardMaxDailyLossQuote: number
+  strategyGuardMaxDrawdownQuote: number
+  strategyGuardMaxSlippageQuote: number
+  strategyGuardApiErrorLimit: number
   strategyGuardAction: StrategyOverrideMode
   /**
    * Bounded recent-evaluation window (days) for guard-review evidence — see
@@ -298,6 +310,10 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   strategyGuardMinClosedTrades: 5,
   strategyGuardLossRateThreshold: 0.4,
   strategyGuardMaxPnlQuote: 0,
+  strategyGuardMaxDailyLossQuote: 25,
+  strategyGuardMaxDrawdownQuote: 50,
+  strategyGuardMaxSlippageQuote: -0.5,
+  strategyGuardApiErrorLimit: 3,
   strategyGuardAction: 'reduce_size',
   guardEvidenceWindowDays: 14,
   councilThreshold: 0.6,
@@ -518,6 +534,7 @@ export interface CycleResult {
   marketWarmup?: MarketDataWarmupReport
   diagnostics?: TradingCycleDiagnostics
   learning?: LearningCycleResult
+  capitalProtection?: CapitalProtectionDecision
 }
 
 export interface TradingCycleDiagnosticSymbol {
@@ -543,6 +560,7 @@ export interface TradingCycleDiagnostics {
   status: 'completed' | 'blocked' | 'data_error'
   reason: string | null
   symbols: Array<TradingCycleDiagnosticSymbol>
+  capitalProtection?: CapitalProtectionDecision
 }
 
 let lastTradingCycleDiagnostics: TradingCycleDiagnostics | null = null
@@ -638,7 +656,7 @@ function loadScores(rows: Array<SRRow>): Map<string, StrategyScore> {
       map.set(r.strategyId, {
         ...emptyScore(r.strategyId),
         ...(r as object),
-      } as StrategyScore)
+      })
     }
   }
   for (const s of STRATEGIES)
@@ -763,6 +781,26 @@ export function baseAssetOf(symbol: string): string {
   return normalized.endsWith('USDT') ? normalized.slice(0, -4) : ''
 }
 
+/** Returns a drift explanation when local live positions are not backed by
+ * the exchange account. A small tolerance covers rounding/commission dust;
+ * any larger shortfall blocks the live cycle before another order is sent. */
+export function reconcileLivePositionBalances(
+  positions: Array<{ symbol: string; quantity: number }>,
+  balances: Array<{ asset: string; free: number; locked: number }>,
+): string | null {
+  for (const position of positions) {
+    const asset = baseAssetOf(position.symbol)
+    if (!asset || !(position.quantity > 0)) continue
+    const account = balances.find((balance) => balance.asset === asset)
+    const available = (account?.free ?? 0) + (account?.locked ?? 0)
+    const tolerance = Math.max(1e-8, position.quantity * 0.005)
+    if (available + tolerance < position.quantity) {
+      return `${position.symbol} local quantity ${position.quantity} exceeds exchange ${asset} balance ${available}`
+    }
+  }
+  return null
+}
+
 /**
  * Sum of buy-side commissions taken in the BASE asset. Binance deducts the
  * MARKET-BUY fee from the received asset itself (unless paid in BNB), so the
@@ -820,6 +858,11 @@ function shouldShadow(
 
 function newGroupId(symbol: string): string {
   return `grp_${symbol}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+}
+
+function exchangeClientOrderId(kind: 'buy' | 'sell', seed: string): string {
+  const digest = createHash('sha256').update(`${kind}:${seed}`).digest('hex').slice(0, 20)
+  return `hermes_${kind}_${digest}`
 }
 
 function paperFill(
@@ -1014,6 +1057,50 @@ async function preflightLiveOrder(
     if (!client.testOrder)
       throw new Error('Live Binance client does not support test orders')
     await client.testOrder(input)
+  }
+}
+
+/** Recover an accepted exchange order when the placement response is
+ * ambiguous (for example, a timeout after Binance accepted the request).
+ * Without a stable client ID, retrying can duplicate a real order; without a
+ * lookup, a filled order can disappear from the local ledger. */
+async function placeOrderWithRecovery(
+  client: BinanceExecutionClient,
+  input: BinanceOrderInput,
+): Promise<BinanceOrderResult> {
+  try {
+    return await client.placeOrder(input)
+  } catch (error) {
+    if (!input.newClientOrderId || !client.getOrderByClientOrderId) throw error
+    try {
+      const recovered = await client.getOrderByClientOrderId(
+        input.symbol,
+        input.newClientOrderId,
+      )
+      if (recovered) {
+        appendAuditLog('binance_order_recovered_after_ambiguous_response', {
+          symbol: input.symbol,
+          side: input.side,
+          newClientOrderId: input.newClientOrderId,
+          orderId: recovered.orderId,
+          status: recovered.status,
+          executionEnvironment: client.environment,
+        })
+        return recovered
+      }
+    } catch (recoveryError) {
+      appendAuditLog('binance_order_recovery_failed', {
+        symbol: input.symbol,
+        side: input.side,
+        newClientOrderId: input.newClientOrderId,
+        executionEnvironment: client.environment,
+        reason:
+          recoveryError instanceof Error
+            ? recoveryError.message
+            : String(recoveryError),
+      })
+    }
+    throw error
   }
 }
 
@@ -1698,6 +1785,30 @@ async function runTradingCycleInner(
     ? realizedTradesForMode(trades, executionMode)
     : []
   const dailyPnlQuote = realizedToday(activeTrades)
+  const totalRealizedPnlQuote = activeTrades.reduce(
+    (sum, trade) => sum + trade.pnlQuote,
+    0,
+  )
+  const liveRiskCaps = resolveLiveRiskCaps(settings)
+  const capitalProtection = evaluateCapitalProtection({
+    executionMode,
+    dailyPnlQuote,
+    totalRealizedPnlQuote,
+    allocationCapUsdt: liveRiskCaps.allocationCapUsdt,
+  })
+  if (
+    executionMode === 'live' &&
+    capitalProtection.action !== 'normal'
+  ) {
+    appendAuditLog('live_capital_protection_triggered', {
+      action: capitalProtection.action,
+      dailyPnlQuote,
+      totalRealizedPnlQuote,
+      detail: capitalProtection.detail,
+      withdrawalEligible: capitalProtection.withdrawalEligible,
+      recommendedWithdrawalQuote: capitalProtection.recommendedWithdrawalQuote,
+    })
+  }
 
   const bail = (reason: string): CycleResult => {
     lastTradingCycleDiagnostics = {
@@ -1706,6 +1817,7 @@ async function runTradingCycleInner(
       status: 'blocked',
       reason,
       symbols: cycleContext.diagnostics,
+      capitalProtection,
     }
     appendAuditLog('demo_trading_cycle_bailed', {
       reason,
@@ -1725,6 +1837,7 @@ async function runTradingCycleInner(
       executionMode: executionMode ?? undefined,
       marketWarmup: cycleContext.marketWarmup,
       diagnostics: lastTradingCycleDiagnostics,
+      capitalProtection,
     }
   }
 
@@ -1758,6 +1871,41 @@ async function runTradingCycleInner(
   if (executionMode === 'live' && quality.recommendedAdjustments.pauseLive) {
     return bail(`decision quality keeps live paused: ${quality.status}`)
   }
+
+  // Exchange-backed modes must complete one successful account reconciliation
+  // per UTC day before any new cycle can place orders. Dynamic import avoids a
+  // module cycle because the reconciliation service uses getFullEngineHistory
+  // for its local source of truth. A drift report trips the kill switch; an
+  // unavailable exchange simply blocks this cycle and is retried later.
+  if (
+    executionMode !== 'paper' &&
+    (mode === 'testnet_execute' ||
+      mode === 'live_auto_trade' ||
+      mode === 'live_monitored' ||
+      mode === 'live_manual_approval')
+  ) {
+    const storedReconciliation =
+      db.settings.tradingAccountReconciliation as
+        | { checkedAt?: string; executionMode?: string; status?: string }
+        | undefined
+    const currentDay = dayKey(new Date(ranAt))
+    const reconciliationFresh =
+      storedReconciliation?.status === 'aligned' &&
+      storedReconciliation.executionMode === executionMode &&
+      typeof storedReconciliation.checkedAt === 'string' &&
+      dayKey(storedReconciliation.checkedAt) === currentDay
+    if (!reconciliationFresh) {
+      const { reconcileTradingAccount } = await import(
+        './trading-reconciliation'
+      )
+      const reconciliation = await reconcileTradingAccount(options.client)
+      if (reconciliation.status !== 'aligned') {
+        return bail(
+          `account reconciliation ${reconciliation.status}: ${reconciliation.detail}`,
+        )
+      }
+    }
+  }
   // Audit-log only, once per cycle (never once per dashboard poll, since
   // decisionQualityReport() is also called from read-only API routes) —
   // this never blocks or disables a strategy, matching the repo's
@@ -1777,11 +1925,25 @@ async function runTradingCycleInner(
     }
   }
 
-  let client = options.client
+  // Paper mode must never execute through a caller-supplied Binance client.
+  // It always uses the internal no-order client; paper market data remains
+  // real-time public Binance data, but its placeOrder implementation only
+  // creates a local simulated fill.
+  let client: BinanceExecutionClient | undefined
+  if (executionMode === 'paper') {
+    const paperClient = new PaperBinanceClient()
+    // Preserve injected public market-data readers for deterministic tests,
+    // but deliberately do not copy account/order methods from that client.
+    if (options.client) {
+      paperClient.getPrice = options.client.getPrice.bind(options.client)
+      paperClient.getKlines = options.client.getKlines.bind(options.client)
+    }
+    client = paperClient
+  } else {
+    client = options.client
+  }
   if (!client) {
-    if (executionMode === 'paper') {
-      client = new PaperBinanceClient()
-    } else if (executionMode === 'testnet') {
+    if (executionMode === 'testnet') {
       const built = createDemoClientFromEnv()
       if (!built.client)
         return bail(built.reason || 'Binance testnet client unavailable')
@@ -1827,6 +1989,16 @@ async function runTradingCycleInner(
     const account = await client.getAccount()
     if (executionMode === 'live' && !account.canTrade)
       return bail('live Binance account reports canTrade=false')
+    if (executionMode === 'live') {
+      const drift = reconcileLivePositionBalances(
+        activePositionsForMode(positions, executionMode),
+        account.balances,
+      )
+      if (drift) {
+        appendAuditLog('live_account_position_drift', { reason: drift })
+        return bail(`live account reconciliation failed: ${drift}`)
+      }
+    }
     quoteBalance = account.balances.find((b) => b.asset === 'USDT')?.free ?? 0
   } catch (err) {
     return bail(`account read failed: ${(err as Error).message}`)
@@ -1852,6 +2024,23 @@ async function runTradingCycleInner(
     Number.isFinite(settings.livePerOrderCapUsdt)
       ? Math.max(1, settings.livePerOrderCapUsdt)
       : 10
+  const executionGuardian =
+    executionMode === 'live'
+      ? {
+          ...config.guardian,
+          maxTotalExposureQuote: Math.min(
+            config.guardian.maxTotalExposureQuote,
+            liveRiskCaps.allocationCapUsdt *
+              capitalProtection.exposureMultiplier,
+          ),
+          maxDailyLossQuote: capitalProtection.newEntriesAllowed
+            ? Math.min(
+                config.guardian.maxDailyLossQuote,
+                liveRiskCaps.dailyLossCapUsdt,
+              )
+            : Math.max(Number.EPSILON, -dailyPnlQuote),
+        }
+      : config.guardian
   const paperShadow = shouldShadow(executionMode, settings)
   const qualityByStrategy = new Map(
     quality.byStrategy.map((strategy) => [strategy.strategyId, strategy]),
@@ -2375,9 +2564,10 @@ async function runTradingCycleInner(
             side: 'SELL',
             type: 'MARKET',
             quantity: sellQuantity,
+            newClientOrderId: exchangeClientOrderId('sell', pos.id),
           }
           await preflightLiveOrder(client, orderInput)
-          const order = await client.placeOrder(orderInput)
+          const order = await placeOrderWithRecovery(client, orderInput)
           if (order.executedQty <= 0) {
             pos.closeFailureCount = (pos.closeFailureCount ?? 0) + 1
             actions.push({
@@ -2487,6 +2677,15 @@ async function runTradingCycleInner(
             strategyId: pos.strategyId,
             action: 'SKIP',
             reason: `close failed: ${message}`,
+          })
+          blocks.push({
+            kind: SR_KIND_BLOCK,
+            symbol,
+            strategyId: pos.strategyId,
+            rule: 'exchange_api_error',
+            detail: `close failed: ${message}`,
+            at: new Date().toISOString(),
+            executionMode,
           })
           appendAuditLog('binance_close_failed', {
             symbol,
@@ -2647,6 +2846,16 @@ async function runTradingCycleInner(
         { symbol, strategyId: vote.leadStrategyId, quoteAmount: proposedQuote },
         {
           openPositions: activePositions().length,
+          totalExposureQuote: activePositions().reduce(
+            (sum, position) => sum + position.entryQuote,
+            0,
+          ),
+          symbolExposureQuote: crossEngineSymbolExposureQuote(
+            symbol,
+            activePositions()
+              .filter((position) => position.symbol === symbol)
+              .reduce((sum, position) => sum + position.entryQuote, 0),
+          ),
           quoteBalance,
           dailyPnlQuote: realizedToday(activeTradeLog()),
           weeklyPnlQuote: realizedWeekly(activeTradeLog()),
@@ -2667,7 +2876,7 @@ async function runTradingCycleInner(
               )
             : undefined,
         },
-        config.guardian,
+        executionGuardian,
       )
       if (!verdict.allowed) {
         recordBlocks(symbol, vote.leadStrategyId, verdict.blocks)
@@ -2682,6 +2891,7 @@ async function runTradingCycleInner(
           side: 'BUY',
           type: 'MARKET',
           quoteOrderQty: approvedQuote,
+          newClientOrderId: exchangeClientOrderId('buy', groupId),
         }
         const shadowAtrExits = atrExitPlan(price, candles, config)
         try {
@@ -2706,7 +2916,7 @@ async function runTradingCycleInner(
             checkpoint()
           }
           await preflightLiveOrder(client, orderInput)
-          const order = await client.placeOrder(orderInput)
+          const order = await placeOrderWithRecovery(client, orderInput)
           if (order.executedQty > 0) {
             const spent = order.cummulativeQuoteQty || approvedQuote
             const fillPrice = order.avgPrice || price
@@ -2759,6 +2969,15 @@ async function runTradingCycleInner(
             strategyId: vote.leadStrategyId,
             action: 'SKIP',
             reason: `open failed: ${(err as Error).message}`,
+          })
+          blocks.push({
+            kind: SR_KIND_BLOCK,
+            symbol,
+            strategyId: vote.leadStrategyId,
+            rule: 'exchange_api_error',
+            detail: `open failed: ${(err as Error).message}`,
+            at: new Date().toISOString(),
+            executionMode,
           })
         }
       }
@@ -2814,6 +3033,7 @@ async function runTradingCycleInner(
     status: 'completed',
     reason: null,
     symbols: cycleContext.diagnostics,
+    capitalProtection,
   }
   return {
     ran: true,
@@ -2826,6 +3046,7 @@ async function runTradingCycleInner(
     marketWarmup: cycleContext.marketWarmup,
     diagnostics: lastTradingCycleDiagnostics,
     learning,
+    capitalProtection,
   }
 }
 
@@ -2890,7 +3111,7 @@ function computeEngineSnapshot(monitor?: LiveMonitor): EngineSnapshot {
   const db = readFinanceStore()
   const rows = db.strategy_results as Array<SRRow>
   const currentExecutionMode: BinanceExecutionEnvironment =
-    executionModeForTradingMode(db.settings.tradingMode as string) ?? 'testnet'
+    executionModeForTradingMode(db.settings.tradingMode) ?? 'testnet'
   const allTrades = loadOfKind<TradeLogEntry>(rows, SR_KIND_TRADE).filter(
     (trade) => !isShadow(trade),
   )
@@ -2997,6 +3218,25 @@ export interface DemoPerformance {
   totalFeesQuote: number
 }
 
+export type StrategyScorecardConfidence = 'low' | 'medium' | 'high'
+
+export interface StrategyScorecardRow {
+  strategyId: string
+  totalTrades: number
+  totalPnlQuote: number
+  winRate: number
+  profitFactor: number
+  /** Mean fee-net P/L per closed trade. */
+  expectancyQuote: number
+  /** Mean fee-net P/L divided by per-trade standard deviation. */
+  sharpeLikeReturn: number
+  maxDrawdown: number
+  averageHoldingMinutes: number
+  averageSlippageQuote: number | null
+  executionModeCounts: Record<string, number>
+  confidence: StrategyScorecardConfidence
+}
+
 /** Performance metrics over the demo engine's own closed trades (fee-net P/L). */
 export function summarizeDemoTrades(
   trades: Array<TradeLogEntry>,
@@ -3056,6 +3296,98 @@ export function demoTradingPerformance(): DemoPerformance {
       (trade) => !isShadow(trade),
     ),
   )
+}
+
+/**
+ * Per-strategy, fee-net evidence for the trading dashboard. This intentionally
+ * uses closed, non-shadow trades only; open positions and shadow hypotheses
+ * must never inflate profitability or sample confidence.
+ */
+export function strategyScorecard(): Array<StrategyScorecardRow> {
+  const rows = readFinanceStore().strategy_results as Array<SRRow>
+  const trades = loadOfKind<TradeLogEntry>(rows, SR_KIND_TRADE).filter(
+    (trade) => !isShadow(trade),
+  )
+  const comparisons = new Map<string, Array<number>>()
+  for (const comparison of decisionQualityReport().shadowComparisons) {
+    const samples = comparisons.get(comparison.strategyId) ?? []
+    samples.push(comparison.slippageQuote)
+    comparisons.set(comparison.strategyId, samples)
+  }
+
+  const byStrategy = new Map<string, Array<TradeLogEntry>>()
+  for (const trade of trades) {
+    const items = byStrategy.get(trade.strategyId) ?? []
+    items.push(trade)
+    byStrategy.set(trade.strategyId, items)
+  }
+
+  return [...byStrategy.entries()]
+    .map(([strategyId, items]) => {
+      const pnl = items.map((trade) => trade.pnlQuote)
+      const wins = pnl.filter((value) => value > 0)
+      const losses = pnl.filter((value) => value < 0)
+      const grossProfit = wins.reduce((sum, value) => sum + value, 0)
+      const grossLoss = Math.abs(losses.reduce((sum, value) => sum + value, 0))
+      const expectancyQuote = pnl.reduce((sum, value) => sum + value, 0) / pnl.length
+      const mean = expectancyQuote
+      const variance =
+        pnl.reduce((sum, value) => sum + (value - mean) ** 2, 0) / pnl.length
+      const pnlStdDev = Math.sqrt(variance)
+      const executionModeCounts = items.reduce<Record<string, number>>(
+        (counts, trade) => {
+          const mode = trade.executionMode ?? 'unknown'
+          counts[mode] = (counts[mode] ?? 0) + 1
+          return counts
+        },
+        {},
+      )
+      let cumulative = 0
+      let peak = 0
+      let maxDrawdown = 0
+      for (const value of pnl) {
+        cumulative += value
+        peak = Math.max(peak, cumulative)
+        maxDrawdown = Math.max(maxDrawdown, peak - cumulative)
+      }
+      const holdMinutes = items.map((trade) =>
+        Math.max(
+          0,
+          (new Date(trade.closedAt).getTime() -
+            new Date(trade.openedAt).getTime()) /
+            60_000,
+        ),
+      )
+      const slippage = comparisons.get(strategyId) ?? []
+      const profitFactor =
+        grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? 999 : 0
+      const confidence: StrategyScorecardConfidence =
+        items.length >= 30 && profitFactor >= 1.3
+          ? 'high'
+          : items.length >= 10
+            ? 'medium'
+            : 'low'
+      return {
+        strategyId,
+        totalTrades: items.length,
+        totalPnlQuote: pnl.reduce((sum, value) => sum + value, 0),
+        winRate: wins.length / items.length,
+        profitFactor,
+        expectancyQuote,
+        sharpeLikeReturn:
+          pnlStdDev > 0 ? expectancyQuote / pnlStdDev : 0,
+        maxDrawdown,
+        averageHoldingMinutes:
+          holdMinutes.reduce((sum, value) => sum + value, 0) /
+          holdMinutes.length,
+        averageSlippageQuote: slippage.length
+          ? slippage.reduce((sum, value) => sum + value, 0) / slippage.length
+          : null,
+        executionModeCounts,
+        confidence,
+      }
+    })
+    .sort((a, b) => b.totalPnlQuote - a.totalPnlQuote)
 }
 
 export type DecisionQualityStatus =
@@ -3411,17 +3743,14 @@ function restoreStepForOverride(existing: StrategyOverride): {
 } | null {
   if (existing.mode === 'disabled')
     return { overrideAction: 'reduce_size', multiplier: 0.5 }
-  if (existing.mode === 'reduce_size') {
-    if (existing.multiplier < 0.75)
-      return { overrideAction: 'reduce_size', multiplier: 0.75 }
-    return { overrideAction: 'clear', multiplier: null }
-  }
-  return null
+  if (existing.multiplier < 0.75)
+    return { overrideAction: 'reduce_size', multiplier: 0.75 }
+  return { overrideAction: 'clear', multiplier: null }
 }
 
 function readStrategyRestoreProgress(
   settingsDemoTrading: unknown,
-): Record<string, StrategyRestoreProgress> {
+): Partial<Record<string, StrategyRestoreProgress>> {
   const dt =
     settingsDemoTrading &&
     typeof settingsDemoTrading === 'object' &&
@@ -3455,7 +3784,7 @@ function readStrategyRestoreProgress(
  * read-modify-write so it survives the `setStrategyOverride()` writes the
  * restore loop makes just before it. */
 function writeStrategyRestoreProgress(
-  progress: Record<string, StrategyRestoreProgress>,
+  progress: Partial<Record<string, StrategyRestoreProgress>>,
 ): void {
   const db = readFinanceStore()
   const settings = db.settings as Record<string, unknown>
@@ -4323,7 +4652,7 @@ export function learningReport(): LearningReport {
     trades,
     config.quotePerTrade,
   )
-  const candidates = loadLearningCandidates(db.strategy_results as Array<SRRow>)
+  const candidates = loadLearningCandidates(db.strategy_results)
   return {
     checkedAt: new Date().toISOString(),
     policy,
@@ -4340,7 +4669,7 @@ export function applyLearningCandidate(candidateId: string): {
 } {
   const db = readFinanceStore()
   const settings = db.settings as Record<string, unknown>
-  const candidates = loadLearningCandidates(db.strategy_results as Array<SRRow>)
+  const candidates = loadLearningCandidates(db.strategy_results)
   const candidate = candidates.find((item) => item.id === candidateId) ?? null
   if (!candidate) {
     return {
@@ -4388,7 +4717,7 @@ export function applyLearningCandidate(candidateId: string): {
     ...(dt.learning &&
     typeof dt.learning === 'object' &&
     !Array.isArray(dt.learning)
-      ? (dt.learning as Record<string, unknown>)
+      ? (dt.learning)
       : {}),
     baseQuotePerTrade: baseQuote,
     lastAppliedCandidateId: candidate.id,
@@ -4448,7 +4777,7 @@ export function runLearningCycle(): LearningCycleResult {
     config.quotePerTrade,
   )
   const existingCandidates = loadLearningCandidates(
-    db.strategy_results as Array<SRRow>,
+    db.strategy_results,
   )
   let generatedCandidate: LearningCandidate | null = null
   let appliedCandidate: LearningCandidate | null = null
@@ -4489,7 +4818,7 @@ export function runLearningCycle(): LearningCycleResult {
   }
 
   const candidates = loadLearningCandidates(
-    readFinanceStore().strategy_results as Array<SRRow>,
+    readFinanceStore().strategy_results,
   )
   return {
     checkedAt: new Date().toISOString(),
@@ -5059,17 +5388,66 @@ function applyAutomaticStrategyGuard(
 ): void {
   if (!config.strategyGuardEnabled || executionMode === 'live') return
   const state = strategyOverrideState()
+  const rows = readFinanceStore().strategy_results as Array<SRRow>
+  const realTrades = loadOfKind<TradeLogEntry>(rows, SR_KIND_TRADE).filter(
+    (trade) =>
+      !isShadow(trade) && executionModeOfTrade(trade) === executionMode,
+  )
+  const shadowComparisons = pairShadowComparisons(
+    loadOfKind<TradeLogEntry>(rows, SR_KIND_TRADE),
+  )
+  const recentErrorCutoff = Date.now() - 24 * 60 * 60_000
   const activeByStrategy = new Map(
     state.active.map((override) => [override.strategyId, override]),
   )
   for (const strategy of STRATEGIES) {
     if (!config.enabledStrategies.includes(strategy.id)) continue
-    const score = scores.get(strategy.id)
-    if (!score) continue
+    const score = scores.get(strategy.id) ?? emptyScore(strategy.id)
+    const strategyTrades = realTrades.filter(
+      (trade) => trade.strategyId === strategy.id,
+    )
+    const dailyPnlQuote = strategyTrades
+      .filter((trade) => Date.parse(trade.closedAt) >= Date.now() - 24 * 60 * 60_000)
+      .reduce((sum, trade) => sum + trade.pnlQuote, 0)
+    const slippage = shadowComparisons.filter(
+      (comparison) =>
+        comparison.strategyId === strategy.id &&
+        comparison.executionMode === executionMode,
+    )
+    const apiErrorCount = rows.filter((row) => {
+      if (
+        row.kind !== SR_KIND_BLOCK ||
+        row.strategyId !== strategy.id ||
+        row.executionMode !== executionMode ||
+        typeof row.at !== 'string' ||
+        Date.parse(row.at) < recentErrorCutoff
+      )
+        return false
+      const rule = `${String(row.rule ?? '')} ${String(row.detail ?? '')}`.toLowerCase()
+      return /api|exchange|connectivity|order.*fail|market.*data.*error/.test(rule)
+    }).length
+    const quarantine = evaluateStrategyQuarantine({
+      trades: strategyTrades,
+      lossStreak: score.lossStreak,
+      lossStreakLimit: config.guardian.lossStreakLimit,
+      minClosedTrades: config.strategyGuardMinClosedTrades,
+      winRate: score.winRate,
+      lossRateThreshold: config.strategyGuardLossRateThreshold,
+      totalPnlQuote: score.totalPnlQuote,
+      maxPnlQuote: config.strategyGuardMaxPnlQuote,
+      dailyPnlQuote,
+      maxDailyLossQuote: config.strategyGuardMaxDailyLossQuote,
+      maxDrawdownQuote: config.strategyGuardMaxDrawdownQuote,
+      averageSlippageQuote: slippage.length
+        ? slippage.reduce((sum, item) => sum + item.slippageQuote, 0) / slippage.length
+        : null,
+      slippageSamples: slippage.length,
+      maxSlippageQuote: config.strategyGuardMaxSlippageQuote,
+      apiErrorCount,
+      apiErrorLimit: config.strategyGuardApiErrorLimit,
+    })
     const triggered =
-      score.trades >= config.strategyGuardMinClosedTrades &&
-      score.winRate <= config.strategyGuardLossRateThreshold &&
-      score.totalPnlQuote <= config.strategyGuardMaxPnlQuote
+      quarantine.triggered
     const existing = activeByStrategy.get(strategy.id)
     // Manual overrides always win; a strategy currently inside a bounded
     // sandbox experiment is left alone too — the experiment owns that
@@ -5089,7 +5467,7 @@ function applyAutomaticStrategyGuard(
         overrideAction: config.strategyGuardAction,
         multiplier:
           config.strategyGuardAction === 'reduce_size' ? 0.5 : undefined,
-        reason: `Automatic sandbox guard: ${score.trades} trades, ${(score.winRate * 100).toFixed(1)}% win rate, ${score.totalPnlQuote.toFixed(2)} USDT PnL.`,
+        reason: `Automatic sandbox quarantine: ${quarantine.reasons.join('; ')}.`,
         source: 'automatic',
       }
       if (!existing) {
@@ -5752,7 +6130,7 @@ export function reviewSandboxExperiments(): SandboxExperimentState {
   const db = readFinanceStore()
   const rows = db.strategy_results as Array<SRRow>
   const currentExecutionMode: BinanceExecutionEnvironment =
-    executionModeForTradingMode(db.settings.tradingMode as string) ?? 'testnet'
+    executionModeForTradingMode(db.settings.tradingMode) ?? 'testnet'
   const allTrades = loadOfKind<TradeLogEntry>(rows, SR_KIND_TRADE).filter(
     (trade) => !isShadow(trade),
   )
@@ -5931,7 +6309,9 @@ export function applyStrategyOverrideRecommendations(): {
     const progress = readStrategyRestoreProgress(
       (readFinanceStore().settings as Record<string, unknown>).demoTrading,
     )
-    const nextProgress: Record<string, StrategyRestoreProgress> = { ...progress }
+    const nextProgress: Partial<Record<string, StrategyRestoreProgress>> = {
+      ...progress,
+    }
     const nowIso = new Date().toISOString()
 
     for (const strategy of report.byStrategy) {
@@ -5945,8 +6325,7 @@ export function applyStrategyOverrideRecommendations(): {
         strategyRecoveryEligible(strategy)
       if (!eligible) {
         // In the hysteresis band or still flagged — reset the streak, hold.
-        if (nextProgress[strategy.strategyId])
-          delete nextProgress[strategy.strategyId]
+        delete nextProgress[strategy.strategyId]
         continue
       }
       const healthyRuns =
@@ -6056,27 +6435,22 @@ export function applyRecommendedSafeguards(): {
   let targetMode = report.recommendedAdjustments.recommendedMode
   let liveRecommendationDeferred = false
   if (targetMode === 'live_manual_approval') {
-    const liveAlreadyApproved = Boolean(
-      db.settings.liveTradingEnabled && db.settings.liveBinanceApprovedAt,
-    )
-    if (!liveAlreadyApproved) {
-      targetMode = 'testnet_execute'
-      liveRecommendationDeferred = true
-    }
+    // Safeguard/learning automation is never an authorization boundary. Even
+    // when the current store says live is armed, keep this function's scope
+    // limited to conservative settings and defer the live recommendation to
+    // the staged readiness activation path.
+    targetMode = 'testnet_execute'
+    liveRecommendationDeferred = true
   }
 
   if (targetMode === 'paper_trade') {
     db.settings.tradingMode = 'paper_trade'
     db.settings.executionAccount = 'paper'
     db.settings.liveTradingEnabled = false
-  } else if (targetMode === 'testnet_execute') {
+  } else {
     db.settings.tradingMode = 'testnet_execute'
     db.settings.executionAccount = 'binance_testnet'
     db.settings.liveTradingEnabled = false
-  } else {
-    db.settings.tradingMode = 'live_manual_approval'
-    db.settings.executionAccount = 'binance_live'
-    db.settings.liveTradingEnabled = true
   }
 
   const applied: AppliedSafeguards = {
@@ -6167,6 +6541,10 @@ export interface LiveMonitor {
    * LIVE_MARKET_SNAPSHOT_REFRESH_MS below), not necessarily "now", so the UI
    * can show "as of Xs ago" instead of implying an always-live read. */
   asOfMs: number
+  reconciliation: {
+    status: 'not_applicable' | 'aligned' | 'drift_detected' | 'unavailable'
+    detail: string
+  }
 }
 
 export interface StrategyEligibilityAudit {
@@ -6248,6 +6626,7 @@ interface LiveMarketSnapshot {
   mode: string
   symbolsKey: string
   asOfMs: number
+  reconciliation: LiveMonitor['reconciliation']
 }
 
 /** How often the background timer re-fetches balance + per-symbol market
@@ -6287,14 +6666,34 @@ async function fetchLiveMarketSnapshot(): Promise<LiveMarketSnapshot> {
       mode,
       symbolsKey,
       asOfMs: Date.now(),
+      reconciliation:
+        mode === 'live'
+          ? { status: 'unavailable', detail: 'exchange client unavailable' }
+          : { status: 'not_applicable', detail: `${mode} mode is not live` },
     }
   }
 
   let quoteBalance = 0
   let balanceFetchOk = true
+  let reconciliation: LiveMonitor['reconciliation'] =
+    mode === 'live'
+      ? { status: 'unavailable', detail: 'exchange account not verified' }
+      : { status: 'not_applicable', detail: `${mode} mode is not live` }
   try {
     const acct = await client.getAccount()
     quoteBalance = acct.balances.find((b) => b.asset === 'USDT')?.free ?? 0
+    if (mode === 'live') {
+      const drift = reconcileLivePositionBalances(
+        activePositionsForMode(
+          loadOfKind<OpenPosition>(rows, SR_KIND_POSITION),
+          'live',
+        ),
+        acct.balances,
+      )
+      reconciliation = drift
+        ? { status: 'drift_detected', detail: drift }
+        : { status: 'aligned', detail: 'local live positions match exchange balances' }
+    }
   } catch {
     /* balance read failed - leave 0 */
     balanceFetchOk = false
@@ -6350,6 +6749,7 @@ async function fetchLiveMarketSnapshot(): Promise<LiveMarketSnapshot> {
     mode,
     symbolsKey,
     asOfMs: Date.now(),
+    reconciliation,
   }
 }
 
@@ -6474,7 +6874,7 @@ export function getStrategyEligibilityAudit(): StrategyEligibilityAudit {
   const settings = db.settings as Record<string, unknown>
   const config = resolveEngineConfig(settings.demoTrading)
   const mode = executionModeForTradingMode(db.settings.tradingMode) ?? 'paper'
-  const scores = loadScores(db.strategy_results as Array<SRRow>)
+  const scores = loadScores(db.strategy_results)
   const overrides = readStrategyOverrideState(settings.demoTrading).active
   const symbolsKey = config.symbols.join(',')
   const snapshot = liveMarketSnapshotCache
@@ -6582,6 +6982,7 @@ export async function getLiveMonitor(): Promise<LiveMonitor> {
       equityQuote: deployedQuote,
       monitoring: [],
       asOfMs: snapshot.asOfMs,
+      reconciliation: snapshot.reconciliation,
     }
   }
 
@@ -6616,5 +7017,6 @@ export async function getLiveMonitor(): Promise<LiveMonitor> {
     equityQuote: snapshot.quoteBalance + positionsMarkValue,
     monitoring,
     asOfMs: snapshot.asOfMs,
+    reconciliation: snapshot.reconciliation,
   }
 }

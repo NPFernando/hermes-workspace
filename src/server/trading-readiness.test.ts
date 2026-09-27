@@ -96,6 +96,7 @@ beforeEach(async () => {
   const financeStore = await import('./finance-store')
   const db = financeStore.readFinanceStore()
   delete (db.settings as Record<string, unknown>).liveReadiness
+  delete (db.settings as Record<string, unknown>).tradingConnectivityVerification
   db.settings.emergencyKillSwitch = true
   db.settings.executionAccount = 'paper'
   db.settings.tradingMode = 'observe_only'
@@ -118,6 +119,7 @@ async function makeEverythingReady(now: Date) {
   const financeStore = await import('./finance-store')
   const db = financeStore.readFinanceStore()
   db.settings.emergencyKillSwitch = false
+  db.settings.emergencyKillSwitchTestedAt = now.toISOString()
   db.settings.executionAccount = 'binance_testnet'
   db.settings.tradingMode = 'testnet_execute'
   db.settings.livePerOrderCapUsdt = 10
@@ -136,6 +138,8 @@ async function makeEverythingReady(now: Date) {
       correlationBucketsEnabled: false,
       correlationBuckets: {},
       maxBucketExposureQuote: 100,
+      maxTotalExposureQuote: 100,
+      maxSymbolExposureQuote: 50,
     },
   }
   financeStore.writeFinanceStore(db)
@@ -178,6 +182,14 @@ async function makeEverythingReady(now: Date) {
   process.env.BINANCE_API_KEY = 'live-key'
   process.env.BINANCE_API_SECRET = 'live-secret'
   process.env.BINANCE_ALLOW_LIVE_TRADING = 'I_APPROVE_BINANCE_LIVE_TRADING'
+  const readiness = await import('./trading-readiness')
+  db.settings.tradingConnectivityVerification = {
+    checkedAt: now.toISOString(),
+    credentialFingerprint: readiness.tradingCredentialFingerprint(),
+    testnet: { ok: true, detail: 'test fixture' },
+    live: { ok: true, detail: 'test fixture' },
+  }
+  financeStore.writeFinanceStore(db)
 }
 
 describe('assessReadiness — fail-closed on missing/stale evidence', () => {
@@ -229,6 +241,19 @@ describe('assessReadiness — fail-closed on missing/stale evidence', () => {
     const snapshot = readiness.assessReadiness(new Date())
     expect(snapshot.gates.find((g) => g.id === 'ledger_integrity')?.pass).toBe(
       false,
+    )
+  })
+
+  it('accepts valid order-level BUY/SELL records with only one side price', async () => {
+    await makeEverythingReady(new Date())
+    state.ledgerRecords = [
+      { status: 'closed', quantity: 1, entryPrice: 100, exitPrice: null },
+      { status: 'closed', quantity: 1, entryPrice: null, exitPrice: 101 },
+    ]
+    const readiness = await import('./trading-readiness')
+    const snapshot = readiness.assessReadiness(new Date())
+    expect(snapshot.gates.find((g) => g.id === 'ledger_integrity')?.pass).toBe(
+      true,
     )
   })
 
