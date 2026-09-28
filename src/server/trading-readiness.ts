@@ -53,6 +53,7 @@ import {
   getFullEngineHistory,
   resolveEngineConfig,
   strategyGuardReview,
+  strategyOverrideState,
 } from './demo-trading-engine'
 import { isConnectivityBreakerTripped } from './connectivity-breaker'
 import {
@@ -281,12 +282,32 @@ function ledgerIntegrityGate(): ReadinessGate {
 }
 
 function strategySampleSizeGate(): ReadinessGate {
-  const reviews = Array.isArray(strategyGuardReview()) ? strategyGuardReview() : []
+  const overrides = strategyOverrideState()
+  const overrideRecord = overrides as unknown as Record<string, unknown>
+  const activeOverrides = Array.isArray(overrideRecord.active)
+    ? overrideRecord.active
+    : []
+  const disabledStrategies = new Set(
+    activeOverrides
+      .filter(
+        (override): override is Record<string, unknown> =>
+          Boolean(override) && typeof override === 'object',
+      )
+      .filter(
+        (override) =>
+          override.mode === 'disabled' &&
+          typeof override.strategyId === 'string',
+      )
+      .map((override) => override.strategyId),
+  )
+  const reviews = (
+    Array.isArray(strategyGuardReview()) ? strategyGuardReview() : []
+  ).filter((review) => !disabledStrategies.has(review.strategyId))
   const insufficient = reviews.filter((r) => !r.window.sufficientSample)
   const pass = reviews.length > 0 && insufficient.length === 0
   const detail =
     reviews.length === 0
-      ? 'no enabled strategies to evaluate'
+      ? 'no active enabled strategies to evaluate'
       : insufficient.length > 0
         ? `${insufficient.map((r) => r.strategyId).join(', ')} below the minimum sample size for their evidence window`
         : `all ${reviews.length} enabled strategies have sufficient recent-window sample size`

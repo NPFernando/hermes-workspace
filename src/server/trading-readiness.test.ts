@@ -28,6 +28,7 @@ const state = vi.hoisted(() => ({
     archivedTrades: [] as Array<Record<string, unknown>>,
   },
   guardReviews: [] as Array<Record<string, unknown>>,
+  strategyOverrides: [] as Array<Record<string, unknown>>,
   ledgerRecords: [] as Array<Record<string, unknown>>,
   breakerTripped: false,
 }))
@@ -40,6 +41,10 @@ vi.mock('./demo-trading-engine', async () => {
     decisionQualityReport: () => state.decisionQuality,
     getFullEngineHistory: () => state.engineHistory,
     strategyGuardReview: () => state.guardReviews,
+    strategyOverrideState: () => ({
+      active: state.strategyOverrides,
+      history: [],
+    }),
   }
 })
 vi.mock('./trading-ledger', async () => {
@@ -70,6 +75,7 @@ function resetMockState() {
     archivedTrades: [],
   }
   state.guardReviews = []
+  state.strategyOverrides = []
   state.ledgerRecords = []
   state.breakerTripped = false
 }
@@ -227,6 +233,26 @@ describe('assessReadiness — fail-closed on missing/stale evidence', () => {
     const gate = snapshot.gates.find((g) => g.id === 'strategy_sample_size')
     expect(gate?.pass).toBe(false)
     expect(gate?.detail).toMatch(/sma_crossover/)
+  })
+
+  it('does not require recent samples for a strategy with an active disabled override', async () => {
+    await makeEverythingReady(new Date())
+    state.strategyOverrides = [
+      {
+        id: 'override_sma_crossover_test',
+        strategyId: 'sma_crossover',
+        mode: 'disabled',
+      },
+    ]
+    state.guardReviews = [
+      { strategyId: 'sma_crossover', window: { sufficientSample: false } },
+      { strategyId: 'rsi_reversion', window: { sufficientSample: true } },
+    ]
+    const readiness = await import('./trading-readiness')
+    const snapshot = readiness.assessReadiness(new Date())
+    const gate = snapshot.gates.find((g) => g.id === 'strategy_sample_size')
+    expect(gate?.pass).toBe(true)
+    expect(gate?.detail).toMatch(/all 1 enabled strategies/)
   })
 
   it('fails ledger_integrity on malformed ledger records (missing/invalid price or quantity)', async () => {
