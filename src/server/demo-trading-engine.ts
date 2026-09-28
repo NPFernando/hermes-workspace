@@ -3377,12 +3377,18 @@ export function strategyScorecard(): Array<StrategyScorecardRow> {
       const evidence = recentEvidence.get(strategyId)
       const profitFactor =
         grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? 999 : 0
-      const confidence: StrategyScorecardConfidence =
+      const historicalConfidence: StrategyScorecardConfidence =
         items.length >= 30 && profitFactor >= 1.3
           ? 'high'
           : items.length >= 10
             ? 'medium'
             : 'low'
+      // A strong all-time record must not mask a thin or stale recent window.
+      // Until the bounded evidence gate has enough closed trades, expose low
+      // confidence so operators cannot mistake historical P/L for current
+      // validation.
+      const confidence: StrategyScorecardConfidence =
+        evidence?.sufficientSample === true ? historicalConfidence : 'low'
       return {
         strategyId,
         totalTrades: items.length,
