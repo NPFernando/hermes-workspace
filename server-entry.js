@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
-import { readFile, stat } from 'node:fs/promises'
+import { readFile, readdir, stat } from 'node:fs/promises'
 import { readFileSync } from 'node:fs'
 import { join, extname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -8,6 +8,22 @@ import server from './dist/server/server.js'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const CLIENT_DIR = join(__dirname, 'dist', 'client')
+
+// TanStack's server route chunk is normally loaded lazily on the first
+// request. Trading validation and account-reconciliation timers are started
+// by that chunk, so a quiet service restart could leave an active paper run
+// stale until an authenticated finance request happened to arrive. Preload
+// the generated router chunk at process boot; its existing singleton guards
+// keep this idempotent and the route remains available through the normal
+// request path. The build always emits exactly one router-*.js asset.
+const SERVER_ASSET_DIR = join(__dirname, 'dist', 'server', 'assets')
+const routerAsset = (await readdir(SERVER_ASSET_DIR)).find(
+  (name) => /^router-[A-Za-z0-9_-]+\.js$/.test(name),
+)
+if (!routerAsset) {
+  throw new Error('server router asset is missing; cannot start automation safely')
+}
+await import(join(SERVER_ASSET_DIR, routerAsset))
 
 // A short artifact fingerprint lets read-only release checks distinguish a
 // healthy process serving an older build from the build just verified. It is
