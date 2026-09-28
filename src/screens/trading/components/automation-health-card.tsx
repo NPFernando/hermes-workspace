@@ -63,6 +63,10 @@ export function AutomationHealthCard({
     totalCount(paper.statusCounts, 'data_error') +
     totalCount(sandbox.statusCounts, 'data_error')
   const hasProblem = stale || last?.status === 'data_error' || dataErrors > 0
+  const noEntries =
+    activeAutoRun !== null &&
+    activeAutoRun.progress.cyclesRun > 0 &&
+    activeAutoRun.progress.tradesOpened === 0
 
   async function reconcile() {
     setBusy(true)
@@ -93,7 +97,7 @@ export function AutomationHealthCard({
           className={`rounded-full px-3 py-1 text-xs font-medium ${
             hasProblem && !stale
               ? 'bg-[color-mix(in_srgb,var(--theme-danger)_15%,transparent)] text-[var(--theme-danger)]'
-              : stale || last?.status === 'blocked'
+              : stale || last?.status === 'blocked' || noEntries
                 ? 'bg-[color-mix(in_srgb,var(--theme-warning)_15%,transparent)] text-[var(--theme-warning)]'
                 : 'bg-[color-mix(in_srgb,var(--theme-success)_15%,transparent)] text-[var(--theme-success)]'
           }`}
@@ -104,7 +108,9 @@ export function AutomationHealthCard({
               ? 'Attention needed'
               : last?.status === 'blocked'
                 ? 'Guarded / no trade'
-                : 'Operational'}
+                : noEntries
+                  ? 'No entries yet'
+                  : 'Operational'}
         </span>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
