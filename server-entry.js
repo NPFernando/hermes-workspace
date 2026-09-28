@@ -17,13 +17,32 @@ const CLIENT_DIR = join(__dirname, 'dist', 'client')
 // keep this idempotent and the route remains available through the normal
 // request path. The build always emits exactly one router-*.js asset.
 const SERVER_ASSET_DIR = join(__dirname, 'dist', 'server', 'assets')
-const routerAsset = (await readdir(SERVER_ASSET_DIR)).find(
-  (name) => /^router-[A-Za-z0-9_-]+\.js$/.test(name),
-)
-if (!routerAsset) {
-  throw new Error('server router asset is missing; cannot start automation safely')
-}
-await import(join(SERVER_ASSET_DIR, routerAsset))
+const financePersistenceConfigured =
+  process.env.HERMES_FINANCE_STORE !== 'json' &&
+  (Boolean(process.env.HERMES_PG_PASSWORD) ||
+    await (async () => {
+      for (const envPath of [
+        join(process.env.HERMES_HOME || join(process.env.HOME || '', '.hermes'), '.env'),
+        join(process.env.HOME || '', '.hermes', '.hermes.backup', '.env'),
+      ]) {
+        try {
+          const contents = await readFile(envPath, 'utf8')
+          if (/^HERMES_PG_PASSWORD=.+$/m.test(contents)) return true
+        } catch {
+          // The built-in JSON/test harness does not have production secrets.
+        }
+      }
+      return false
+    })())
+
+if (financePersistenceConfigured) {
+  const routerAsset = (await readdir(SERVER_ASSET_DIR)).find(
+    (name) => /^router-[A-Za-z0-9_-]+\.js$/.test(name),
+  )
+  if (!routerAsset) {
+    throw new Error('server router asset is missing; cannot start automation safely')
+  }
+  await import(join(SERVER_ASSET_DIR, routerAsset)) }
 
 // A short artifact fingerprint lets read-only release checks distinguish a
 // healthy process serving an older build from the build just verified. It is
