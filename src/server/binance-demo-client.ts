@@ -71,6 +71,9 @@ export interface BinanceOrderInput {
   quantity?: number
   quoteOrderQty?: number
   price?: number
+  /** Stable id used to reconcile an accepted order after an ambiguous
+   * network response. Binance limits this field to 36 characters. */
+  newClientOrderId?: string
 }
 
 export interface SymbolFilters {
@@ -113,7 +116,17 @@ export interface BinanceExecutionClient {
     }>
   >
   getAccount: () => Promise<BinanceAccount>
+  /** Read-only fills used by account reconciliation. */
+  getMyTrades?: (
+    symbol: string,
+    startTime?: number,
+  ) => Promise<Array<{ id: number; orderId: number; time: number }>>
   placeOrder: (input: BinanceOrderInput) => Promise<BinanceOrderResult>
+  /** Optional read-only recovery lookup for an ambiguous placement response. */
+  getOrderByClientOrderId?: (
+    symbol: string,
+    newClientOrderId: string,
+  ) => Promise<BinanceOrderResult | null>
   testOrder?: (input: BinanceOrderInput) => Promise<void>
   /** LOT_SIZE/NOTIONAL exchange filters; optional so paper/test fakes can omit it. */
   getSymbolFilters?: (symbol: string) => Promise<SymbolFilters>
@@ -196,6 +209,13 @@ function orderParams(
         'MARKET order requires quantity or quoteOrderQty.',
       )
   }
+  if (input.newClientOrderId != null) {
+    if (!/^[A-Za-z0-9_-]{1,36}$/.test(input.newClientOrderId))
+      throw new DemoEnvironmentError(
+        'newClientOrderId must be 1-36 characters using letters, numbers, _ or -.',
+      )
+    params.newClientOrderId = input.newClientOrderId
+  }
   return params
 }
 
@@ -210,7 +230,17 @@ abstract class SignedBinanceClient implements BinanceExecutionClient {
   protected abstract assertBaseUrl(baseUrl: string): string
   protected abstract errorPrefix(): string
   buildUserDataStreamSubscribeParams(): Record<string, unknown> {
-    return {}
+    const params: Record<string, string | number> = {
+      apiKey: this.apiKey,
+      recvWindow: this.recvWindow,
+      timestamp: Date.now(),
+    }
+    const payload = new URLSearchParams(
+      Object.entries(params)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, value]) => [key, String(value)]),
+    ).toString()
+    return { ...params, signature: this.sign(payload) }
   }
 
   constructor(config: {
@@ -379,6 +409,26 @@ abstract class SignedBinanceClient implements BinanceExecutionClient {
     }
   }
 
+  async getMyTrades(
+    symbol: string,
+    startTime?: number,
+  ): Promise<Array<{ id: number; orderId: number; time: number }>> {
+    const raw = await this.signedRequest('GET', '/api/v3/myTrades', {
+      symbol,
+      ...(startTime !== undefined ? { startTime } : {}),
+      limit: 1000,
+    })
+    if (!Array.isArray(raw)) return []
+    return raw.flatMap((trade: any) => {
+      const id = Number(trade.id)
+      const orderId = Number(trade.orderId)
+      const time = Number(trade.time)
+      return Number.isFinite(id) && Number.isFinite(orderId) && Number.isFinite(time)
+        ? [{ id, orderId, time }]
+        : []
+    })
+  }
+
   async testOrder(input: BinanceOrderInput): Promise<void> {
     await this.signedRequest('POST', '/api/v3/order/test', orderParams(input))
   }
@@ -389,30 +439,53 @@ abstract class SignedBinanceClient implements BinanceExecutionClient {
       '/api/v3/order',
       orderParams(input),
     )
-    const fills = (raw.fills || []).map((f: any) => ({
-      price: parseFloat(f.price),
-      qty: parseFloat(f.qty),
-      commission: parseFloat(f.commission),
-      commissionAsset: f.commissionAsset,
-    }))
-    const executedQty = parseFloat(raw.executedQty || '0')
-    const cummulativeQuoteQty = parseFloat(raw.cummulativeQuoteQty || '0')
-    return {
-      symbol: raw.symbol,
-      orderId: raw.orderId,
-      status: raw.status,
-      side: raw.side,
-      type: raw.type,
-      executedQty,
-      cummulativeQuoteQty,
-      fills,
-      transactTime: raw.transactTime,
-      avgPrice: executedQty > 0 ? cummulativeQuoteQty / executedQty : 0,
+    return parseOrderResult(raw)
+  }
+
+  async getOrderByClientOrderId(
+    symbol: string,
+    newClientOrderId: string,
+  ): Promise<BinanceOrderResult | null> {
+    try {
+      const raw = await this.signedRequest('GET', '/api/v3/order', {
+        symbol,
+        origClientOrderId: newClientOrderId,
+      })
+      return parseOrderResult(raw)
+    } catch (error) {
+      // Binance uses -2013 when an order ID is not found. This is an expected
+      // negative lookup after a failed placement; other errors remain fatal.
+      if (error instanceof DemoEnvironmentError && /code -2013\b/.test(error.message))
+        return null
+      throw error
     }
   }
 
   async cancelOrder(symbol: string, orderId: number): Promise<void> {
     await this.signedRequest('DELETE', '/api/v3/order', { symbol, orderId })
+  }
+}
+
+function parseOrderResult(raw: any): BinanceOrderResult {
+  const fills = (raw.fills || []).map((f: any) => ({
+    price: parseFloat(f.price),
+    qty: parseFloat(f.qty),
+    commission: parseFloat(f.commission),
+    commissionAsset: f.commissionAsset,
+  }))
+  const executedQty = parseFloat(raw.executedQty || '0')
+  const cummulativeQuoteQty = parseFloat(raw.cummulativeQuoteQty || '0')
+  return {
+    symbol: raw.symbol,
+    orderId: raw.orderId,
+    status: raw.status,
+    side: raw.side,
+    type: raw.type,
+    executedQty,
+    cummulativeQuoteQty,
+    fills,
+    transactTime: raw.transactTime,
+    avgPrice: executedQty > 0 ? cummulativeQuoteQty / executedQty : 0,
   }
 }
 

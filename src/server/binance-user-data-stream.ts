@@ -1,5 +1,5 @@
 /**
- * Read-only, informational listener on Binance Demo Trading's WebSocket API
+ * Read-only, informational listener on Binance Spot's WebSocket API
  * user data stream (`userDataStream.subscribe.signature` — HMAC-signed, no
  * Ed25519 session needed: https://developers.binance.com/docs/binance-spot-api-docs/web-socket-api.md#user-data-signature).
  * Audit-logs order/balance events as they happen instead of only learning
@@ -20,20 +20,40 @@
  */
 import { randomUUID } from 'node:crypto'
 import { appendAuditLog, readFinanceStore } from './finance-store'
-import { createDemoClientFromEnv } from './binance-demo-client'
+import {
+  createDemoClientFromEnv,
+  createLiveClientFromEnv,
+} from './binance-demo-client'
 
 const WS_HOST_BY_REST_HOST: Record<string, string> = {
   'demo-api.binance.com': 'demo-ws-api.binance.com',
   'testnet.binance.vision': 'ws-api.testnet.binance.vision',
+  'api.binance.com': 'ws-api.binance.com',
 }
 
 const RECONNECT_DELAY_MS = 15_000
 const ARMED_POLL_INTERVAL_MS = 60_000
 
+export interface BinanceUserDataStreamStatus {
+  enabled: boolean
+  running: boolean
+  armed: boolean
+  connected: boolean
+  environment: 'testnet' | 'live' | null
+  lastConnectedAt: string | null
+  lastEventAt: string | null
+  lastError: string | null
+}
+
 let socket: WebSocket | null = null
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let stopped = true
+let connected = false
+let connectedEnvironment: 'testnet' | 'live' | null = null
+let lastConnectedAt: string | null = null
+let lastEventAt: string | null = null
+let lastError: string | null = null
 
 function envFlagOff(name: string): boolean {
   const value = process.env[name]?.trim().toLowerCase()
@@ -98,10 +118,15 @@ function isArmed(): boolean {
   try {
     const db = readFinanceStore()
     const settings = db.settings as Record<string, unknown>
-    return (
-      settings.tradingMode === 'testnet_execute' &&
-      settings.emergencyKillSwitch !== true
-    )
+    const testnetArmed = settings.tradingMode === 'testnet_execute'
+    const liveArmed =
+      (settings.tradingMode === 'live_manual_approval' ||
+        settings.tradingMode === 'live_monitored' ||
+        settings.tradingMode === 'live_auto_trade') &&
+      settings.liveTradingEnabled === true &&
+      typeof settings.liveBinanceApprovedAt === 'string' &&
+      settings.liveBinanceApprovedAt.length > 0
+    return (testnetArmed || liveArmed) && settings.emergencyKillSwitch !== true
   } catch {
     return false
   }
@@ -120,6 +145,7 @@ function closeSocket(): void {
   if (!socket) return
   const current = socket
   socket = null
+  connected = false
   try {
     current.close()
   } catch {
@@ -130,17 +156,30 @@ function closeSocket(): void {
 function connectIfArmed(): void {
   if (stopped || socket) return
   if (!isArmed()) return
-  const built = createDemoClientFromEnv()
-  if (!built.client) return
+  const db = readFinanceStore()
+  const settings = db.settings as Record<string, unknown>
+  const liveMode =
+    settings.tradingMode === 'live_manual_approval' ||
+    settings.tradingMode === 'live_monitored' ||
+    settings.tradingMode === 'live_auto_trade'
+  const built = liveMode
+    ? createLiveClientFromEnv()
+    : createDemoClientFromEnv()
+  if (!built.client) {
+    lastError = built.reason ?? 'exchange client unavailable'
+    return
+  }
   const client = built.client
   const wsHost = WS_HOST_BY_REST_HOST[client.host]
   if (!wsHost) return
+  connectedEnvironment = liveMode ? 'live' : 'testnet'
 
   const subscribeId = randomUUID()
   let ws: WebSocket
   try {
     ws = new WebSocket(`wss://${wsHost}/ws-api/v3`)
   } catch (err) {
+    lastError = err instanceof Error ? err.message : String(err)
     appendAuditLog('binance_user_data_stream_connect_failed', {
       reason: err instanceof Error ? err.message : String(err),
     })
@@ -185,19 +224,27 @@ function connectIfArmed(): void {
           status: msg.status,
           error: msg.error,
         })
+        lastError = `subscription rejected (status ${String(msg.status)})`
         closeSocket()
       } else {
+        connected = true
+        lastConnectedAt = new Date().toISOString()
+        lastError = null
         appendAuditLog('binance_user_data_stream_subscribed', {})
       }
       return
     }
 
     const logged = auditEntryForEvent(msg.event)
-    if (logged) appendAuditLog(logged.action, logged.details)
+    if (logged) {
+      lastEventAt = new Date().toISOString()
+      appendAuditLog(logged.action, logged.details)
+    }
   })
 
   ws.addEventListener('close', () => {
     socket = null
+    connected = false
     scheduleReconnect()
   })
 
@@ -241,4 +288,26 @@ export function stopBinanceUserDataStream(): void {
     reconnectTimer = null
   }
   closeSocket()
+  connected = false
+  connectedEnvironment = null
+  lastConnectedAt = null
+  lastEventAt = null
+  lastError = null
+}
+
+export function getBinanceUserDataStreamStatus(): BinanceUserDataStreamStatus {
+  return {
+    enabled:
+      !envFlagOff('HERMES_BINANCE_USER_DATA_STREAM') &&
+      !process.env.VITEST &&
+      process.env.NODE_ENV !== 'test' &&
+      typeof window === 'undefined',
+    running: pollTimer !== null,
+    armed: isArmed(),
+    connected,
+    environment: connectedEnvironment,
+    lastConnectedAt,
+    lastEventAt,
+    lastError,
+  }
 }

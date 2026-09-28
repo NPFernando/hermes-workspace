@@ -11,6 +11,8 @@ function pnlTone(value: number): 'good' | 'warn' | 'neutral' {
 
 const CHIP_STYLE: Record<TradingEngineArmState, string> = {
   live: 'border-[color-mix(in_srgb,var(--theme-danger)_40%,transparent)] bg-[color-mix(in_srgb,var(--theme-danger)_15%,transparent)] text-[var(--theme-danger)]',
+  sandbox:
+    'border-[color-mix(in_srgb,var(--theme-accent-secondary)_40%,transparent)] bg-[color-mix(in_srgb,var(--theme-accent-secondary)_15%,transparent)] text-[var(--theme-accent-secondary)]',
   paper: 'border-[color-mix(in_srgb,var(--theme-warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-warning)_10%,transparent)] text-[var(--theme-warning)]',
   gated: 'border-[var(--theme-border)] bg-[color-mix(in_srgb,var(--theme-text)_8%,transparent)] text-[var(--theme-muted)]',
   disabled:
@@ -44,9 +46,24 @@ export function TradingSummaryStrip() {
           tone={pnlTone(summary.todayPnlQuote)}
         />
         <StatCard
-          label="Total P&L"
+          label="Paper P&L"
+          value={formatUsdt(summary.paperPnlQuote)}
+          tone={pnlTone(summary.paperPnlQuote)}
+        />
+        <StatCard
+          label="Sandbox P&L"
+          value={formatUsdt(summary.sandboxPnlQuote)}
+          tone={pnlTone(summary.sandboxPnlQuote)}
+        />
+        <StatCard
+          label="All-stage P&L"
           value={formatUsdt(summary.totalPnlQuote)}
           tone={pnlTone(summary.totalPnlQuote)}
+        />
+        <StatCard
+          label="Live P&L"
+          value={formatUsdt(summary.livePnlQuote)}
+          tone={pnlTone(summary.livePnlQuote)}
         />
         <StatCard
           label="Open positions"
@@ -61,6 +78,11 @@ export function TradingSummaryStrip() {
           }
         />
       </div>
+      <p className="mt-2 text-xs text-[var(--theme-muted)]">
+        Paper: {summary.paperTrades} trades · Sandbox: {summary.sandboxTrades}{' '}
+        trades · Live: {summary.liveTrades} trades. All-stage P&L is historical
+        fee-net ledger evidence; it is not a promise of future profit.
+      </p>
       <div className="mt-3 flex flex-wrap gap-2">
         {summary.engines.map((engine) => (
           <span

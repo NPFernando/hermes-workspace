@@ -37,6 +37,10 @@ export interface GuardianConfig {
   correlationBucketsEnabled: boolean
   correlationBuckets: Record<string, Array<string>>
   maxBucketExposureQuote: number
+  /** Portfolio-wide open-notional cap across all symbols and engines. */
+  maxTotalExposureQuote: number
+  /** Exact-symbol open-notional cap, preventing concentration in one market. */
+  maxSymbolExposureQuote: number
 }
 
 export const DEFAULT_GUARDIAN_CONFIG: GuardianConfig = {
@@ -54,6 +58,8 @@ export const DEFAULT_GUARDIAN_CONFIG: GuardianConfig = {
     alts: ['XRPUSDT'],
   },
   maxBucketExposureQuote: 100,
+  maxTotalExposureQuote: 100,
+  maxSymbolExposureQuote: 50,
 }
 
 /** Bucket name containing `symbol`, or null if it isn't in any configured bucket. */
@@ -104,6 +110,10 @@ export interface GuardianContext {
   strategyCooldownUntil?: string | null
   /** Current open-position quote exposure per correlation bucket (see GuardianConfig.correlationBuckets). */
   bucketExposureQuote?: Record<string, number>
+  /** Current total open-position quote exposure across all symbols. */
+  totalExposureQuote?: number
+  /** Current open-position quote exposure for the proposed symbol. */
+  symbolExposureQuote?: number
   now?: Date
 }
 
@@ -163,6 +173,22 @@ export function checkOrderProposal(
   }
 
   const approvedQuote = Math.min(proposal.quoteAmount, config.perTradeQuoteCap)
+
+  const totalExposure = ctx.totalExposureQuote ?? 0
+  if (totalExposure + approvedQuote > config.maxTotalExposureQuote) {
+    blocks.push({
+      rule: 'total_exposure_cap',
+      detail: `${proposal.symbol} exposure would reach ${(totalExposure + approvedQuote).toFixed(2)}, breaching portfolio cap ${config.maxTotalExposureQuote.toFixed(2)} — existing exposure ${totalExposure.toFixed(2)}`,
+    })
+  }
+
+  const symbolExposure = ctx.symbolExposureQuote ?? 0
+  if (symbolExposure + approvedQuote > config.maxSymbolExposureQuote) {
+    blocks.push({
+      rule: 'symbol_exposure_cap',
+      detail: `${proposal.symbol} exposure would reach ${(symbolExposure + approvedQuote).toFixed(2)}, breaching symbol cap ${config.maxSymbolExposureQuote.toFixed(2)} — existing symbol exposure ${symbolExposure.toFixed(2)}`,
+    })
+  }
 
   if (config.correlationBucketsEnabled) {
     const bucket = bucketForSymbol(proposal.symbol, config.correlationBuckets)

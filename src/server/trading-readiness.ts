@@ -1,13 +1,11 @@
 /**
  * Staged live-trading readiness gates.
  *
- * Every existing "flip a mode" surface in routes/api/finance.ts
- * (`set_trading_mode`, `set_execution_account`, `arm_live_binance`) only
- * asks for an approval PHRASE before allowing `live_manual_approval` /
- * `binance_live` — none of them check whether the system has actually
- * earned that trust (enough paper/testnet evidence, intact risk caps, a
- * working kill switch, live credentials that exist, etc). This module adds
- * that missing evidence layer on top, without touching any of the above:
+ * Every live activation surface in routes/api/finance.ts is routed through
+ * this module's staged workflow. Legacy mode/account/arm actions are
+ * deliberately rejected for live activation, so a phrase alone can never
+ * bypass earned-trust checks (paper/testnet evidence, intact risk caps, a
+ * working kill switch, live credentials, etc):
  *
  *  1. `assessReadiness()` computes 10 independent gates from data the
  *     engine already tracks (decisionQualityReport, strategyGuardReview,
@@ -42,7 +40,7 @@
  */
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { createHash, randomUUID } from 'node:crypto'
+import { createHash, randomUUID, scryptSync } from 'node:crypto'
 import {
   FINANCE_AUDIT_PATH,
   appendAuditLog,
@@ -61,6 +59,10 @@ import {
   createDemoClientFromEnv,
   createLiveClientFromEnv,
 } from './binance-demo-client'
+import {
+  liveRiskCapsAreValid,
+  resolveLiveRiskCaps,
+} from './trading-live-risk'
 import { buildLedgerRecords } from './trading-ledger'
 import type { FinanceDatabase } from './finance-store'
 import type { DecisionQualityReport } from './demo-trading-engine'
@@ -88,6 +90,7 @@ const APPROVAL_HISTORY_CAP = 20
 const MIN_PAPER_TRADES = 20
 const MIN_TESTNET_TRADES = 10
 const MAX_EVIDENCE_AGE_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
+const MAX_CONNECTIVITY_VERIFICATION_AGE_MS = 15 * 60 * 1000
 const MAX_LIVE_PER_ORDER_CAP_USDT = 50
 
 export type ReadinessGateId =
@@ -189,6 +192,8 @@ export function computeSettingsFingerprint(db: FinanceDatabase): string {
     enabledStrategies: [...config.enabledStrategies].sort(),
     noLossExitMode: config.noLossExitMode,
     livePerOrderCapUsdt: settings.livePerOrderCapUsdt,
+    liveAllocationCapUsdt: settings.liveAllocationCapUsdt,
+    liveDailyLossCapUsdt: settings.liveDailyLossCapUsdt,
     emergencyKillSwitch: settings.emergencyKillSwitch,
     executionAccount: settings.executionAccount,
     tradingMode: settings.tradingMode,
@@ -226,8 +231,10 @@ function evidenceGate(
   let detail: string
   if (!trades.length) {
     detail = `no closed trades recorded yet — need at least ${minTrades}`
-  } else if (!sampleOk) {
+  } else if (trades.length < minTrades) {
     detail = `only ${trades.length} closed trade(s), need at least ${minTrades}`
+  } else if (!enoughSample) {
+    detail = `${trades.length} closed trade(s) meet the count threshold, but the performance-quality validation is not positive yet`
   } else if (evidenceAgeMs === null || !fresh) {
     const ageDays = evidenceAgeMs === null ? null : Math.round(evidenceAgeMs / 86_400_000)
     detail = `most recent closed trade is ${ageDays ?? 'unknown'} day(s) old — evidence is stale (max ${MAX_EVIDENCE_AGE_MS / 86_400_000} days)`
@@ -244,19 +251,17 @@ function ledgerIntegrityGate(): ReadinessGate {
   const storageOk = storage.health.status !== 'postgres_unavailable'
   const records = Array.isArray(buildLedgerRecords()) ? buildLedgerRecords() : []
   const anomalies = records.filter((r) => {
-    if (r.status === 'open') {
-      return (
-        r.quantity == null ||
-        r.quantity <= 0 ||
-        r.entryPrice == null ||
-        r.entryPrice <= 0
-      )
-    }
+    if (r.quantity == null || r.quantity <= 0) return true
+    if (r.status === 'open')
+      return r.entryPrice == null || r.entryPrice <= 0
+
+    // Council/grid rows are round trips and contain both prices. LLM and
+    // rebalance rows are order-level records: a BUY has only entryPrice and a
+    // SELL has only exitPrice. Requiring both falsely marked every valid
+    // order-level record as corrupt and blocked live readiness.
     return (
-      r.entryPrice == null ||
-      r.entryPrice <= 0 ||
-      r.exitPrice == null ||
-      r.exitPrice <= 0
+      (r.entryPrice == null || r.entryPrice <= 0) &&
+      (r.exitPrice == null || r.exitPrice <= 0)
     )
   })
   const pass = storageOk && anomalies.length === 0
@@ -319,18 +324,83 @@ function recoveryVisibilityGate(db: FinanceDatabase): ReadinessGate {
   }
 }
 
-function accountConnectivityGate(): ReadinessGate {
+export function tradingCredentialFingerprint(
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  // This is an equality fingerprint, not password storage. Use a
+  // memory-hard KDF so credential material is not processed by a fast hash.
+  return scryptSync(
+    JSON.stringify({
+      testnetKey: env.BINANCE_TESTNET_API_KEY?.trim() ?? '',
+      testnetBase: env.BINANCE_TESTNET_BASE_URL?.trim() ?? '',
+      liveKey: env.BINANCE_API_KEY?.trim() ?? '',
+      liveBase: env.BINANCE_BASE_URL?.trim() ?? '',
+    }),
+    'hermes-trading-credential-fingerprint-v1',
+    32,
+  ).toString('hex')
+}
+
+function accountConnectivityGate(db: FinanceDatabase, now: number): ReadinessGate {
+  const settings = db.settings as Record<string, unknown>
   const breakerTripped = isConnectivityBreakerTripped()
   const testnet = createDemoClientFromEnv()
   const live = createLiveClientFromEnv()
-  const pass = !breakerTripped && testnet.client !== null && live.client !== null
+  const verification = settings.tradingConnectivityVerification as
+    | {
+        checkedAt?: unknown
+        credentialFingerprint?: unknown
+        testnet?: { ok?: unknown; detail?: unknown }
+        live?: { ok?: unknown; detail?: unknown }
+      }
+    | null
+    | undefined
+  const checkedAt =
+    typeof verification?.checkedAt === 'string'
+      ? Date.parse(verification.checkedAt)
+      : Number.NaN
+  const verificationFresh =
+    Number.isFinite(checkedAt) &&
+    now - checkedAt >= 0 &&
+    now - checkedAt <= MAX_CONNECTIVITY_VERIFICATION_AGE_MS
+  const fingerprintMatches =
+    verification?.credentialFingerprint === tradingCredentialFingerprint()
+  const testnetVerified = verification
+    ? verification.testnet?.ok === true
+    : false
+  const liveVerified = verification ? verification.live?.ok === true : false
+  const verificationOk =
+    verificationFresh &&
+    fingerprintMatches &&
+    testnetVerified &&
+    liveVerified
+  const pass =
+    !breakerTripped &&
+    testnet.client !== null &&
+    live.client !== null &&
+    verificationOk
   const problems = [
     breakerTripped && 'connectivity breaker is tripped',
     !testnet.client && `testnet credentials: ${testnet.reason}`,
     !live.client && `live credentials: ${live.reason}`,
+    testnet.client &&
+      live.client &&
+      !verificationOk &&
+      (verification
+        ? !fingerprintMatches
+          ? 'read-only exchange verification belongs to different credentials — verify again'
+          : !verificationFresh
+            ? 'read-only exchange verification is stale — verify again'
+            : `read-only exchange verification failed: ${[
+                  verification.testnet?.detail,
+                  verification.live?.detail,
+                ]
+                  .filter(Boolean)
+                  .join('; ') || 'account checks did not pass'}`
+        : 'read-only exchange verification has not been completed — use Verify exchange connectivity'),
   ].filter(Boolean)
   const detail = pass
-    ? 'testnet and live credentials present, connectivity breaker not tripped'
+    ? 'testnet and live accounts verified read-only, credentials current, connectivity breaker not tripped'
     : problems.join('; ')
   return {
     id: 'account_connectivity',
@@ -340,6 +410,55 @@ function accountConnectivityGate(): ReadinessGate {
     detail,
     evidenceAgeMs: null,
   }
+}
+
+export interface TradingConnectivityVerification {
+  checkedAt: string
+  credentialFingerprint: string
+  testnet: { ok: boolean; detail: string }
+  live: { ok: boolean; detail: string }
+}
+
+/** Performs read-only account authentication checks for both stages. It never
+ * calls testOrder/placeOrder and persists no credentials or balances. */
+export async function verifyTradingConnectivity(
+  now: Date = new Date(),
+): Promise<TradingConnectivityVerification> {
+  const check = async (
+    client: ReturnType<typeof createDemoClientFromEnv> | ReturnType<typeof createLiveClientFromEnv>,
+  ): Promise<{ ok: boolean; detail: string }> => {
+    if (!client.client) return { ok: false, detail: client.reason ?? 'client unavailable' }
+    try {
+      const account = await client.client.getAccount()
+      return account.canTrade
+        ? { ok: true, detail: 'account authenticated and canTrade=true' }
+        : { ok: false, detail: 'account authenticated but canTrade=false' }
+    } catch (error) {
+      return {
+        ok: false,
+        detail: error instanceof Error ? error.message : String(error),
+      }
+    }
+  }
+  const [testnet, live] = await Promise.all([
+    check(createDemoClientFromEnv()),
+    check(createLiveClientFromEnv()),
+  ])
+  const result: TradingConnectivityVerification = {
+    checkedAt: now.toISOString(),
+    credentialFingerprint: tradingCredentialFingerprint(),
+    testnet,
+    live,
+  }
+  const db = readFinanceStore()
+  db.settings.tradingConnectivityVerification = result
+  writeFinanceStore(db)
+  appendAuditLog('trading_connectivity_verified', {
+    checkedAt: result.checkedAt,
+    testnetOk: result.testnet.ok,
+    liveOk: result.live.ok,
+  })
+  return result
 }
 
 function killSwitchGate(db: FinanceDatabase): ReadinessGate {
@@ -366,19 +485,29 @@ function exposureCapsGate(db: FinanceDatabase): ReadinessGate {
     cap > 0 &&
     cap <= MAX_LIVE_PER_ORDER_CAP_USDT
   const g = config.guardian
+  const liveCapsValid = liveRiskCapsAreValid(settings)
+  const liveCaps = resolveLiveRiskCaps(settings)
   const guardianOk =
     g.maxOpenPositions > 0 &&
     g.perTradeQuoteCap > 0 &&
     g.maxDailyLossQuote > 0 &&
-    g.minQuoteBalance >= 0
-  const pass = capOk && guardianOk
+    g.minQuoteBalance >= 0 &&
+    g.maxTotalExposureQuote > 0 &&
+    g.maxSymbolExposureQuote > 0 &&
+    (!g.correlationBucketsEnabled ||
+      (g.maxBucketExposureQuote > 0 &&
+        Object.keys(g.correlationBuckets).length > 0))
+  const pass = capOk && guardianOk && liveCapsValid
   const problems = [
     !capOk &&
       `livePerOrderCapUsdt (${String(cap)}) must be a positive number <= ${MAX_LIVE_PER_ORDER_CAP_USDT}`,
-    !guardianOk && 'guardian position/quote/loss caps are not fully configured',
+      !guardianOk &&
+        'guardian position/quote/loss/total/symbol/correlation caps are not fully configured',
+    !liveCapsValid &&
+      'live pilot caps must be positive and no greater than 25 USDT allocation / 2.50 USDT daily loss',
   ].filter(Boolean)
   const detail = pass
-    ? `per-order cap ${cap} USDT, position cap ${g.maxOpenPositions}, per-trade cap ${g.perTradeQuoteCap} USDT`
+    ? `per-order cap ${cap} USDT, live allocation cap ${liveCaps.allocationCapUsdt} USDT, daily-loss cap ${liveCaps.dailyLossCapUsdt} USDT`
     : problems.join('; ')
   return {
     id: 'exposure_caps',
@@ -433,10 +562,15 @@ function emergencyStopReadinessGate(db: FinanceDatabase): ReadinessGate {
     typeof db.settings.emergencyKillSwitch === 'boolean' &&
     typeof db.settings.tradingMode === 'string' &&
     typeof db.settings.executionAccount === 'string'
-  const pass = auditDirWritable && schemaOk
+  const testedAt = db.settings.emergencyKillSwitchTestedAt
+  const tested =
+    typeof testedAt === 'string' && Number.isFinite(Date.parse(testedAt))
+  const pass = auditDirWritable && schemaOk && tested
   const problems = [
     !auditDirWritable && `audit log directory (${auditDir}) is not writable`,
     !schemaOk && 'settings schema for emergency stop is incomplete',
+    !tested &&
+      'kill switch has not been exercised and explicitly re-armed — test it before approval',
   ].filter(Boolean)
   return {
     id: 'emergency_stop_readiness',
@@ -444,7 +578,7 @@ function emergencyStopReadinessGate(db: FinanceDatabase): ReadinessGate {
     pass,
     blocking: true,
     detail: pass
-      ? 'audit log writable and emergency-stop settings schema intact'
+      ? `audit log writable, emergency-stop settings schema intact, kill switch tested ${testedAt}`
       : problems.join('; '),
     evidenceAgeMs: null,
   }
@@ -484,7 +618,7 @@ export function assessReadiness(now: Date = new Date()): ReadinessSnapshot {
     ledgerIntegrityGate(),
     strategySampleSizeGate(),
     recoveryVisibilityGate(db),
-    accountConnectivityGate(),
+    accountConnectivityGate(db, nowMs),
     killSwitchGate(db),
     exposureCapsGate(db),
     patientHoldIsolationGate(),
@@ -791,17 +925,6 @@ export function activateLiveReadiness(
     })
     return { ok: false, error: 'connectivity breaker is tripped' }
   }
-  const liveSnapshot = assessReadiness(now)
-  if (!liveSnapshot.allPassed) {
-    appendAuditLog('live_readiness_activate_blocked', {
-      reason: 'readiness gates failing at activation time',
-      blockers: liveSnapshot.blockers,
-    })
-    return {
-      ok: false,
-      error: `readiness gates failing: ${liveSnapshot.blockers.join(', ')}`,
-    }
-  }
   let state = loadReadinessState(db)
   const approval = state.approval
   if (!approval) {
@@ -823,12 +946,35 @@ export function activateLiveReadiness(
       error: `approval status is "${approval.status}" — call approve first`,
     }
   }
-
+  const liveSnapshot = assessReadiness(now)
+  if (!liveSnapshot.allPassed) {
+    appendAuditLog('live_readiness_activate_blocked', {
+      reason: 'readiness gates failing at activation time',
+      blockers: liveSnapshot.blockers,
+    })
+    return {
+      ok: false,
+      error: `readiness gates failing: ${liveSnapshot.blockers.join(', ')}`,
+    }
+  }
   const approvedAt = now.toISOString()
+  const liveCaps = resolveLiveRiskCaps(db.settings)
+  const configuredPerOrder =
+    typeof db.settings.livePerOrderCapUsdt === 'number' &&
+    Number.isFinite(db.settings.livePerOrderCapUsdt) &&
+    db.settings.livePerOrderCapUsdt > 0
+      ? db.settings.livePerOrderCapUsdt
+      : 10
   db.settings.executionAccount = 'binance_live'
   db.settings.tradingMode = 'live_manual_approval'
   db.settings.liveTradingEnabled = true
   db.settings.paperShadowEnabled = true
+  db.settings.liveAllocationCapUsdt = liveCaps.allocationCapUsdt
+  db.settings.liveDailyLossCapUsdt = liveCaps.dailyLossCapUsdt
+  db.settings.livePerOrderCapUsdt = Math.min(
+    configuredPerOrder,
+    liveCaps.allocationCapUsdt,
+  )
   db.settings.liveBinanceApprovedAt = approvedAt
   db.settings.liveBinanceApprovalId = approval.id
 
@@ -848,6 +994,8 @@ export function activateLiveReadiness(
   appendAuditLog('live_readiness_activated', {
     approvalId: updated.id,
     livePerOrderCapUsdt: db.settings.livePerOrderCapUsdt,
+    liveAllocationCapUsdt: db.settings.liveAllocationCapUsdt,
+    liveDailyLossCapUsdt: db.settings.liveDailyLossCapUsdt,
   })
   return { ok: true, approval: updated }
 }

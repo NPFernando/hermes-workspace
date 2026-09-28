@@ -429,6 +429,37 @@ describe('runValidationCycle', () => {
 })
 
 describe('restart recovery (time-budget reconciliation)', () => {
+  it('normalizes legacy runs with automation-health fields missing', async () => {
+    await setMode('testnet_execute')
+    const { startValidationRun, reviewValidationRuns } =
+      await import('./validation-run')
+    await startValidationRun({
+      stage: 'sandbox',
+      strategies: ['rsi_reversion'],
+      budgets: VALID_BUDGETS,
+    })
+
+    const store = await import('./finance-store')
+    const db = store.readFinanceStore()
+    const settings = db.settings as Record<string, unknown>
+    const state = settings.validationRuns as {
+      active: Array<{ progress: Record<string, unknown> }>
+    }
+    delete state.active[0]!.progress.lastSuccessfulCycleAt
+    delete state.active[0]!.progress.consecutiveFailures
+    delete state.active[0]!.progress.nextRetryAt
+    state.active[0]!.progress.lastCycleAt = '2026-09-27T17:04:00.012Z'
+    state.active[0]!.progress.lastCycleRan = true
+    store.writeFinanceStore(db)
+
+    const restored = reviewValidationRuns()
+    expect(restored.active[0]?.progress).toMatchObject({
+      lastSuccessfulCycleAt: '2026-09-27T17:04:00.012Z',
+      consecutiveFailures: 0,
+      nextRetryAt: null,
+    })
+  })
+
   it('moves an overdue active run to history purely from wall-clock age, with no in-memory timer', async () => {
     await setMode('testnet_execute')
     const { startValidationRun, reviewValidationRuns } =

@@ -43,17 +43,17 @@ import {
   listKnownSenders,
   listPendingIngestions,
   maskSensitive,
+  nextScheduledDate,
   readFinanceStore,
   recordCategoryCorrection,
   recordGmailSyncError,
   recordNetWorthSnapshot,
   removeAlertSnooze,
   removeDismissedSenderCandidate,
+  scheduledRecurrence,
   setKnownSenderPassword,
   setNonLiveExecutionMode,
   snoozeAlert,
-  nextScheduledDate,
-  scheduledRecurrence,
   storeIntelligenceRecords,
   tradingPerformanceSummary,
   updateExchangeRate,
@@ -112,8 +112,13 @@ import {
   strategyCatalog,
   strategyGuardReview,
   strategyOverrideState,
+  strategyScorecard,
 } from '../../server/demo-trading-engine'
 import { startFinanceStorageMonitor } from '../../server/finance-storage-monitor'
+import {
+  getBinanceUserDataStreamStatus,
+  startBinanceUserDataStream,
+} from '../../server/binance-user-data-stream'
 import { fetchAndStoreGoogleNews } from '../../server/finance-news.service'
 import { tradingCycleDiagnosticTrends } from '../../server/finance-postgres-store'
 import {
@@ -128,6 +133,10 @@ import {
 import { evaluatePaperDecisionQuality } from '../../server/paper-decision-quality'
 import { resetConnectivityBreaker } from '../../server/connectivity-breaker'
 import {
+  MAX_LIVE_ALLOCATION_CAP_USDT,
+  MAX_LIVE_DAILY_LOSS_CAP_USDT,
+} from '../../server/trading-live-risk'
+import {
   ensureValidationRunAutomation,
   finalizeValidationRun,
   recoverValidationRunAutomationIfStale,
@@ -138,6 +147,10 @@ import {
   validationRunsPayload,
 } from '../../server/validation-run'
 import {
+  runTestnetExecutionProbe,
+  testnetExecutionProbeSummary,
+} from '../../server/testnet-execution-probe'
+import {
   activateLiveReadiness,
   approveLiveApproval,
   assessAndPersistReadiness,
@@ -145,7 +158,9 @@ import {
   deactivateLiveReadiness,
   getReadinessState,
   requestLiveApproval,
+  verifyTradingConnectivity,
 } from '../../server/trading-readiness'
+import { reconcileTradingAccount } from '../../server/trading-reconciliation'
 
 const VALID_LONG_SHORT_PERIODS = new Set([
   '5m',
@@ -163,6 +178,10 @@ type JsonRecord = Record<string, unknown>
 
 startFinanceStorageMonitor()
 ensureValidationRunAutomation()
+// Read-only sandbox account-event telemetry. The listener self-gates on
+// testnet mode, credentials, environment, and test/runtime guards; it never
+// writes positions, trades, settings, or orders.
+startBinanceUserDataStream()
 
 async function parseJsonBody(request: Request): Promise<JsonRecord> {
   try {
@@ -377,6 +396,7 @@ function financePayload() {
     transactions: maskSensitive(getUnifiedTransactions(db)),
     tradingPerformance: tradingPerformanceSummary(db),
     demoPerformance: demoTradingPerformance(),
+    strategyScorecard: strategyScorecard(),
     decisionQuality: decisionQualityReport(),
     paperDecisionQuality: evaluatePaperDecisionQuality({
       decisions: readPaperDecisionJournal(),
@@ -391,8 +411,16 @@ function financePayload() {
     strategyOverrides: strategyOverrideState(),
     sandboxExperiments: reviewSandboxExperiments(),
     validationRuns: validationRunsPayload(),
+    testnetExecutionProbe: testnetExecutionProbeSummary(
+      db.settings.testnetExecutionProbe,
+    ),
     validationReconciliation: validationReconciliationPayload(),
-    lastTradingCycleDiagnostics: getLastTradingCycleDiagnostics(),
+    // Keep the API field aligned with FinancePayload and the trading screen;
+    // the longer historical name silently left the diagnostics panels empty.
+    lastCycleDiagnostics: getLastTradingCycleDiagnostics(),
+    userDataStream: getBinanceUserDataStreamStatus(),
+    tradingAccountReconciliation:
+      db.settings.tradingAccountReconciliation ?? null,
     tradingCycleDiagnosticTrends: {
       paper: tradingCycleDiagnosticTrends('paper'),
       sandbox: tradingCycleDiagnosticTrends('sandbox'),
@@ -842,25 +870,25 @@ export const Route = createFileRoute('/api/finance')({
               setNonLiveExecutionMode(requestedMode)
               return json(financePayload())
             }
-            const db = readFinanceStore()
-            if (
-              isLiveMode(requestedMode) &&
-              body.approval !== 'I_APPROVE_LIVE_TRADING' &&
-              !db.settings.liveBinanceApprovedAt
-            ) {
+            // Legacy mode switching must never bypass the staged readiness
+            // workflow. Live activation is intentionally single-path through
+            // request_live_readiness -> approve_live_readiness ->
+            // activate_live_readiness.
+            if (isLiveMode(requestedMode)) {
               appendAuditLog('trading_mode_change_blocked', {
                 requestedMode,
-                reason: 'missing explicit approval phrase',
+                reason: 'live activation requires staged readiness workflow',
               })
               return json(
                 {
                   ok: false,
                   error:
-                    'Explicit approval phrase required before enabling live trading.',
+                    'Live activation requires the staged readiness workflow. Assess gates, request approval, approve, then activate live readiness.',
                 },
                 { status: 400 },
               )
             }
+            const db = readFinanceStore()
             db.settings.tradingMode =
               requestedMode as typeof db.settings.tradingMode
             db.settings.executionAccount =
@@ -868,12 +896,12 @@ export const Route = createFileRoute('/api/finance')({
                 ? 'paper'
                 : requestedMode === 'testnet_execute'
                   ? 'binance_testnet'
-                  : isLiveMode(requestedMode)
-                    ? 'binance_live'
-                    : requestedMode === 'observe_only'
-                      ? 'paper'
-                      : db.settings.executionAccount
-            db.settings.liveTradingEnabled = isLiveMode(requestedMode)
+                  : requestedMode === 'observe_only'
+                    ? 'paper'
+                    : db.settings.executionAccount
+            // Only non-live modes reach this branch; live activation has a
+            // single writer in trading-readiness.activateLiveReadiness().
+            db.settings.liveTradingEnabled = false
             // NOTE: the emergency kill switch is an INDEPENDENT master cutoff — a mode
             // change must never arm or disarm it. Use `set_kill_switch` for that. This
             // keeps "select a mode" and "disarm the safety cutoff" as two deliberate,
@@ -905,26 +933,18 @@ export const Route = createFileRoute('/api/finance')({
               db.settings.tradingMode = 'testnet_execute'
               db.settings.liveTradingEnabled = false
             } else if (account === 'binance_live') {
-              if (
-                body.approval !== 'I_APPROVE_LIVE_TRADING' &&
-                !db.settings.liveBinanceApprovedAt
-              ) {
-                appendAuditLog('execution_account_change_blocked', {
-                  account,
-                  reason: 'missing live approval',
-                })
-                return json(
-                  {
-                    ok: false,
-                    error:
-                      'Live Binance account selection requires explicit approval.',
-                  },
-                  { status: 400 },
-                )
-              }
-              db.settings.executionAccount = 'binance_live'
-              db.settings.tradingMode = 'live_manual_approval'
-              db.settings.liveTradingEnabled = true
+              appendAuditLog('execution_account_change_blocked', {
+                account,
+                reason: 'live activation requires staged readiness workflow',
+              })
+              return json(
+                {
+                  ok: false,
+                  error:
+                    'Live Binance activation requires the staged readiness workflow. Use Live execution readiness.',
+                },
+                { status: 400 },
+              )
             } else {
               return json(
                 {
@@ -942,40 +962,17 @@ export const Route = createFileRoute('/api/finance')({
             return json(financePayload())
           }
           if (action === 'arm_live_binance') {
-            if (body.approval !== 'I_APPROVE_BINANCE_LIVE_TRADING') {
-              appendAuditLog('live_binance_arm_blocked', {
-                reason: 'missing explicit approval phrase',
-              })
-              return json(
-                {
-                  ok: false,
-                  error:
-                    'Arming Binance live trading requires the explicit approval phrase.',
-                },
-                { status: 400 },
-              )
-            }
-            const db = readFinanceStore()
-            const approvedAt = new Date().toISOString()
-            db.settings.primaryTradingProvider = 'binance'
-            db.settings.executionAccount = 'binance_live'
-            db.settings.tradingMode = 'live_manual_approval'
-            db.settings.liveTradingEnabled = true
-            db.settings.paperShadowEnabled = true
-            db.settings.livePerOrderCapUsdt =
-              typeof body.livePerOrderCapUsdt === 'number' &&
-              Number.isFinite(body.livePerOrderCapUsdt)
-                ? Math.max(1, Math.min(body.livePerOrderCapUsdt, 50))
-                : db.settings.livePerOrderCapUsdt || 10
-            db.settings.liveBinanceApprovedAt = approvedAt
-            db.settings.liveBinanceApprovalId = `live_binance_${Date.now()}`
-            writeFinanceStore(db)
-            appendAuditLog('live_binance_armed', {
-              approvedAt,
-              livePerOrderCapUsdt: db.settings.livePerOrderCapUsdt,
-              paperShadowEnabled: true,
+            appendAuditLog('live_binance_arm_blocked', {
+              reason: 'legacy live arm route disabled; staged readiness required',
             })
-            return json(financePayload())
+            return json(
+              {
+                ok: false,
+                error:
+                  'This legacy live-arm action is disabled. Use Live execution readiness: assess, request approval, approve, then activate.',
+              },
+              { status: 400 },
+            )
           }
           if (action === 'emergency_stop') {
             const db = readFinanceStore()
@@ -1010,6 +1007,13 @@ export const Route = createFileRoute('/api/finance')({
               )
             }
             db.settings.emergencyKillSwitch = engaged
+            if (engaged) {
+              db.settings.emergencyKillSwitchLastEngagedAt =
+                new Date().toISOString()
+            } else if (db.settings.emergencyKillSwitchLastEngagedAt) {
+              db.settings.emergencyKillSwitchTestedAt =
+                new Date().toISOString()
+            }
             writeFinanceStore(db)
             appendAuditLog('kill_switch_set', {
               engaged,
@@ -1020,6 +1024,20 @@ export const Route = createFileRoute('/api/finance')({
           if (action === 'assess_live_readiness') {
             const snapshot = assessAndPersistReadiness()
             return json({ ...financePayload(), liveReadinessResult: snapshot })
+          }
+          if (action === 'verify_trading_connectivity') {
+            const verification = await verifyTradingConnectivity()
+            return json({
+              ...financePayload(),
+              tradingConnectivityResult: verification,
+            })
+          }
+          if (action === 'reconcile_trading_account') {
+            const reconciliation = await reconcileTradingAccount()
+            return json({
+              ...financePayload(),
+              tradingAccountReconciliationResult: reconciliation,
+            })
           }
           if (action === 'request_live_readiness_approval') {
             const result = requestLiveApproval()
@@ -1434,6 +1452,20 @@ export const Route = createFileRoute('/api/finance')({
                 : undefined
             const db = readFinanceStore()
             const settings = db.settings as Record<string, unknown>
+            const liveAllocationCap = inRange(
+              cfg.liveAllocationCapUsdt,
+              0.01,
+              MAX_LIVE_ALLOCATION_CAP_USDT,
+            )
+            const liveDailyLossCap = inRange(
+              cfg.liveDailyLossCapUsdt,
+              0.01,
+              MAX_LIVE_DAILY_LOSS_CAP_USDT,
+            )
+            if (liveAllocationCap !== undefined)
+              settings.liveAllocationCapUsdt = liveAllocationCap
+            if (liveDailyLossCap !== undefined)
+              settings.liveDailyLossCapUsdt = liveDailyLossCap
             const dt = (
               settings.demoTrading && typeof settings.demoTrading === 'object'
                 ? { ...(settings.demoTrading as Record<string, unknown>) }
@@ -1571,6 +1603,26 @@ export const Route = createFileRoute('/api/finance')({
               -100000,
               0,
             )
+            const strategyGuardMaxDailyLoss = inRange(
+              cfg.strategyGuardMaxDailyLossQuote,
+              0.01,
+              100000,
+            )
+            const strategyGuardMaxDrawdown = inRange(
+              cfg.strategyGuardMaxDrawdownQuote,
+              0.01,
+              100000,
+            )
+            const strategyGuardMaxSlippage = inRange(
+              cfg.strategyGuardMaxSlippageQuote,
+              -100000,
+              0,
+            )
+            const strategyGuardApiErrors = inRange(
+              cfg.strategyGuardApiErrorLimit,
+              1,
+              100,
+            )
             if (strategyGuardMinTrades !== undefined)
               dt.strategyGuardMinClosedTrades = Math.floor(
                 strategyGuardMinTrades,
@@ -1579,6 +1631,14 @@ export const Route = createFileRoute('/api/finance')({
               dt.strategyGuardLossRateThreshold = strategyGuardLossRate
             if (strategyGuardMaxPnl !== undefined)
               dt.strategyGuardMaxPnlQuote = strategyGuardMaxPnl
+            if (strategyGuardMaxDailyLoss !== undefined)
+              dt.strategyGuardMaxDailyLossQuote = strategyGuardMaxDailyLoss
+            if (strategyGuardMaxDrawdown !== undefined)
+              dt.strategyGuardMaxDrawdownQuote = strategyGuardMaxDrawdown
+            if (strategyGuardMaxSlippage !== undefined)
+              dt.strategyGuardMaxSlippageQuote = strategyGuardMaxSlippage
+            if (strategyGuardApiErrors !== undefined)
+              dt.strategyGuardApiErrorLimit = Math.floor(strategyGuardApiErrors)
             if (
               cfg.strategyGuardAction === 'reduce_size' ||
               cfg.strategyGuardAction === 'disabled'
@@ -1586,6 +1646,16 @@ export const Route = createFileRoute('/api/finance')({
               dt.strategyGuardAction = cfg.strategyGuardAction
             const maxBucketExposure = inRange(
               cfg.guardianMaxBucketExposureQuote,
+              0,
+              100000,
+            )
+            const maxTotalExposure = inRange(
+              cfg.guardianMaxTotalExposureQuote,
+              0,
+              100000,
+            )
+            const maxSymbolExposure = inRange(
+              cfg.guardianMaxSymbolExposureQuote,
               0,
               100000,
             )
@@ -1612,7 +1682,9 @@ export const Route = createFileRoute('/api/finance')({
               maxOpen !== undefined ||
               typeof cfg.guardianCorrelationBucketsEnabled === 'boolean' ||
               guardianCorrelationBuckets !== undefined ||
-              maxBucketExposure !== undefined
+              maxBucketExposure !== undefined ||
+              maxTotalExposure !== undefined ||
+              maxSymbolExposure !== undefined
             ) {
               const guardian = (
                 dt.guardian && typeof dt.guardian === 'object'
@@ -1628,6 +1700,10 @@ export const Route = createFileRoute('/api/finance')({
                 guardian.correlationBuckets = guardianCorrelationBuckets
               if (maxBucketExposure !== undefined)
                 guardian.maxBucketExposureQuote = maxBucketExposure
+              if (maxTotalExposure !== undefined)
+                guardian.maxTotalExposureQuote = maxTotalExposure
+              if (maxSymbolExposure !== undefined)
+                guardian.maxSymbolExposureQuote = maxSymbolExposure
               dt.guardian = guardian
             }
             // learningPolicy.autoApplyModes: only 'paper_trade' and
@@ -1689,6 +1765,8 @@ export const Route = createFileRoute('/api/finance')({
             }
             writeFinanceStore(db)
             appendAuditLog('engine_config_updated', {
+              liveAllocationCapUsdt: settings.liveAllocationCapUsdt,
+              liveDailyLossCapUsdt: settings.liveDailyLossCapUsdt,
               takeProfitPct: dt.takeProfitPct,
               stopLossPct: dt.stopLossPct,
               quotePerTrade: dt.quotePerTrade,
@@ -1709,6 +1787,12 @@ export const Route = createFileRoute('/api/finance')({
               maxBucketExposureQuote: (
                 dt.guardian as Record<string, unknown> | undefined
               )?.maxBucketExposureQuote,
+              maxTotalExposureQuote: (
+                dt.guardian as Record<string, unknown> | undefined
+              )?.maxTotalExposureQuote,
+              maxSymbolExposureQuote: (
+                dt.guardian as Record<string, unknown> | undefined
+              )?.maxSymbolExposureQuote,
               regimeSmaPeriod: dt.regimeSmaPeriod,
               regimeSwitchingEnabled: dt.regimeSwitchingEnabled,
               regimeSwitchingVolPeriod: dt.regimeSwitchingVolPeriod,
@@ -1721,6 +1805,10 @@ export const Route = createFileRoute('/api/finance')({
               strategyGuardLossRateThreshold:
                 dt.strategyGuardLossRateThreshold,
               strategyGuardMaxPnlQuote: dt.strategyGuardMaxPnlQuote,
+              strategyGuardMaxDailyLossQuote: dt.strategyGuardMaxDailyLossQuote,
+              strategyGuardMaxDrawdownQuote: dt.strategyGuardMaxDrawdownQuote,
+              strategyGuardMaxSlippageQuote: dt.strategyGuardMaxSlippageQuote,
+              strategyGuardApiErrorLimit: dt.strategyGuardApiErrorLimit,
               strategyGuardAction: dt.strategyGuardAction,
               learningPolicyAutoApplyModes: (
                 dt.learningPolicy as Record<string, unknown> | undefined
@@ -2957,6 +3045,7 @@ export const Route = createFileRoute('/api/finance')({
               budgets: body.budgets,
               notes: body.notes,
               autoRun: body.autoRun,
+              cycleIntervalMinutes: body.cycleIntervalMinutes,
             })
             return json({ ...financePayload(), validationRunResult: result })
           }
@@ -2974,6 +3063,34 @@ export const Route = createFileRoute('/api/finance')({
               { ...financePayload(), validationRunResult: result },
               { status: result.ok ? 200 : 400 },
             )
+          }
+          if (action === 'run_testnet_execution_probe') {
+            const db = readFinanceStore()
+            if (
+              db.settings.tradingMode !== 'testnet_execute' ||
+              db.settings.executionAccount !== 'binance_testnet' ||
+              db.settings.liveTradingEnabled
+            ) {
+              return json(
+                {
+                  ok: false,
+                  error:
+                    'Testnet execution probe requires testnet_execute, binance_testnet, and live trading disabled.',
+                },
+                { status: 400 },
+              )
+            }
+            const result = await runTestnetExecutionProbe({
+              roundTrips:
+                typeof body.roundTrips === 'number'
+                  ? body.roundTrips
+                  : undefined,
+              quotePerRoundTrip:
+                typeof body.quotePerRoundTrip === 'number'
+                  ? body.quotePerRoundTrip
+                  : undefined,
+            })
+            return json({ ...financePayload(), testnetExecutionProbeResult: result })
           }
           if (action === 'stop_validation_run') {
             const result = stopValidationRun(body.stage, body.reason)

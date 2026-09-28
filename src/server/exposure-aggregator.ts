@@ -41,3 +41,16 @@ export function crossEngineBucketExposureQuote(
   }
   return merged
 }
+
+/** Exact-symbol exposure across the council and the isolated grid engine. */
+export function crossEngineSymbolExposureQuote(
+  symbol: string,
+  councilExposure: number,
+): number {
+  return (
+    councilExposure +
+    heldGridPositions()
+      .filter((position) => position.symbol === symbol)
+      .reduce((sum, position) => sum + position.entryQuote, 0)
+  )
+}
