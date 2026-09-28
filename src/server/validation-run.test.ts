@@ -445,11 +445,11 @@ describe('restart recovery (time-budget reconciliation)', () => {
     const state = settings.validationRuns as {
       active: Array<{ progress: Record<string, unknown> }>
     }
-    delete state.active[0]!.progress.lastSuccessfulCycleAt
-    delete state.active[0]!.progress.consecutiveFailures
-    delete state.active[0]!.progress.nextRetryAt
-    state.active[0]!.progress.lastCycleAt = '2026-09-27T17:04:00.012Z'
-    state.active[0]!.progress.lastCycleRan = true
+    delete state.active[0].progress.lastSuccessfulCycleAt
+    delete state.active[0].progress.consecutiveFailures
+    delete state.active[0].progress.nextRetryAt
+    state.active[0].progress.lastCycleAt = '2026-09-27T17:04:00.012Z'
+    state.active[0].progress.lastCycleRan = true
     store.writeFinanceStore(db)
 
     const restored = reviewValidationRuns()

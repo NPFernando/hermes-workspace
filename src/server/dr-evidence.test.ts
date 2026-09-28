@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { sanitizeDrEvidence, readDrEvidence } from './dr-evidence'
+import { readDrEvidence, sanitizeDrEvidence } from './dr-evidence'
 
 describe('disaster recovery evidence sanitization', () => {
   afterEach(() => {

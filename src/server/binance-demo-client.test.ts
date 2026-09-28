@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from 'vitest'
 import * as os from 'node:os'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
   BinanceDemoClient,
@@ -352,7 +352,7 @@ describe('getSymbolFilters', () => {
 
 describe('createDemoClientFromEnv', () => {
   it('returns null with a reason when creds are absent', () => {
-    const { client, reason } = createDemoClientFromEnv({} as NodeJS.ProcessEnv)
+    const { client, reason } = createDemoClientFromEnv({})
     expect(client).toBeNull()
     expect(reason).toMatch(/not set/)
   })
@@ -363,7 +363,7 @@ describe('createDemoClientFromEnv', () => {
       BINANCE_TESTNET_API_SECRET: 'secret',
       BINANCE_TESTNET_BASE_URL: 'https://demo-api.binance.com/api',
       BINANCE_API_KEY: 'prod',
-    } as unknown as NodeJS.ProcessEnv)
+    })
     expect(client?.host).toBe('demo-api.binance.com')
   })
 
@@ -372,7 +372,7 @@ describe('createDemoClientFromEnv', () => {
       BINANCE_TESTNET_API_KEY: 'same',
       BINANCE_TESTNET_API_SECRET: 'secret',
       BINANCE_API_KEY: 'same',
-    } as unknown as NodeJS.ProcessEnv)
+    })
     expect(client).toBeNull()
     expect(reason).toMatch(/production key/)
   })
@@ -436,7 +436,7 @@ describe('createLiveClientFromEnv', () => {
     const { client, reason } = createLiveClientFromEnv({
       BINANCE_API_KEY: 'live',
       BINANCE_API_SECRET: 'secret',
-    } as unknown as NodeJS.ProcessEnv)
+    })
     expect(client).toBeNull()
     expect(reason).toMatch(/approval/)
   })
@@ -448,7 +448,7 @@ describe('createLiveClientFromEnv', () => {
       BINANCE_BASE_URL: 'https://api.binance.com/api',
       BINANCE_ALLOW_LIVE_TRADING: 'I_APPROVE_BINANCE_LIVE_TRADING',
       BINANCE_TESTNET_API_KEY: 'testnet',
-    } as unknown as NodeJS.ProcessEnv)
+    })
     expect(client?.host).toBe('api.binance.com')
   })
 })

@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Same isolation pattern as rebalance-engine.test.ts / llm-signal-engine.test.ts —
 // point HOME at a temp dir so readFinanceStore never touches the real
@@ -48,9 +48,9 @@ describe('getTradingSummary', () => {
     const store = await import('./finance-store')
     const db = store.readFinanceStore()
     db.settings.emergencyKillSwitch = false
-    db.settings.tradingMode = 'paper_trade' as never
-    db.settings.demoTradingRebalance = { enabled: true } as never
-    db.settings.demoTradingLlm = { enabled: true } as never
+    db.settings.tradingMode = 'paper_trade'
+    db.settings.demoTradingRebalance = { enabled: true }
+    db.settings.demoTradingLlm = { enabled: true }
     store.writeFinanceStore(db)
 
     const { getTradingSummary } = await import('./trading-summary')
@@ -79,8 +79,8 @@ describe('getTradingSummary', () => {
     const store = await import('./finance-store')
     const db = store.readFinanceStore()
     db.settings.emergencyKillSwitch = false
-    db.settings.tradingMode = 'testnet_execute' as never
-    db.settings.demoTradingGrid = { executionMode: 'paper' } as never
+    db.settings.tradingMode = 'testnet_execute'
+    db.settings.demoTradingGrid = { executionMode: 'paper' }
     store.writeFinanceStore(db)
 
     const { getTradingSummary } = await import('./trading-summary')

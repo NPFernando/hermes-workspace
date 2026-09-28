@@ -12,7 +12,7 @@ type RotationEntry = {
 type RotationResponse = {
   ok?: boolean
   summary?: { expired: number; expiring: number; untracked: number }
-  statuses?: RotationEntry[]
+  statuses?: Array<RotationEntry>
 }
 
 const stateLabel: Record<RotationEntry['state'], string> = {

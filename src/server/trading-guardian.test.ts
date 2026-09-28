@@ -6,8 +6,8 @@ import {
   cooldownUntil,
   dayKey,
   weekKey,
-  type GuardianContext,
 } from './trading-guardian'
+import type { GuardianContext } from './trading-guardian'
 
 const baseCtx: GuardianContext = {
   openPositions: 0,
