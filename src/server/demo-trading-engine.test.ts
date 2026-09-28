@@ -1000,7 +1000,7 @@ describe('runTradingCycle open → close → score', () => {
       entryFeeQuote: 0.025,
       openedAt: new Date().toISOString(),
       executionMode: 'testnet',
-    } as never)
+    })
     store.writeFinanceStore(db)
 
     const { reconcileTradingAccount } = await import('./trading-reconciliation')
