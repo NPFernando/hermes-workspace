@@ -625,8 +625,6 @@ const DEFAULT_CYCLE_INTERVAL_MINUTES = 20
 const MIN_CYCLE_INTERVAL_MINUTES = 5
 const MAX_CYCLE_INTERVAL_MINUTES = 120
 const AUTO_CYCLE_POLL_INTERVAL_MS = 60_000
-const AUTO_CYCLE_STALE_AFTER_MS =
-  MAX_CYCLE_INTERVAL_MINUTES * 60_000 + AUTO_CYCLE_POLL_INTERVAL_MS
 const AUTO_CYCLE_RECOVERY_COOLDOWN_MS = 5 * 60_000
 // The ~20-minute cadence above is enforced only by the setInterval that
 // calls runAutomaticValidationTick — runValidationCycle itself has never
@@ -724,18 +722,23 @@ export function ensureValidationRunAutomation(): void {
 
 /**
  * Recovery hook for long-lived server processes where a timer was lost or
- * delayed. It is intentionally bounded and can only request one tick after
- * the normal cadence plus a small grace period has elapsed.
+ * delayed. It only requests work when a persisted auto-run is actually due,
+ * and the cooldown prevents repeated authenticated reads from multiplying
+ * recovery ticks while a cycle is still settling.
  */
 export function recoverValidationRunAutomationIfStale(): void {
   ensureValidationRunAutomation()
   const now = Date.now()
   if (
     validationAutomationTickInProgress ||
-    now - validationAutomationLastTickAt < AUTO_CYCLE_STALE_AFTER_MS
+    now - validationAutomationLastTickAt < AUTO_CYCLE_RECOVERY_COOLDOWN_MS
   ) {
     return
   }
+  const hasDueAutoRun = reviewValidationRuns().active.some(
+    (run) => run.autoRun && automaticRunDue(run, now),
+  )
+  if (!hasDueAutoRun) return
   validationAutomationLastTickAt = now
   void runAutomaticValidationTick('recovery')
 }
