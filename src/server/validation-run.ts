@@ -626,6 +626,12 @@ const MIN_CYCLE_INTERVAL_MINUTES = 5
 const MAX_CYCLE_INTERVAL_MINUTES = 120
 const AUTO_CYCLE_POLL_INTERVAL_MS = 60_000
 const AUTO_CYCLE_RECOVERY_COOLDOWN_MS = 5 * 60_000
+// A validation cycle normally completes well inside the 60-second scheduler
+// poll. Keep the scheduler from being held indefinitely by an upstream or
+// persistence operation that outlives the individual Binance request guards.
+// This timeout does not cancel the underlying cycle; the per-stage guard below
+// prevents a second cycle from being started while that promise is settling.
+const AUTO_CYCLE_TIMEOUT_MS = 90_000
 // The ~20-minute cadence above is enforced only by the setInterval that
 // calls runAutomaticValidationTick — runValidationCycle itself has never
 // had a time-based guard, only cycle/trade *count* budgets. In production
@@ -654,6 +660,7 @@ function validationAutomationDisabled(): boolean {
 let validationAutomationTimer: ReturnType<typeof setInterval> | null = null
 let validationAutomationTickInProgress = false
 let validationAutomationLastTickAt = 0
+const validationAutomationStagesInProgress = new Set<ValidationStage>()
 
 function automaticRunDue(run: ValidationRun, now: number): boolean {
   const retryAt = run.progress.nextRetryAt
@@ -686,18 +693,53 @@ async function runAutomaticValidationTick(source: 'startup' | 'interval' | 'reco
       (run) => run.autoRun && automaticRunDue(run, now),
     )
     for (const run of active) {
-      try {
-        await runValidationCycle(run.stage, { automated: true })
-      } catch (error) {
-        console.error(
-          `[validation-run] automated ${run.stage} cycle failed:`,
-          error,
-        )
-      }
+      await runAutomaticValidationCycle(run.stage)
     }
   } finally {
     validationAutomationTickInProgress = false
   }
+}
+
+/**
+ * Run one automated stage without allowing a stalled async operation to block
+ * every other scheduled stage forever. The underlying promise is allowed to
+ * settle safely after the timeout; keeping its stage marked in-flight avoids
+ * duplicate work and relies on runTradingCycle's existing global serialization
+ * as a second safety barrier.
+ */
+async function runAutomaticValidationCycle(stage: ValidationStage): Promise<void> {
+  if (validationAutomationStagesInProgress.has(stage)) return
+  validationAutomationStagesInProgress.add(stage)
+
+  const cyclePromise = runValidationCycle(stage, { automated: true }).catch(
+    (error) => {
+      console.error(`[validation-run] automated ${stage} cycle failed:`, error)
+    },
+  )
+  let timeout!: ReturnType<typeof setTimeout>
+  const timeoutPromise = new Promise<'timeout'>((resolve) => {
+    timeout = setTimeout(() => {
+      appendAuditLog('validation_run_automation_cycle_timeout', {
+        stage,
+        timeoutMs: AUTO_CYCLE_TIMEOUT_MS,
+      })
+      resolve('timeout')
+    }, AUTO_CYCLE_TIMEOUT_MS)
+  })
+
+  const outcome = await Promise.race([
+    cyclePromise.then(() => 'completed' as const),
+    timeoutPromise,
+  ])
+  clearTimeout(timeout)
+
+  if (outcome === 'timeout') {
+    void cyclePromise.finally(() => {
+      validationAutomationStagesInProgress.delete(stage)
+    })
+    return
+  }
+  validationAutomationStagesInProgress.delete(stage)
 }
 
 /**
