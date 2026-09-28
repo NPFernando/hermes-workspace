@@ -106,6 +106,10 @@ export interface ValidationRunEvidence {
    * trades that had a paired shadow comparison; null when none did. */
   avgSlippageQuote: number | null
   shadowComparisonsSampled: number
+  /** Signal observations are diagnostic only and never count as trades or P/L. */
+  signalEvaluations: number
+  signalCountsByStrategy: Record<string, number>
+  councilNonActionSignals: number
   errors: Array<ValidationRunErrorEntry>
 }
 
@@ -174,6 +178,7 @@ function emptyState(): ValidationRunState {
 
 function normalizeValidationRun(run: ValidationRun): ValidationRun {
   const progress = run.progress
+  const rawEvidence = run.evidence as unknown as Partial<ValidationRunEvidence>
   const lastCycleAt = progress.lastCycleAt ?? null
   const lastCycleRan = progress.lastCycleRan ?? null
   return {
@@ -188,6 +193,12 @@ function normalizeValidationRun(run: ValidationRun): ValidationRun {
         (lastCycleRan === true ? lastCycleAt : null),
       consecutiveFailures: progress.consecutiveFailures ?? 0,
       nextRetryAt: progress.nextRetryAt ?? null,
+    },
+    evidence: {
+      ...run.evidence,
+      signalEvaluations: rawEvidence.signalEvaluations ?? 0,
+      signalCountsByStrategy: rawEvidence.signalCountsByStrategy ?? {},
+      councilNonActionSignals: rawEvidence.councilNonActionSignals ?? 0,
     },
   }
 }
@@ -551,6 +562,9 @@ export async function startValidationRun(
       feesQuote: 0,
       avgSlippageQuote: null,
       shadowComparisonsSampled: 0,
+      signalEvaluations: 0,
+      signalCountsByStrategy: {},
+      councilNonActionSignals: 0,
       errors: [],
     },
     readinessImpact: null,
@@ -874,6 +888,34 @@ export async function runValidationCycle(
 
   const openedCount = cycle.actions.filter((a) => a.action === 'OPEN').length
   const closedCount = newTrades.length
+  const diagnostics = cycle.diagnostics?.symbols ?? []
+  const signalCountsByStrategy = diagnostics.reduce<Record<string, number>>(
+    (counts, diagnostic) => {
+      for (const signal of diagnostic.strategySignals) {
+        if (signal.signal === 'HOLD') continue
+        counts[signal.strategyId] = (counts[signal.strategyId] ?? 0) + 1
+      }
+      return counts
+    },
+    {},
+  )
+  const signalEvaluations = diagnostics.reduce(
+    (count, diagnostic) => count + diagnostic.strategySignals.length,
+    0,
+  )
+  const councilNonActionSignals = diagnostics.filter(
+    (diagnostic) =>
+      diagnostic.councilSignal !== 'HOLD' &&
+      diagnostic.finalAction !== 'OPEN' &&
+      diagnostic.finalAction !== 'CLOSE',
+  ).length
+  const nextSignalCountsByStrategy = {
+    ...run.evidence.signalCountsByStrategy,
+  }
+  for (const [strategyId, count] of Object.entries(signalCountsByStrategy)) {
+    nextSignalCountsByStrategy[strategyId] =
+      (nextSignalCountsByStrategy[strategyId] ?? 0) + count
+  }
   const realizedPnlQuote =
     run.evidence.realizedPnlQuote + newTrades.reduce((s, t) => s + t.pnlQuote, 0)
   const feesQuote =
@@ -924,6 +966,10 @@ export async function runValidationCycle(
       feesQuote,
       avgSlippageQuote,
       shadowComparisonsSampled,
+      signalEvaluations: run.evidence.signalEvaluations + signalEvaluations,
+      signalCountsByStrategy: nextSignalCountsByStrategy,
+      councilNonActionSignals:
+        run.evidence.councilNonActionSignals + councilNonActionSignals,
       errors: errors.slice(-ERRORS_CAP),
     },
     updatedAt: new Date(now).toISOString(),

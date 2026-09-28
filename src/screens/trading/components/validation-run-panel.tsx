@@ -613,6 +613,21 @@ export function ValidationRunPanel({
               </span>
             </p>
             <p>
+              Signal observations:{' '}
+              <span className="text-[var(--theme-text)]">
+                {activeRun.evidence.signalEvaluations} ·{' '}
+                {activeRun.evidence.councilNonActionSignals} council non-action
+              </span>
+            </p>
+            <p>
+              Strategy signals:{' '}
+              <span className="text-[var(--theme-text)]">
+                {Object.entries(activeRun.evidence.signalCountsByStrategy)
+                  .map(([strategyId, count]) => `${strategyId}:${count}`)
+                  .join(' · ') || 'none'}
+              </span>
+            </p>
+            <p>
               Last successful cycle:{' '}
               <span className="text-[var(--theme-text)]">
                 {ageLabel(activeRun.progress.lastSuccessfulCycleAt ?? null)}

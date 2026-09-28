@@ -318,6 +318,8 @@ describe('runValidationCycle', () => {
     expect(result.cycle?.actions.some((a) => a.action === 'OPEN')).toBe(true)
     expect(result.run?.progress.cyclesRun).toBe(1)
     expect(result.run?.progress.tradesOpened).toBeGreaterThanOrEqual(1)
+    expect(result.run?.evidence.signalEvaluations).toBeGreaterThan(0)
+    expect(result.run?.evidence.signalCountsByStrategy.rsi_reversion).toBeGreaterThan(0)
   })
 
   it('debounces back-to-back automated cycles but never a manual one', async () => {

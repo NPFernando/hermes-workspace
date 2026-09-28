@@ -339,6 +339,9 @@ export type ValidationRunEvidence = {
   feesQuote: number
   avgSlippageQuote: number | null
   shadowComparisonsSampled: number
+  signalEvaluations: number
+  signalCountsByStrategy: Record<string, number>
+  councilNonActionSignals: number
   errors: Array<{ at: string; message: string }>
 }
 
