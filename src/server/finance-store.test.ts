@@ -93,6 +93,21 @@ describe('finance-store', () => {
     })
   })
 
+  it('fails closed for the live Binance approval summary when the env marker is absent', () => {
+    const db = createEmptyFinanceDatabase()
+    db.settings.liveBinanceApprovedAt = '2026-09-28T00:00:00.000Z'
+    const previous = process.env.BINANCE_ALLOW_LIVE_TRADING
+    try {
+      delete process.env.BINANCE_ALLOW_LIVE_TRADING
+      expect(financeSummary(db).liveBinanceApproved).toBe(false)
+      process.env.BINANCE_ALLOW_LIVE_TRADING = 'I_APPROVE_BINANCE_LIVE_TRADING'
+      expect(financeSummary(db).liveBinanceApproved).toBe(true)
+    } finally {
+      if (previous === undefined) delete process.env.BINANCE_ALLOW_LIVE_TRADING
+      else process.env.BINANCE_ALLOW_LIVE_TRADING = previous
+    }
+  })
+
   it('blocks executable trading plans without required risk controls', () => {
     const plan = createTradingPlan({
       platform: 'binance',

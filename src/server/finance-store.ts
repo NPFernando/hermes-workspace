@@ -3245,6 +3245,9 @@ export function effectiveAccountBalance(
 }
 
 export function financeSummary(db: FinanceDatabase) {
+  const liveBinanceApprovalRecorded = Boolean(db.settings.liveBinanceApprovedAt)
+  const liveBinanceApprovalConfigured =
+    process.env.BINANCE_ALLOW_LIVE_TRADING === 'I_APPROVE_BINANCE_LIVE_TRADING'
   // PF-201: the reporting currency. Stored amounts stay LKR-denominated
   // (`convertedLkrAmount`, `wealthGoalTargetLkr`, …); this only changes what
   // the aggregate `*Lkr` figures below are *expressed* in. Default 'LKR' keeps
@@ -3412,7 +3415,10 @@ export function financeSummary(db: FinanceDatabase) {
     livePerOrderCapUsdt: db.settings.livePerOrderCapUsdt,
     liveAllocationCapUsdt: db.settings.liveAllocationCapUsdt,
     liveDailyLossCapUsdt: db.settings.liveDailyLossCapUsdt,
-    liveBinanceApproved: Boolean(db.settings.liveBinanceApprovedAt),
+    // Fail closed when the explicit process-level approval marker is absent;
+    // the readiness account-connectivity gate uses the same requirement.
+    liveBinanceApproved:
+      liveBinanceApprovalRecorded && liveBinanceApprovalConfigured,
     ibkrStatus: db.settings.ibkrStatus,
   }
 }
