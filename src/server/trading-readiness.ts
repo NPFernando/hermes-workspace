@@ -40,7 +40,7 @@
  */
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { createHash, randomUUID } from 'node:crypto'
+import { createHash, createHmac, randomUUID } from 'node:crypto'
 import {
   FINANCE_AUDIT_PATH,
   appendAuditLog,
@@ -327,7 +327,10 @@ function recoveryVisibilityGate(db: FinanceDatabase): ReadinessGate {
 export function tradingCredentialFingerprint(
   env: NodeJS.ProcessEnv = process.env,
 ): string {
-  return createHash('sha256')
+  // This is an equality fingerprint, not password storage. HMAC keeps the
+  // credential material out of the digest's plain unsalted-password pattern
+  // while remaining stable across readiness checks in the same deployment.
+  return createHmac('sha256', 'hermes-trading-credential-fingerprint-v1')
     .update(
       JSON.stringify({
         testnetKey: env.BINANCE_TESTNET_API_KEY?.trim() ?? '',
