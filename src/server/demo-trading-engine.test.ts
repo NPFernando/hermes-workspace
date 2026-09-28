@@ -3195,6 +3195,37 @@ describe('learning cycle', () => {
 })
 
 describe('strategyGuardReview', () => {
+  it('caps scorecard confidence when historical trades are outside the recent window', async () => {
+    const store = await import('./finance-store')
+    const db = store.readFinanceStore()
+    const oldClosedAt = new Date(Date.now() - 30 * 24 * 60 * 60_000).toISOString()
+    db.strategy_results = Array.from({ length: 30 }, (_, index) => ({
+      kind: 'demo_trade_log',
+      id: `old_rsi_${index}`,
+      symbol: 'BTCUSDT',
+      strategyId: 'rsi_reversion',
+      entryPrice: 100,
+      exitPrice: 102,
+      quantity: 1,
+      entryQuote: 100,
+      exitQuote: 102,
+      pnlQuote: 2,
+      feesQuote: 0,
+      reason: 'historical evidence',
+      openedAt: oldClosedAt,
+      closedAt: oldClosedAt,
+      executionMode: 'paper',
+    }))
+    store.writeFinanceStore(db)
+
+    const { strategyScorecard } = await import('./demo-trading-engine')
+    const row = strategyScorecard().find((r) => r.strategyId === 'rsi_reversion')
+
+    expect(row?.totalTrades).toBe(30)
+    expect(row?.recentSampleSufficient).toBe(false)
+    expect(row?.confidence).toBe('low')
+  })
+
   it('flags insufficient evidence when the window has too few trades', async () => {
     const { strategyGuardReview } = await import('./demo-trading-engine')
     const review = strategyGuardReview()
