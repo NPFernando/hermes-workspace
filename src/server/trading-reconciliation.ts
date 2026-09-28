@@ -33,6 +33,30 @@ export interface TradingAccountReconciliation {
   detail: string
 }
 
+const DAILY_RECONCILIATION_INTERVAL_MS = 24 * 60 * 60 * 1000
+let reconciliationAutomationTimer: ReturnType<typeof setInterval> | null = null
+
+/**
+ * Keep exchange reconciliation alive for long-running server processes.
+ * The check is read-only; if it finds an unexplained drift, the existing
+ * reconciliation path engages the emergency kill switch and disables live
+ * trading before returning. The singleton guard prevents duplicate timers
+ * when the finance route is initialized more than once in development or
+ * during a hot reload.
+ */
+export function ensureTradingAccountReconciliationAutomation(): void {
+  if (reconciliationAutomationTimer) return
+  reconciliationAutomationTimer = setInterval(() => {
+    void reconcileTradingAccount().catch((error) => {
+      console.error('[trading-reconciliation] daily check failed:', error)
+    })
+  }, DAILY_RECONCILIATION_INTERVAL_MS)
+  reconciliationAutomationTimer.unref()
+  void reconcileTradingAccount().catch((error) => {
+    console.error('[trading-reconciliation] startup check failed:', error)
+  })
+}
+
 function persist(report: TradingAccountReconciliation): void {
   const db = readFinanceStore()
   db.settings.tradingAccountReconciliation = report

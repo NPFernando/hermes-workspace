@@ -160,7 +160,10 @@ import {
   requestLiveApproval,
   verifyTradingConnectivity,
 } from '../../server/trading-readiness'
-import { reconcileTradingAccount } from '../../server/trading-reconciliation'
+import {
+  ensureTradingAccountReconciliationAutomation,
+  reconcileTradingAccount,
+} from '../../server/trading-reconciliation'
 
 const VALID_LONG_SHORT_PERIODS = new Set([
   '5m',
@@ -178,6 +181,7 @@ type JsonRecord = Record<string, unknown>
 
 startFinanceStorageMonitor()
 ensureValidationRunAutomation()
+ensureTradingAccountReconciliationAutomation()
 // Read-only sandbox account-event telemetry. The listener self-gates on
 // testnet mode, credentials, environment, and test/runtime guards; it never
 // writes positions, trades, settings, or orders.
