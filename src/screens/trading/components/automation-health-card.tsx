@@ -120,6 +120,22 @@ export function AutomationHealthCard({
         <Metric label="Last result" value={last?.status ?? 'Unknown'} />
         <Metric label="Paper cycles" value={String(paper.cycles)} />
         <Metric label="Sandbox cycles" value={String(sandbox.cycles)} />
+        <Metric
+          label="Auto-run trades"
+          value={
+            activeAutoRun
+              ? `${activeAutoRun.progress.tradesOpened} opened / ${activeAutoRun.progress.tradesClosed} closed`
+              : 'n/a'
+          }
+        />
+        <Metric
+          label="Council non-action"
+          value={
+            activeAutoRun
+              ? String(activeAutoRun.evidence.councilNonActionSignals)
+              : 'n/a'
+          }
+        />
         <Metric label="Blocked / data errors" value={`${blocked} / ${dataErrors}`} />
         <Metric
           label="Account reconciliation"
