@@ -3237,6 +3237,12 @@ export interface StrategyScorecardRow {
   averageSlippageQuote: number | null
   executionModeCounts: Record<string, number>
   confidence: StrategyScorecardConfidence
+  /** Recent bounded-window evidence used by the readiness/quarantine gates. */
+  evidenceWindowDays: number
+  recentTrades: number
+  recentPnlQuote: number
+  recentWinRate: number
+  recentSampleSufficient: boolean
 }
 
 /** Performance metrics over the demo engine's own closed trades (fee-net P/L). */
@@ -3323,6 +3329,9 @@ export function strategyScorecard(): Array<StrategyScorecardRow> {
     items.push(trade)
     byStrategy.set(trade.strategyId, items)
   }
+  const recentEvidence = new Map(
+    strategyGuardReview().map((review) => [review.strategyId, review.window]),
+  )
 
   return [...byStrategy.entries()]
     .map(([strategyId, items]) => {
@@ -3361,6 +3370,7 @@ export function strategyScorecard(): Array<StrategyScorecardRow> {
         ),
       )
       const slippage = comparisons.get(strategyId) ?? []
+      const evidence = recentEvidence.get(strategyId)
       const profitFactor =
         grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? 999 : 0
       const confidence: StrategyScorecardConfidence =
@@ -3387,6 +3397,11 @@ export function strategyScorecard(): Array<StrategyScorecardRow> {
           : null,
         executionModeCounts,
         confidence,
+        evidenceWindowDays: evidence?.windowDays ?? 0,
+        recentTrades: evidence?.closedTrades ?? 0,
+        recentPnlQuote: evidence?.realizedPnlQuote ?? 0,
+        recentWinRate: evidence?.winRate ?? 0,
+        recentSampleSufficient: evidence?.sufficientSample ?? false,
       }
     })
     .sort((a, b) => b.totalPnlQuote - a.totalPnlQuote)

@@ -524,6 +524,11 @@ export type FinancePayload = {
     averageSlippageQuote: number | null
     executionModeCounts: Record<string, number>
     confidence: 'low' | 'medium' | 'high'
+    evidenceWindowDays: number
+    recentTrades: number
+    recentPnlQuote: number
+    recentWinRate: number
+    recentSampleSufficient: boolean
   }>
   decisionQuality: DecisionQualityReport
   paperDecisionQuality: PaperDecisionQualityReport
