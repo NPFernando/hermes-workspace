@@ -528,6 +528,10 @@ export type FinancePayload = {
     recentTrades: number
     recentPnlQuote: number
     recentWinRate: number
+    recentProfitFactor: number
+    recentExpectancyQuote: number
+    recentSharpeLikeReturn: number
+    recentMaxDrawdown: number
     recentSampleSufficient: boolean
   }>
   decisionQuality: DecisionQualityReport

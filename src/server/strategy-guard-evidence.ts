@@ -32,6 +32,14 @@ export interface StrategyEvidenceWindow {
   winRate: number
   lossRate: number
   realizedPnlQuote: number
+  /** Gross-profit / gross-loss over the bounded window. */
+  profitFactor: number
+  /** Mean fee-net P/L per closed trade in the bounded window. */
+  expectancyQuote: number
+  /** Mean P/L divided by its population standard deviation. */
+  sharpeLikeReturn: number
+  /** Peak-to-trough fee-net P/L drawdown in the bounded window. */
+  maxDrawdown: number
   avgWinQuote: number
   avgLossQuote: number
   /** Non-negative outcomes that weren't a forced close, within the window. */
@@ -89,6 +97,27 @@ export function computeStrategyEvidenceWindow(
     (sum, trade) => sum + trade.pnlQuote,
     0,
   )
+  const grossProfit = wins.reduce((sum, trade) => sum + trade.pnlQuote, 0)
+  const grossLoss = Math.abs(
+    losses.reduce((sum, trade) => sum + trade.pnlQuote, 0),
+  )
+  const expectancyQuote =
+    closedTrades > 0 ? realizedPnlQuote / closedTrades : 0
+  const variance =
+    closedTrades > 0
+      ? windowed.reduce(
+          (sum, trade) => sum + (trade.pnlQuote - expectancyQuote) ** 2,
+          0,
+        ) / closedTrades
+      : 0
+  let cumulative = 0
+  let peak = 0
+  let maxDrawdown = 0
+  for (const trade of windowed) {
+    cumulative += trade.pnlQuote
+    peak = Math.max(peak, cumulative)
+    maxDrawdown = Math.max(maxDrawdown, peak - cumulative)
+  }
   const recoveredTrades = windowed.filter(
     (trade) => trade.pnlQuote >= 0 && !trade.reason.includes('force-closed'),
   ).length
@@ -106,6 +135,12 @@ export function computeStrategyEvidenceWindow(
     winRate: closedTrades > 0 ? wins.length / closedTrades : 0,
     lossRate: closedTrades > 0 ? losses.length / closedTrades : 0,
     realizedPnlQuote,
+    profitFactor:
+      grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? 999 : 0,
+    expectancyQuote,
+    sharpeLikeReturn:
+      variance > 0 ? expectancyQuote / Math.sqrt(variance) : 0,
+    maxDrawdown,
     avgWinQuote:
       wins.length > 0
         ? wins.reduce((sum, trade) => sum + trade.pnlQuote, 0) / wins.length

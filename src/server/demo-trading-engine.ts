@@ -3242,6 +3242,10 @@ export interface StrategyScorecardRow {
   recentTrades: number
   recentPnlQuote: number
   recentWinRate: number
+  recentProfitFactor: number
+  recentExpectancyQuote: number
+  recentSharpeLikeReturn: number
+  recentMaxDrawdown: number
   recentSampleSufficient: boolean
 }
 
@@ -3401,6 +3405,10 @@ export function strategyScorecard(): Array<StrategyScorecardRow> {
         recentTrades: evidence?.closedTrades ?? 0,
         recentPnlQuote: evidence?.realizedPnlQuote ?? 0,
         recentWinRate: evidence?.winRate ?? 0,
+        recentProfitFactor: evidence?.profitFactor ?? 0,
+        recentExpectancyQuote: evidence?.expectancyQuote ?? 0,
+        recentSharpeLikeReturn: evidence?.sharpeLikeReturn ?? 0,
+        recentMaxDrawdown: evidence?.maxDrawdown ?? 0,
         recentSampleSufficient: evidence?.sufficientSample ?? false,
       }
     })

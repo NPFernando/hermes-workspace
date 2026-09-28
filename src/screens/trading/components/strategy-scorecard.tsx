@@ -35,7 +35,8 @@ export function StrategyScorecard({
         <div>
           <h2 className="text-lg font-semibold">Per-strategy scorecard</h2>
           <p className="mt-1 text-xs text-[var(--theme-muted)]">
-            Closed non-shadow trades only; P/L is net of recorded fees.
+            Closed non-shadow trades only; P/L is net of recorded fees. Recent
+            metrics use the bounded evidence window.
           </p>
         </div>
         <span className="rounded-full border border-[var(--theme-border)] px-2.5 py-1 text-xs text-[var(--theme-muted)]">
@@ -99,7 +100,13 @@ export function StrategyScorecard({
                     {formatUsdt(row.recentPnlQuote)}
                   </span>
                   <span className="block text-[var(--theme-muted)]">
-                    {formatFractionPct(row.recentWinRate)} recent win
+                    {formatFractionPct(row.recentWinRate)} win · PF{' '}
+                    {row.recentProfitFactor.toFixed(2)} · E{' '}
+                    {formatUsdt(row.recentExpectancyQuote)}
+                  </span>
+                  <span className="block text-[var(--theme-muted)]">
+                    Sharpe {row.recentSharpeLikeReturn.toFixed(2)} · DD{' '}
+                    {formatUsdt(row.recentMaxDrawdown)}
                   </span>
                 </td>
                 <td className="px-2 py-3 text-[var(--theme-muted)]">
