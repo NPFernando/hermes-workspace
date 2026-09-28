@@ -67,8 +67,9 @@ export function validationRecommendationLabel(
  * Controlled paper/sandbox evidence-collection runs. Exactly one active run
  * per stage; starting one requires explicit, bounded time/cycle/trade/
  * exposure budgets (no "unlimited" option) and is rejected server-side on
- * live mode, an out-of-range/missing budget, a stage/tradingMode mismatch,
- * or an already-active run for that stage. "Run cycle" attributes one
+ * live mode, an out-of-range/missing budget, or an already-active run for
+ * that stage. Paper may run as a bounded sidecar while testnet is active.
+ * "Run cycle" attributes one
  * `runTradingCycle()` call (same gates as the main "Run cycle" button,
  * narrowed to this run's selected strategies) to the run's evidence.
  */
@@ -111,7 +112,6 @@ export function ValidationRunPanel({
   const activeRun = activeByStage.get(stage) ?? null
   const activeReconciliation =
     reconciliation.active.find((item) => item.stage === stage) ?? null
-  const activePaperRun = activeByStage.get('paper') ?? null
   const latestCompletedRun = state.history.at(0) ?? null
   const latestCompletedTrend = latestCompletedRun
     ? trends[latestCompletedRun.stage]
@@ -129,9 +129,7 @@ export function ValidationRunPanel({
       ? 'Continue the bounded paper run until its checkpoint; zero trades or low samples are incomplete evidence.'
       : 'Continue the bounded sandbox run and reconcile fills, attribution, account state, and risk before any expansion.'
     : stage === 'sandbox'
-      ? activePaperRun
-        ? 'Sandbox is blocked while the paper run is active. Review and finalize paper evidence first.'
-        : completedPaperRun
+      ? completedPaperRun
           ? 'Review the completed paper checkpoint before starting a separate sandbox run.'
           : 'Start and complete a paper run before using sandbox/testnet.'
       : 'Start a bounded paper run with the selected strategies and automatic cycles only when ready.'

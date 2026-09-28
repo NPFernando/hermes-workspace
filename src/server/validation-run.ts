@@ -19,11 +19,10 @@
  *    `runTradingCycle()` already enforces; it only narrows it further via
  *    `RunCycleOptions.config.enabledStrategies`.
  *  - Only one active run per stage at a time (a second `start` for the
- *    same stage is a conflict and is rejected), and a run's declared stage
- *    must match the trading system's *current* execution mode (a "sandbox"
- *    run cannot be started/continued while `tradingMode` resolves to
- *    `paper`, and vice versa) — this keeps run-attributed evidence from
- *    silently mixing paper and sandbox activity.
+ *    same stage is a conflict and is rejected). A sandbox run must match the
+ *    current execution mode. A paper run may also run as a paper-only
+ *    sidecar while the global mode is testnet; the engine's cycle serializer
+ *    still prevents overlap and all trade attribution remains mode-scoped.
  *  - This module never calls a Binance client, never writes an order, and
  *    never flips any risk-control setting. It only calls the existing,
  *    already-gated `runTradingCycle()` (same gates as the "Run cycle"
@@ -444,7 +443,8 @@ export async function startValidationRun(
     )
   }
   const currentStage = stageForExecutionMode(resolvedMode)
-  if (currentStage !== stage) {
+  const paperSidecar = stage === 'paper' && resolvedMode === 'testnet'
+  if (currentStage !== stage && !paperSidecar) {
     throw new Error(
       `Requested stage "${stage}" does not match the current tradingMode's execution mode ("${resolvedMode}", stage "${currentStage}") — switch tradingMode before starting this run.`,
     )
@@ -537,7 +537,7 @@ export async function startValidationRun(
   const run: ValidationRun = {
     id: `validation_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     stage,
-    executionMode: resolvedMode,
+    executionMode: paperSidecar ? 'paper' : resolvedMode,
     strategies,
     autoRun: input.autoRun === true,
     cycleIntervalMinutes,
@@ -772,7 +772,8 @@ export async function runValidationCycle(
   const resolvedMode = executionModeForTradingMode(
     db.settings.tradingMode,
   )
-  if (resolvedMode !== run.executionMode) {
+  const paperSidecar = run.executionMode === 'paper' && resolvedMode === 'testnet'
+  if (resolvedMode !== run.executionMode && !paperSidecar) {
     return {
       ok: false,
       message: `tradingMode changed since this run started (now resolves to ${resolvedMode ?? 'no execution mode'}, run expects ${run.executionMode}) — stop this validation run before changing modes.`,
@@ -817,6 +818,7 @@ export async function runValidationCycle(
   const cycle = await runTradingCycle({
     force: options.force === true,
     client: options.client,
+    executionModeOverride: paperSidecar ? 'paper' : undefined,
     config: { enabledStrategies: run.strategies },
   })
 

@@ -1131,6 +1131,12 @@ export function resolveEngineConfig(
 export interface RunCycleOptions {
   config?: Partial<EngineConfig>
   client?: BinanceExecutionClient
+  /**
+   * Allows the validation scheduler to run a paper-only sidecar while the
+   * global mode remains testnet. Live is intentionally not representable.
+   * The cycle serializer still permits only one engine cycle at a time.
+   */
+  executionModeOverride?: Exclude<BinanceExecutionEnvironment, 'live'>
   /** Bypasses non-live mode selection only; live approval and kill switch still apply. */
   force?: boolean
 }
@@ -1765,7 +1771,7 @@ async function runTradingCycleInner(
 
   const mode = db.settings.tradingMode
   let executionMode: BinanceExecutionEnvironment | null =
-    executionModeForTradingMode(mode)
+    options.executionModeOverride ?? executionModeForTradingMode(mode)
   if (!executionMode && options.force)
     executionMode = options.client?.environment ?? 'paper'
 

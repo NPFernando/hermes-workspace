@@ -256,6 +256,23 @@ describe('startValidationRun — strict rejection', () => {
     expect(paperRun.state.active).toHaveLength(2)
   })
 
+  it('allows a paper-only sidecar while testnet remains the global mode', async () => {
+    await setMode('testnet_execute')
+    const { startValidationRun } = await import('./validation-run')
+    const result = await startValidationRun({
+      stage: 'paper',
+      strategies: ['rsi_reversion'],
+      budgets: VALID_BUDGETS,
+      autoRun: true,
+    })
+    expect(result.run).toMatchObject({
+      stage: 'paper',
+      executionMode: 'paper',
+      autoRun: true,
+      status: 'active',
+    })
+  })
+
   it('starts successfully with valid, bounded input and records a baseline', async () => {
     await setMode('testnet_execute')
     const { startValidationRun } = await import('./validation-run')
@@ -320,6 +337,25 @@ describe('runValidationCycle', () => {
     expect(result.run?.progress.tradesOpened).toBeGreaterThanOrEqual(1)
     expect(result.run?.evidence.signalEvaluations).toBeGreaterThan(0)
     expect(result.run?.evidence.signalCountsByStrategy.rsi_reversion).toBeGreaterThan(0)
+  })
+
+  it('runs a paper sidecar through the no-order paper client while global mode is testnet', async () => {
+    await setMode('testnet_execute')
+    const { startValidationRun, runValidationCycle } =
+      await import('./validation-run')
+    await startValidationRun({
+      stage: 'paper',
+      strategies: ['rsi_reversion'],
+      budgets: VALID_BUDGETS,
+    })
+    const result = await runValidationCycle('paper', {
+      client: fakeClient() as never,
+    })
+    expect(result.ok).toBe(true)
+    expect(result.run?.executionMode).toBe('paper')
+    expect(result.run?.progress.cyclesRun).toBe(1)
+    expect(result.cycle?.executionMode).toBe('paper')
+    expect(result.run?.evidence.signalEvaluations).toBeGreaterThan(0)
   })
 
   it('debounces back-to-back automated cycles but never a manual one', async () => {
