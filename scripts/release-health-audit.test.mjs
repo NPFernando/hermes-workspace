@@ -14,7 +14,7 @@ function runner({ failingPull = false, failedRun = false, staleRun = false } = {
         workflowName: 'CI',
         createdAt: staleRun
           ? new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
-          : '2026-09-18T00:00:00Z',
+          : new Date().toISOString(),
       }]
     }
     return failingPull

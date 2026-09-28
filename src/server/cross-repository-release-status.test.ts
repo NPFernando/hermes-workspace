@@ -28,7 +28,7 @@ describe('cross-repository release status', () => {
                     status: 'completed',
                     conclusion: 'success',
                     headSha: 'abc123',
-                    createdAt: '2026-09-18T01:00:00Z',
+                    createdAt: new Date().toISOString(),
                   },
                 ]),
                 stderr: '',
