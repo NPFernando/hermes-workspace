@@ -25,9 +25,8 @@ export interface GuardianConfig {
   cooldownMinutes: number
   minQuoteBalance: number
   /**
-   * Correlated-symbol exposure cap. Off by default (ships disarmed, same as
-   * the grid engine's absoluteStopFloorEnabled and testnet execution layer)
-   * — symbols like BTC/ETH/SOL move together, so several "independent"
+   * Correlated-symbol exposure cap. Enabled by default — symbols like
+   * BTC/ETH/SOL move together, so several "independent"
    * council positions can add up to one large correlated bet that no single
    * per-trade cap would catch. `correlationBuckets` is a static grouping
    * (not a computed correlation matrix — cheap, and captures most of the
@@ -52,7 +51,7 @@ export const DEFAULT_GUARDIAN_CONFIG: GuardianConfig = {
   lossStreakLimit: 3,
   cooldownMinutes: 240,
   minQuoteBalance: 500,
-  correlationBucketsEnabled: false,
+  correlationBucketsEnabled: true,
   correlationBuckets: {
     majors: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'],
     alts: ['XRPUSDT'],

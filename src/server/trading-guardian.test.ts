@@ -145,12 +145,20 @@ describe('checkOrderProposal', () => {
     expect(v.blocks.some((b) => b.rule === 'symbol_exposure_cap')).toBe(true)
   })
 
-  it('ignores bucket exposure when correlationBucketsEnabled is off (default)', () => {
+  it('can explicitly disable bucket exposure for a compatibility configuration', () => {
+    const config = {
+      ...DEFAULT_GUARDIAN_CONFIG,
+      correlationBucketsEnabled: false,
+    }
     const v = checkOrderProposal(proposal, {
       ...baseCtx,
       bucketExposureQuote: { majors: 999 },
-    })
+    }, config)
     expect(v.blocks.some((b) => b.rule === 'bucket_exposure_cap')).toBe(false)
+  })
+
+  it('enables correlated bucket exposure protection by default', () => {
+    expect(DEFAULT_GUARDIAN_CONFIG.correlationBucketsEnabled).toBe(true)
   })
 
   it('blocks when correlated bucket exposure would breach the cap', () => {
