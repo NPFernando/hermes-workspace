@@ -3226,6 +3226,24 @@ describe('strategyGuardReview', () => {
     expect(row?.confidence).toBe('low')
   })
 
+  it('includes enabled strategies with zero closed trades as low-confidence rows', async () => {
+    const { strategyScorecard } = await import('./demo-trading-engine')
+    const row = strategyScorecard().find((entry) => entry.strategyId === 'rsi_reversion')
+
+    expect(row).toMatchObject({
+      strategyId: 'rsi_reversion',
+      totalTrades: 0,
+      totalPnlQuote: 0,
+      winRate: 0,
+      profitFactor: 0,
+      expectancyQuote: 0,
+      averageHoldingMinutes: 0,
+      averageSlippageQuote: null,
+      confidence: 'low',
+      recentSampleSufficient: false,
+    })
+  })
+
   it('flags insufficient evidence when the window has too few trades', async () => {
     const { strategyGuardReview } = await import('./demo-trading-engine')
     const review = strategyGuardReview()

@@ -3322,9 +3322,13 @@ export function demoTradingPerformance(): DemoPerformance {
  * must never inflate profitability or sample confidence.
  */
 export function strategyScorecard(): Array<StrategyScorecardRow> {
-  const rows = readFinanceStore().strategy_results as Array<SRRow>
+  const db = readFinanceStore()
+  const rows = db.strategy_results as Array<SRRow>
   const trades = loadOfKind<TradeLogEntry>(rows, SR_KIND_TRADE).filter(
     (trade) => !isShadow(trade),
+  )
+  const config = resolveEngineConfig(
+    (db.settings as Record<string, unknown>).demoTrading,
   )
   const comparisons = new Map<string, Array<number>>()
   for (const comparison of decisionQualityReport().shadowComparisons) {
@@ -3339,6 +3343,12 @@ export function strategyScorecard(): Array<StrategyScorecardRow> {
     items.push(trade)
     byStrategy.set(trade.strategyId, items)
   }
+  // Keep enabled strategies visible even before their first closed trade.
+  // Omitting them makes an empty evidence sample look like missing telemetry
+  // and prevents the dashboard from showing the required low-confidence state.
+  for (const strategyId of config.enabledStrategies) {
+    if (!byStrategy.has(strategyId)) byStrategy.set(strategyId, [])
+  }
   const recentEvidence = new Map(
     strategyGuardReview().map((review) => [review.strategyId, review.window]),
   )
@@ -3350,10 +3360,14 @@ export function strategyScorecard(): Array<StrategyScorecardRow> {
       const losses = pnl.filter((value) => value < 0)
       const grossProfit = wins.reduce((sum, value) => sum + value, 0)
       const grossLoss = Math.abs(losses.reduce((sum, value) => sum + value, 0))
-      const expectancyQuote = pnl.reduce((sum, value) => sum + value, 0) / pnl.length
+      const expectancyQuote = pnl.length
+        ? pnl.reduce((sum, value) => sum + value, 0) / pnl.length
+        : 0
       const mean = expectancyQuote
       const variance =
-        pnl.reduce((sum, value) => sum + (value - mean) ** 2, 0) / pnl.length
+        pnl.length
+          ? pnl.reduce((sum, value) => sum + (value - mean) ** 2, 0) / pnl.length
+          : 0
       const pnlStdDev = Math.sqrt(variance)
       const executionModeCounts = items.reduce<Record<string, number>>(
         (counts, trade) => {
@@ -3399,15 +3413,17 @@ export function strategyScorecard(): Array<StrategyScorecardRow> {
         strategyId,
         totalTrades: items.length,
         totalPnlQuote: pnl.reduce((sum, value) => sum + value, 0),
-        winRate: wins.length / items.length,
+        winRate: items.length ? wins.length / items.length : 0,
         profitFactor,
         expectancyQuote,
         sharpeLikeReturn:
           pnlStdDev > 0 ? expectancyQuote / pnlStdDev : 0,
         maxDrawdown,
         averageHoldingMinutes:
-          holdMinutes.reduce((sum, value) => sum + value, 0) /
-          holdMinutes.length,
+          holdMinutes.length
+            ? holdMinutes.reduce((sum, value) => sum + value, 0) /
+              holdMinutes.length
+            : 0,
         averageSlippageQuote: slippage.length
           ? slippage.reduce((sum, value) => sum + value, 0) / slippage.length
           : null,
