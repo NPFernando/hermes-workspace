@@ -57,6 +57,7 @@ export function StrategyScorecard({
               <th className="px-2 py-2 font-medium">Avg hold</th>
               <th className="px-2 py-2 font-medium">Slippage</th>
               <th className="px-2 py-2 font-medium">Trades</th>
+              <th className="px-2 py-2 font-medium">Signals (P/S)</th>
               <th className="px-2 py-2 font-medium">Recent evidence</th>
               <th className="px-2 py-2 font-medium">Modes</th>
               <th className="px-2 py-2 font-medium">Confidence</th>
@@ -88,6 +89,10 @@ export function StrategyScorecard({
                     : formatUsdt(row.averageSlippageQuote)}
                 </td>
                 <td className="px-2 py-3">{row.totalTrades}</td>
+                <td className="px-2 py-3 text-[var(--theme-muted)]">
+                  {row.validationSignalCounts.paper}/
+                  {row.validationSignalCounts.sandbox}
+                </td>
                 <td className="px-2 py-3">
                   <span
                     className={

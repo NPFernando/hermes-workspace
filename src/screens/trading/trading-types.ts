@@ -516,6 +516,7 @@ export type FinancePayload = {
   }
   strategyScorecard: Array<{
     strategyId: string
+    validationSignalCounts: { paper: number; sandbox: number }
     totalTrades: number
     totalPnlQuote: number
     winRate: number

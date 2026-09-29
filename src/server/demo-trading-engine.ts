@@ -3230,6 +3230,8 @@ export type StrategyScorecardConfidence = 'low' | 'medium' | 'high'
 
 export interface StrategyScorecardRow {
   strategyId: string
+  /** Non-trade signal observations from the active evidence campaigns. */
+  validationSignalCounts: { paper: number; sandbox: number }
   totalTrades: number
   totalPnlQuote: number
   winRate: number
@@ -3324,6 +3326,25 @@ export function demoTradingPerformance(): DemoPerformance {
 export function strategyScorecard(): Array<StrategyScorecardRow> {
   const db = readFinanceStore()
   const rows = db.strategy_results as Array<SRRow>
+  const validationRuns = (db.settings as Record<string, unknown>)
+    .validationRuns as
+    | { active?: Array<Record<string, unknown>> }
+    | undefined
+  const validationSignalCounts = new Map<string, { paper: number; sandbox: number }>()
+  for (const run of validationRuns?.active ?? []) {
+    const stage = run.stage === 'paper' || run.stage === 'sandbox' ? run.stage : null
+    if (!stage) continue
+    const evidence = run.evidence as Record<string, unknown> | undefined
+    const counts = evidence?.signalCountsByStrategy as
+      | Record<string, unknown>
+      | undefined
+    for (const [strategyId, value] of Object.entries(counts ?? {})) {
+      const current = validationSignalCounts.get(strategyId) ?? { paper: 0, sandbox: 0 }
+      const count = typeof value === 'number' && Number.isFinite(value) ? value : 0
+      current[stage] += count
+      validationSignalCounts.set(strategyId, current)
+    }
+  }
   const trades = loadOfKind<TradeLogEntry>(rows, SR_KIND_TRADE).filter(
     (trade) => !isShadow(trade),
   )
@@ -3411,6 +3432,8 @@ export function strategyScorecard(): Array<StrategyScorecardRow> {
         evidence?.sufficientSample === true ? historicalConfidence : 'low'
       return {
         strategyId,
+        validationSignalCounts:
+          validationSignalCounts.get(strategyId) ?? { paper: 0, sandbox: 0 },
         totalTrades: items.length,
         totalPnlQuote: pnl.reduce((sum, value) => sum + value, 0),
         winRate: items.length ? wins.length / items.length : 0,
