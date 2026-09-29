@@ -9,6 +9,29 @@ import server from './dist/server/server.js'
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const CLIENT_DIR = join(__dirname, 'dist', 'client')
 
+// Keep the boot-time persistence probe and the bundled finance modules on
+// the same configuration path.  Production stores the Postgres credentials
+// in ~/.hermes/.env, while systemd intentionally does not export them as
+// process arguments.  Loading only these four names (and never logging them)
+// prevents a false "persistence unavailable" result from leaving automation
+// lazy after restart.
+for (const envPath of [
+  join(process.env.HERMES_HOME || join(process.env.HOME || '', '.hermes'), '.env'),
+  join(process.env.HERMES_HOME || join(process.env.HOME || '', '.hermes'), '.hermes.backup', '.env'),
+]) {
+  try {
+    const contents = readFileSync(envPath, 'utf8')
+    for (const line of contents.split('\n')) {
+      const match = line.match(/^(HERMES_PG_(?:PASSWORD|HOST|PORT|USER))=(.*)$/)
+      if (match && !process.env[match[1]]) {
+        process.env[match[1]] = match[2].trim().replace(/^"|"$/g, '')
+      }
+    }
+  } catch {
+    // CI and the JSON/test harness do not have the production env file.
+  }
+}
+
 // TanStack's server route chunk is normally loaded lazily on the first
 // request. Trading validation and account-reconciliation timers are started
 // by that chunk, so a quiet service restart could leave an active paper run
@@ -42,7 +65,8 @@ if (financePersistenceConfigured) {
   if (!routerAsset) {
     throw new Error('server router asset is missing; cannot start automation safely')
   }
-  await import(join(SERVER_ASSET_DIR, routerAsset)) }
+  await import(join(SERVER_ASSET_DIR, routerAsset))
+}
 
 // A short artifact fingerprint lets read-only release checks distinguish a
 // healthy process serving an older build from the build just verified. It is
