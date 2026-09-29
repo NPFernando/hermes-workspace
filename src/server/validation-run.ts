@@ -659,6 +659,8 @@ function validationAutomationDisabled(): boolean {
 }
 let validationAutomationTimer: ReturnType<typeof setInterval> | null = null
 let validationAutomationTickInProgress = false
+let validationAutomationTickStartedAt = 0
+let validationAutomationTickGeneration = 0
 let validationAutomationLastTickAt = 0
 const validationAutomationStagesInProgress = new Set<ValidationStage>()
 
@@ -680,14 +682,30 @@ function automaticRunDue(run: ValidationRun, now: number): boolean {
 }
 
 async function runAutomaticValidationTick(source: 'startup' | 'interval' | 'recovery') {
-  if (validationAutomationTickInProgress) return
+  if (validationAutomationTickInProgress) {
+    const ageMs = Date.now() - validationAutomationTickStartedAt
+    if (ageMs <= AUTO_CYCLE_TIMEOUT_MS + AUTO_CYCLE_POLL_INTERVAL_MS) return
+    // A persistence/readiness operation can outlive the per-stage timeout and
+    // leave the process-local tick flag set forever. Invalidate that stale
+    // generation so a later authenticated read or interval can recover. The
+    // stage-level in-flight set still prevents duplicate cycles if the old
+    // promise eventually resumes.
+    appendAuditLog('validation_run_automation_tick_recovered', {
+      staleAgeMs: ageMs,
+      source,
+    })
+    validationAutomationTickGeneration += 1
+    validationAutomationTickInProgress = false
+  }
+  const generation = ++validationAutomationTickGeneration
   validationAutomationTickInProgress = true
+  validationAutomationTickStartedAt = Date.now()
   validationAutomationLastTickAt = Date.now()
-  appendAuditLog('validation_run_automation_tick', {
-    at: new Date(validationAutomationLastTickAt).toISOString(),
-    source,
-  })
   try {
+    appendAuditLog('validation_run_automation_tick', {
+      at: new Date(validationAutomationLastTickAt).toISOString(),
+      source,
+    })
     const now = Date.now()
     const active = reviewValidationRuns().active.filter(
       (run) => run.autoRun && automaticRunDue(run, now),
@@ -696,7 +714,10 @@ async function runAutomaticValidationTick(source: 'startup' | 'interval' | 'reco
       await runAutomaticValidationCycle(run.stage)
     }
   } finally {
-    validationAutomationTickInProgress = false
+    if (generation === validationAutomationTickGeneration) {
+      validationAutomationTickInProgress = false
+      validationAutomationTickStartedAt = 0
+    }
   }
 }
 
