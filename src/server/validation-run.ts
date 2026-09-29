@@ -144,9 +144,7 @@ export interface ValidationRunState {
 }
 
 export type ValidationRecommendation =
-  | 'continue_collecting'
-  | 'keep_unchanged'
-  | 'review_reversible_control'
+  'continue_collecting' | 'keep_unchanged' | 'review_reversible_control'
 
 export interface ValidationRunReconciliation {
   runId: string
@@ -234,9 +232,7 @@ function stageForExecutionMode(
   return null
 }
 
-function readinessGateForStage(
-  stage: ValidationStage,
-): ReadinessGate | null {
+function readinessGateForStage(stage: ValidationStage): ReadinessGate | null {
   const snapshot = assessReadiness()
   const id = stage === 'paper' ? 'paper_evidence' : 'sandbox_evidence'
   return snapshot.gates.find((g) => g.id === id) ?? null
@@ -303,7 +299,9 @@ function reconcileExpiry(
 /** Read-only view: reconciles expiry then returns the current state. Safe
  * to call as often as a dashboard poll wants — mirrors
  * `reviewSandboxExperiments()`'s "reconcile-on-read" convention. */
-export function reviewValidationRuns(now: Date = new Date()): ValidationRunState {
+export function reviewValidationRuns(
+  now: Date = new Date(),
+): ValidationRunState {
   return reconcileExpiry(loadState(), now.getTime())
 }
 
@@ -329,7 +327,8 @@ function reconcileRun(
       run.strategies.includes(position.strategyId),
   )
   const warnings: Array<string> = []
-  if (run.progress.tradesClosed === 0) warnings.push('no closed trades collected')
+  if (run.progress.tradesClosed === 0)
+    warnings.push('no closed trades collected')
   if (run.progress.cyclesRun === 0) warnings.push('no cycles completed')
   if (trades.length !== run.progress.tradesClosed) {
     warnings.push(
@@ -342,17 +341,20 @@ function reconcileRun(
     )
   }
   if (positions.length > 0) {
-    warnings.push(`${positions.length} selected-strategy position(s) remain open`)
+    warnings.push(
+      `${positions.length} selected-strategy position(s) remain open`,
+    )
   }
   const enoughSample = run.progress.tradesClosed >= 5
-  const recommendation: ValidationRecommendation =
-    warnings.some((warning) => warning.includes('mismatch'))
+  const recommendation: ValidationRecommendation = warnings.some((warning) =>
+    warning.includes('mismatch'),
+  )
+    ? 'continue_collecting'
+    : !enoughSample
       ? 'continue_collecting'
-      : !enoughSample
-        ? 'continue_collecting'
-        : run.evidence.realizedPnlQuote > 0
-          ? 'keep_unchanged'
-          : 'review_reversible_control'
+      : run.evidence.realizedPnlQuote > 0
+        ? 'keep_unchanged'
+        : 'review_reversible_control'
   return {
     runId: run.id,
     stage: run.stage,
@@ -437,9 +439,7 @@ export async function startValidationRun(
 
   const db = readFinanceStore()
   const settings = db.settings as Record<string, unknown>
-  const resolvedMode = executionModeForTradingMode(
-    db.settings.tradingMode,
-  )
+  const resolvedMode = executionModeForTradingMode(db.settings.tradingMode)
   if (resolvedMode === 'live' || resolvedMode === null) {
     throw new Error(
       `Validation runs may only target paper or sandbox/testnet — current tradingMode ("${String(db.settings.tradingMode)}") resolves to ${resolvedMode ?? 'no execution mode'}, never live.`,
@@ -464,7 +464,8 @@ export async function startValidationRun(
     ? [
         ...new Set(
           input.strategies.filter(
-            (id): id is string => typeof id === 'string' && Boolean(getStrategy(id)),
+            (id): id is string =>
+              typeof id === 'string' && Boolean(getStrategy(id)),
           ),
         ),
       ]
@@ -667,6 +668,17 @@ let validationAutomationTickStartedAt = 0
 let validationAutomationTickGeneration = 0
 let validationAutomationLastTickAt = 0
 const validationAutomationStagesInProgress = new Set<ValidationStage>()
+const validationAutomationStageAttempts = new Map<
+  ValidationStage,
+  { generation: number; startedAt: number }
+>()
+
+export function validationAutomationStageTimedOut(
+  startedAt: number,
+  now = Date.now(),
+): boolean {
+  return now - startedAt > AUTO_CYCLE_TIMEOUT_MS + AUTO_CYCLE_POLL_INTERVAL_MS
+}
 
 function automaticRunDue(run: ValidationRun, now: number): boolean {
   const retryAt = run.progress.nextRetryAt
@@ -685,7 +697,9 @@ function automaticRunDue(run: ValidationRun, now: number): boolean {
   return now - lastAttempt >= intervalMinutes * 60_000
 }
 
-async function runAutomaticValidationTick(source: 'startup' | 'interval' | 'recovery') {
+async function runAutomaticValidationTick(
+  source: 'startup' | 'interval' | 'recovery',
+) {
   if (validationAutomationTickInProgress) {
     const ageMs = Date.now() - validationAutomationTickStartedAt
     if (ageMs <= AUTO_CYCLE_TIMEOUT_MS + AUTO_CYCLE_POLL_INTERVAL_MS) return
@@ -728,13 +742,52 @@ async function runAutomaticValidationTick(source: 'startup' | 'interval' | 'reco
 /**
  * Run one automated stage without allowing a stalled async operation to block
  * every other scheduled stage forever. The underlying promise is allowed to
- * settle safely after the timeout; keeping its stage marked in-flight avoids
- * duplicate work and relies on runTradingCycle's existing global serialization
- * as a second safety barrier.
+ * settle safely after the timeout; a generation-tagged watchdog releases a
+ * stale stage for recovery while preventing late cleanup from touching a
+ * newer attempt. runTradingCycle's global serialization remains a second
+ * safety barrier against concurrent exchange work.
  */
-async function runAutomaticValidationCycle(stage: ValidationStage): Promise<void> {
-  if (validationAutomationStagesInProgress.has(stage)) return
+async function runAutomaticValidationCycle(
+  stage: ValidationStage,
+): Promise<void> {
+  const previousAttempt = validationAutomationStageAttempts.get(stage)
+  const attemptStartedAt = previousAttempt?.startedAt ?? Date.now()
+  if (
+    validationAutomationStagesInProgress.has(stage) &&
+    !validationAutomationStageTimedOut(attemptStartedAt)
+  )
+    return
+
+  if (validationAutomationStagesInProgress.has(stage)) {
+    const ageMs = Date.now() - attemptStartedAt
+
+    // A timed-out promise may never settle (for example, a persistence or
+    // upstream operation can outlive its request guard). Keeping the stage in
+    // the in-flight set forever silently starves that validation run while
+    // other stages continue. Release only this stage after the watchdog
+    // window; generation matching below prevents the old promise's cleanup
+    // from deleting a newer attempt.
+    appendAuditLog('validation_run_automation_stage_recovered', {
+      stage,
+      staleAgeMs: ageMs,
+      previousGeneration: previousAttempt?.generation ?? null,
+    })
+    validationAutomationStagesInProgress.delete(stage)
+  }
+
+  const generation = (previousAttempt?.generation ?? 0) + 1
   validationAutomationStagesInProgress.add(stage)
+  validationAutomationStageAttempts.set(stage, {
+    generation,
+    startedAt: Date.now(),
+  })
+
+  const cleanup = () => {
+    if (validationAutomationStageAttempts.get(stage)?.generation !== generation)
+      return
+    validationAutomationStagesInProgress.delete(stage)
+    validationAutomationStageAttempts.delete(stage)
+  }
 
   const cyclePromise = runValidationCycle(stage, { automated: true }).catch(
     (error) => {
@@ -759,12 +812,14 @@ async function runAutomaticValidationCycle(stage: ValidationStage): Promise<void
   clearTimeout(timeout)
 
   if (outcome === 'timeout') {
-    void cyclePromise.finally(() => {
-      validationAutomationStagesInProgress.delete(stage)
-    })
+    // Release the stage at the timeout boundary so a later scheduler tick can
+    // recover it. The generation guard keeps late cleanup from touching a
+    // newer attempt.
+    cleanup()
+    void cyclePromise
     return
   }
-  validationAutomationStagesInProgress.delete(stage)
+  cleanup()
 }
 
 /**
@@ -836,10 +891,9 @@ export async function runValidationCycle(
   }
 
   const db = readFinanceStore()
-  const resolvedMode = executionModeForTradingMode(
-    db.settings.tradingMode,
-  )
-  const paperSidecar = run.executionMode === 'paper' && resolvedMode === 'testnet'
+  const resolvedMode = executionModeForTradingMode(db.settings.tradingMode)
+  const paperSidecar =
+    run.executionMode === 'paper' && resolvedMode === 'testnet'
   if (resolvedMode !== run.executionMode && !paperSidecar) {
     return {
       ok: false,
@@ -954,7 +1008,10 @@ export async function runValidationCycle(
   }
   for (const action of cycle.actions) {
     if (action.action === 'BLOCKED') {
-      errors.push({ at: cycle.ranAt, message: `${action.symbol}: ${action.reason}` })
+      errors.push({
+        at: cycle.ranAt,
+        message: `${action.symbol}: ${action.reason}`,
+      })
     }
   }
 
@@ -1034,7 +1091,8 @@ export async function runValidationCycle(
       (nextSignalCountsByStrategy[strategyId] ?? 0) + count
   }
   const realizedPnlQuote =
-    run.evidence.realizedPnlQuote + newTrades.reduce((s, t) => s + t.pnlQuote, 0)
+    run.evidence.realizedPnlQuote +
+    newTrades.reduce((s, t) => s + t.pnlQuote, 0)
   const feesQuote =
     run.evidence.feesQuote + newTrades.reduce((s, t) => s + t.feesQuote, 0)
   const priorSlippageSum =
@@ -1055,7 +1113,10 @@ export async function runValidationCycle(
       lastCycleAt: new Date(now).toISOString(),
       lastCycleRan: cycle.ran,
       lastCycleReason: cycle.reason ?? null,
-      currentExposureQuote: currentExposureQuote(run.executionMode, run.strategies),
+      currentExposureQuote: currentExposureQuote(
+        run.executionMode,
+        run.strategies,
+      ),
       lastSuccessfulCycleAt: cycle.ran
         ? cycle.ranAt
         : (run.progress.lastSuccessfulCycleAt ?? null),
@@ -1070,7 +1131,8 @@ export async function runValidationCycle(
               now +
                 Math.min(
                   30 * 60_000,
-                  5 * 60_000 *
+                  5 *
+                    60_000 *
                     2 ** Math.min(3, run.progress.consecutiveFailures ?? 0),
                 ),
             ).toISOString(),
@@ -1098,7 +1160,8 @@ export async function runValidationCycle(
   if (!latestRun) {
     return {
       ok: false,
-      message: 'Validation run changed while its cycle was running; review the latest run state.',
+      message:
+        'Validation run changed while its cycle was running; review the latest run state.',
       run: null,
       cycle,
       state: latestState,
@@ -1122,7 +1185,10 @@ export async function runValidationCycle(
   // stop taking further cycles for this run once breached; the underlying
   // position(s) remain fully managed by the engine's own normal cycles
   // (cron etc.) regardless, so nothing here ever force-closes anything.
-  if (updatedRun.progress.currentExposureQuote > updatedRun.budgets.maxExposureQuote) {
+  if (
+    updatedRun.progress.currentExposureQuote >
+    updatedRun.budgets.maxExposureQuote
+  ) {
     return endRun(run.id, 'stopped', 'exposure budget exceeded')
   }
   if (updatedRun.progress.cyclesRun >= updatedRun.budgets.maxCycles) {
@@ -1134,7 +1200,9 @@ export async function runValidationCycle(
 
   return {
     ok: true,
-    message: cycle.ran ? 'Cycle attributed to validation run.' : (cycle.reason ?? 'Cycle did not run.'),
+    message: cycle.ran
+      ? 'Cycle attributed to validation run.'
+      : (cycle.reason ?? 'Cycle did not run.'),
     run: updatedRun,
     cycle,
     state,

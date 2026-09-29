@@ -98,6 +98,21 @@ const VALID_BUDGETS = {
   maxExposureQuote: 100,
 }
 
+describe('validation automation watchdog', () => {
+  it('recovers a stage only after the timeout plus poll window', async () => {
+    const { validationAutomationStageTimedOut } =
+      await import('./validation-run')
+    const startedAt = 1_000_000
+
+    expect(
+      validationAutomationStageTimedOut(startedAt, startedAt + 149_999),
+    ).toBe(false)
+    expect(
+      validationAutomationStageTimedOut(startedAt, startedAt + 150_001),
+    ).toBe(true)
+  })
+})
+
 describe('startValidationRun — strict rejection', () => {
   it('rejects live mode outright, regardless of requested stage', async () => {
     await setMode('live_manual_approval')
@@ -153,7 +168,10 @@ describe('startValidationRun — strict rejection', () => {
 
   it.each([
     ['missing budgets object', {}],
-    ['zeroed budgets', { maxDurationMs: 0, maxCycles: 0, maxTrades: 0, maxExposureQuote: 0 }],
+    [
+      'zeroed budgets',
+      { maxDurationMs: 0, maxCycles: 0, maxTrades: 0, maxExposureQuote: 0 },
+    ],
     [
       'negative budgets',
       { maxDurationMs: -1, maxCycles: -1, maxTrades: -1, maxExposureQuote: -1 },
@@ -336,7 +354,9 @@ describe('runValidationCycle', () => {
     expect(result.run?.progress.cyclesRun).toBe(1)
     expect(result.run?.progress.tradesOpened).toBeGreaterThanOrEqual(1)
     expect(result.run?.evidence.signalEvaluations).toBeGreaterThan(0)
-    expect(result.run?.evidence.signalCountsByStrategy.rsi_reversion).toBeGreaterThan(0)
+    expect(
+      result.run?.evidence.signalCountsByStrategy.rsi_reversion,
+    ).toBeGreaterThan(0)
   })
 
   it('records an explicit zero for an evaluated strategy with only HOLD signals', async () => {
@@ -349,7 +369,9 @@ describe('runValidationCycle', () => {
       budgets: VALID_BUDGETS,
     })
     const result = await runValidationCycle('sandbox', {
-      client: fakeClient({ getKlines: async () => flatHighCandles(100) }) as never,
+      client: fakeClient({
+        getKlines: async () => flatHighCandles(100),
+      }) as never,
     })
     expect(result.ok).toBe(true)
     expect(result.run?.evidence.signalCountsByStrategy).toMatchObject({
@@ -412,7 +434,9 @@ describe('runValidationCycle', () => {
     // debounced — this is exactly the "open, then immediately close"
     // pattern the API and other tests rely on.
     const manual = await runValidationCycle('sandbox', {
-      client: fakeClient({ getKlines: async () => flatHighCandles(130) }) as never,
+      client: fakeClient({
+        getKlines: async () => flatHighCandles(130),
+      }) as never,
     })
     expect(manual.cycle).not.toBeNull()
     expect(manual.run?.progress.cyclesRun).toBe(2)
@@ -442,12 +466,16 @@ describe('runValidationCycle', () => {
     expect(opened.cycle?.actions.some((a) => a.action === 'OPEN')).toBe(true)
 
     const closed = await runValidationCycle('sandbox', {
-      client: fakeClient({ getKlines: async () => flatHighCandles(130) }) as never,
+      client: fakeClient({
+        getKlines: async () => flatHighCandles(130),
+      }) as never,
     })
     expect(closed.cycle?.actions.some((a) => a.action === 'CLOSE')).toBe(true)
     expect(closed.run?.progress.tradesClosed).toBeGreaterThanOrEqual(1)
     expect(closed.run?.evidence.realizedPnlQuote).toBeGreaterThan(0)
-    expect(closed.run?.evidence.ledgerRecordIds.length).toBeGreaterThanOrEqual(1)
+    expect(closed.run?.evidence.ledgerRecordIds.length).toBeGreaterThanOrEqual(
+      1,
+    )
   })
 
   it('rejects further cycles once tradingMode no longer matches the run', async () => {
@@ -532,8 +560,9 @@ describe('restart recovery (time-budget reconciliation)', () => {
     // timer is ever created by this module — see reconcileExpiry()).
     const store = await import('./finance-store')
     const db = store.readFinanceStore()
-    const state = (db.settings as Record<string, unknown>)
-      .validationRuns as { active: Array<{ createdAt: string }> }
+    const state = (db.settings as Record<string, unknown>).validationRuns as {
+      active: Array<{ createdAt: string }>
+    }
     state.active[0].createdAt = new Date(Date.now() - 3_600_000).toISOString()
     store.writeFinanceStore(db)
 
@@ -606,10 +635,8 @@ describe('validationRunsPayload', () => {
 describe('validationReconciliationPayload', () => {
   it('marks a fresh zero-trade run as incomplete evidence', async () => {
     await setMode('testnet_execute')
-    const {
-      startValidationRun,
-      validationReconciliationPayload,
-    } = await import('./validation-run')
+    const { startValidationRun, validationReconciliationPayload } =
+      await import('./validation-run')
     await startValidationRun({
       stage: 'sandbox',
       strategies: ['rsi_reversion'],
@@ -624,7 +651,10 @@ describe('validationReconciliationPayload', () => {
       recommendation: 'continue_collecting',
     })
     expect(payload.active[0]?.warnings).toEqual(
-      expect.arrayContaining(['no closed trades collected', 'no cycles completed']),
+      expect.arrayContaining([
+        'no closed trades collected',
+        'no cycles completed',
+      ]),
     )
   })
 })

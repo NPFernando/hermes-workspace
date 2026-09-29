@@ -15,6 +15,26 @@ function totalCount(counts: Record<string, number>, key: string): number {
   return counts[key] ?? 0
 }
 
+function latestAutoRun(
+  runs: FinancePayload['validationRuns']['active'],
+): FinancePayload['validationRuns']['active'][number] | null {
+  let latest: FinancePayload['validationRuns']['active'][number] | null = null
+  for (const run of runs) {
+    const latestAt = latest?.progress.lastSuccessfulCycleAt
+      ? Date.parse(latest.progress.lastSuccessfulCycleAt)
+      : Number.NEGATIVE_INFINITY
+    const runAt = run.progress.lastSuccessfulCycleAt
+      ? Date.parse(run.progress.lastSuccessfulCycleAt)
+      : Number.NEGATIVE_INFINITY
+    if (!latest || runAt > latestAt) latest = run
+  }
+  return latest
+}
+
+function stageLabel(stage: 'paper' | 'sandbox'): string {
+  return stage === 'paper' ? 'Paper' : 'Sandbox'
+}
+
 /**
  * Operator-facing view of the persisted automation loop. This intentionally
  * reports engine evidence, not scheduler claims: a successful scheduler tick
@@ -41,7 +61,7 @@ export function AutomationHealthCard({
   const activeAutoRuns = payload.validationRuns.active.filter(
     (run) => run.autoRun,
   )
-  const activeAutoRun = activeAutoRuns.at(0) ?? null
+  const activeAutoRun = latestAutoRun(activeAutoRuns)
   const stream = payload.userDataStream
   const reconciliation = payload.tradingAccountReconciliation
   const lastAt =
@@ -63,10 +83,25 @@ export function AutomationHealthCard({
     totalCount(paper.statusCounts, 'data_error') +
     totalCount(sandbox.statusCounts, 'data_error')
   const hasProblem = stale || last?.status === 'data_error' || dataErrors > 0
-  const noEntries =
-    activeAutoRun !== null &&
-    activeAutoRun.progress.cyclesRun > 0 &&
-    activeAutoRun.progress.tradesOpened === 0
+  const noEntries = activeAutoRuns.some(
+    (run) => run.progress.cyclesRun > 0 && run.progress.tradesOpened === 0,
+  )
+  const autoRunTradeSummary = activeAutoRuns.length
+    ? activeAutoRuns
+        .map(
+          (run) =>
+            `${stageLabel(run.stage)}: ${run.progress.tradesOpened} opened / ${run.progress.tradesClosed} closed`,
+        )
+        .join(' · ')
+    : 'n/a'
+  const councilNonActionSummary = activeAutoRuns.length
+    ? activeAutoRuns
+        .map(
+          (run) =>
+            `${stageLabel(run.stage)}: ${run.evidence.councilNonActionSignals}`,
+        )
+        .join(' · ')
+    : 'n/a'
 
   async function reconcile() {
     setBusy(true)
@@ -88,8 +123,8 @@ export function AutomationHealthCard({
         <div>
           <h2 className="text-lg font-semibold">Automation health</h2>
           <p className="mt-1 text-xs text-[var(--theme-muted)]">
-            Evidence from completed engine cycles. A scheduled job being
-            marked successful does not itself prove a trade or a healthy market
+            Evidence from completed engine cycles. A scheduled job being marked
+            successful does not itself prove a trade or a healthy market
             decision.
           </p>
         </div>
@@ -126,31 +161,33 @@ export function AutomationHealthCard({
         <Metric label="Last result" value={last?.status ?? 'Unknown'} />
         <Metric label="Paper cycles" value={String(paper.cycles)} />
         <Metric label="Sandbox cycles" value={String(sandbox.cycles)} />
+        <Metric label="Auto-run trades" value={autoRunTradeSummary} />
+        <Metric label="Council non-action" value={councilNonActionSummary} />
         <Metric
-          label="Auto-run trades"
-          value={
-            activeAutoRun
-              ? `${activeAutoRun.progress.tradesOpened} opened / ${activeAutoRun.progress.tradesClosed} closed`
-              : 'n/a'
-          }
+          label="Blocked / data errors"
+          value={`${blocked} / ${dataErrors}`}
         />
-        <Metric
-          label="Council non-action"
-          value={
-            activeAutoRun
-              ? String(activeAutoRun.evidence.councilNonActionSignals)
-              : 'n/a'
-          }
-        />
-        <Metric label="Blocked / data errors" value={`${blocked} / ${dataErrors}`} />
         <Metric
           label="Account reconciliation"
-          value={reconciliation ? reconciliation.status.replace('_', ' ') : 'not checked'}
+          value={
+            reconciliation
+              ? reconciliation.status.replace('_', ' ')
+              : 'not checked'
+          }
         />
       </div>
       <div className="mt-3 flex flex-wrap gap-2 text-xs text-[var(--theme-muted)]">
-        <span className={`rounded-full border px-2.5 py-1 ${stream.connected ? 'border-emerald-500/40 text-emerald-300' : 'border-[var(--theme-border)]'}`}>
-          Exchange events: {stream.connected ? `connected (${stream.environment ?? 'unknown'})` : stream.enabled ? stream.armed ? 'not connected' : 'standby' : 'disabled'}
+        <span
+          className={`rounded-full border px-2.5 py-1 ${stream.connected ? 'border-emerald-500/40 text-emerald-300' : 'border-[var(--theme-border)]'}`}
+        >
+          Exchange events:{' '}
+          {stream.connected
+            ? `connected (${stream.environment ?? 'unknown'})`
+            : stream.enabled
+              ? stream.armed
+                ? 'not connected'
+                : 'standby'
+              : 'disabled'}
         </span>
         {stream.lastEventAt ? (
           <span className="rounded-full border border-[var(--theme-border)] px-2.5 py-1">
@@ -163,7 +200,10 @@ export function AutomationHealthCard({
           </span>
         ) : null}
         <span className="rounded-full border border-[var(--theme-border)] px-2.5 py-1">
-          Auto-run stages: {activeAutoRuns.length ? activeAutoRuns.map((run) => run.stage).join(', ') : 'none'}
+          Auto-run stages:{' '}
+          {activeAutoRuns.length
+            ? activeAutoRuns.map((run) => run.stage).join(', ')
+            : 'none'}
         </span>
         {last?.reason ? (
           <span className="rounded-full border border-[var(--theme-border)] px-2.5 py-1">
@@ -191,7 +231,9 @@ export function AutomationHealthCard({
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-[var(--theme-border)]/70 bg-[color-mix(in_srgb,var(--theme-text)_6%,transparent)] p-3">
-      <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">{label}</div>
+      <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--theme-muted)]">
+        {label}
+      </div>
       <div className="mt-1 text-sm font-semibold capitalize">{value}</div>
     </div>
   )
