@@ -342,6 +342,7 @@ export type ValidationRunEvidence = {
   signalEvaluations: number
   signalCountsByStrategy: Record<string, number>
   councilNonActionSignals: number
+  nonActionReasonCounts: Record<string, number>
   errors: Array<{ at: string; message: string }>
 }
 

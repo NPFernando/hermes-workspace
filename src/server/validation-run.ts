@@ -109,6 +109,8 @@ export interface ValidationRunEvidence {
   signalEvaluations: number
   signalCountsByStrategy: Record<string, number>
   councilNonActionSignals: number
+  /** Bounded counts of why a non-HOLD council signal did not trade. */
+  nonActionReasonCounts: Record<string, number>
   errors: Array<ValidationRunErrorEntry>
 }
 
@@ -198,6 +200,7 @@ function normalizeValidationRun(run: ValidationRun): ValidationRun {
       signalEvaluations: rawEvidence.signalEvaluations ?? 0,
       signalCountsByStrategy: rawEvidence.signalCountsByStrategy ?? {},
       councilNonActionSignals: rawEvidence.councilNonActionSignals ?? 0,
+      nonActionReasonCounts: rawEvidence.nonActionReasonCounts ?? {},
     },
   }
 }
@@ -565,6 +568,7 @@ export async function startValidationRun(
       signalEvaluations: 0,
       signalCountsByStrategy: {},
       councilNonActionSignals: 0,
+      nonActionReasonCounts: {},
       errors: [],
     },
     readinessImpact: null,
@@ -986,6 +990,42 @@ export async function runValidationCycle(
       diagnostic.finalAction !== 'OPEN' &&
       diagnostic.finalAction !== 'CLOSE',
   ).length
+  const nonActionReasonCounts = diagnostics.reduce<Record<string, number>>(
+    (counts, diagnostic) => {
+      if (
+        diagnostic.councilSignal === 'HOLD' ||
+        diagnostic.finalAction === 'OPEN' ||
+        diagnostic.finalAction === 'CLOSE'
+      ) {
+        return counts
+      }
+      const rawReason = diagnostic.finalReason?.trim()
+      const reason = rawReason
+        ? rawReason.slice(0, 160)
+        : `final_action:${diagnostic.finalAction ?? 'none'}`
+      const key = Object.prototype.hasOwnProperty.call(counts, reason)
+        ? reason
+        : Object.keys(counts).length < 32
+          ? reason
+          : 'other'
+      counts[key] = (counts[key] ?? 0) + 1
+      return counts
+    },
+    {},
+  )
+  const nextNonActionReasonCounts = { ...run.evidence.nonActionReasonCounts }
+  for (const [reason, count] of Object.entries(nonActionReasonCounts)) {
+    const key = Object.prototype.hasOwnProperty.call(
+      nextNonActionReasonCounts,
+      reason,
+    )
+      ? reason
+      : Object.keys(nextNonActionReasonCounts).length < 32
+        ? reason
+        : 'other'
+    nextNonActionReasonCounts[key] =
+      (nextNonActionReasonCounts[key] ?? 0) + count
+  }
   const nextSignalCountsByStrategy = {
     ...run.evidence.signalCountsByStrategy,
   }
@@ -1047,6 +1087,7 @@ export async function runValidationCycle(
       signalCountsByStrategy: nextSignalCountsByStrategy,
       councilNonActionSignals:
         run.evidence.councilNonActionSignals + councilNonActionSignals,
+      nonActionReasonCounts: nextNonActionReasonCounts,
       errors: errors.slice(-ERRORS_CAP),
     },
     updatedAt: new Date(now).toISOString(),

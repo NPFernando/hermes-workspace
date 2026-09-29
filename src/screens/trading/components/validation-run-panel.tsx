@@ -625,6 +625,16 @@ export function ValidationRunPanel({
                   .join(' · ') || 'none'}
               </span>
             </p>
+            <p className="sm:col-span-2">
+              Non-action reasons:{' '}
+              <span className="text-[var(--theme-text)]">
+                {Object.entries(activeRun.evidence.nonActionReasonCounts)
+                  .sort(([, a], [, b]) => b - a)
+                  .slice(0, 6)
+                  .map(([reason, count]) => `${count}× ${reason}`)
+                  .join(' · ') || 'none recorded'}
+              </span>
+            </p>
             <p>
               Last successful cycle:{' '}
               <span className="text-[var(--theme-text)]">
