@@ -3195,6 +3195,12 @@ describe('learning cycle', () => {
 })
 
 describe('strategyGuardReview', () => {
+  it('enables the automatic strategy guard by default', async () => {
+    const { DEFAULT_ENGINE_CONFIG } = await import('./demo-trading-engine')
+
+    expect(DEFAULT_ENGINE_CONFIG.strategyGuardEnabled).toBe(true)
+  })
+
   it('caps scorecard confidence when historical trades are outside the recent window', async () => {
     const store = await import('./finance-store')
     const db = store.readFinanceStore()

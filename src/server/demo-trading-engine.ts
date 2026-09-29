@@ -307,7 +307,9 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   longShortSentimentEnabled: false,
   longShortSentimentPeriod: '1h',
   noLossExitMode: true,
-  strategyGuardEnabled: false,
+  // Automatic quarantine is a safety control: it can only reduce size or
+  // disable a strategy after configured loss, slippage, or API-error limits.
+  strategyGuardEnabled: true,
   strategyGuardMinClosedTrades: 5,
   strategyGuardLossRateThreshold: 0.4,
   strategyGuardMaxPnlQuote: 0,
