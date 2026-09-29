@@ -5993,7 +5993,7 @@ export function startSandboxExperiment(input: {
     id,
     strategyIds,
     executionMode,
-    durationMinutes,
+    durationMinutes: durationMinutesCap,
     tradeCap,
     sizeMultiplierCap,
     reason,

@@ -2165,6 +2165,7 @@ describe('sandbox experiments', () => {
       multiplier: 0.5,
       source: 'experiment',
     })
+    expect(result.experiment?.durationMinutes).toBe(60)
   })
 
   it('does not apply an override when the size cap is 1 (tracking only)', async () => {
