@@ -339,6 +339,24 @@ describe('runValidationCycle', () => {
     expect(result.run?.evidence.signalCountsByStrategy.rsi_reversion).toBeGreaterThan(0)
   })
 
+  it('records an explicit zero for an evaluated strategy with only HOLD signals', async () => {
+    await setMode('testnet_execute')
+    const { startValidationRun, runValidationCycle } =
+      await import('./validation-run')
+    await startValidationRun({
+      stage: 'sandbox',
+      strategies: ['sma_crossover'],
+      budgets: VALID_BUDGETS,
+    })
+    const result = await runValidationCycle('sandbox', {
+      client: fakeClient({ getKlines: async () => flatHighCandles(100) }) as never,
+    })
+    expect(result.ok).toBe(true)
+    expect(result.run?.evidence.signalCountsByStrategy).toMatchObject({
+      sma_crossover: 0,
+    })
+  })
+
   it('runs a paper sidecar through the no-order paper client while global mode is testnet', async () => {
     await setMode('testnet_execute')
     const { startValidationRun, runValidationCycle } =

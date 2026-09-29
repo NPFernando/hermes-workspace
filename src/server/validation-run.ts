@@ -936,16 +936,25 @@ export async function runValidationCycle(
   const openedCount = cycle.actions.filter((a) => a.action === 'OPEN').length
   const closedCount = newTrades.length
   const diagnostics = cycle.diagnostics?.symbols ?? []
-  const signalCountsByStrategy = diagnostics.reduce<Record<string, number>>(
-    (counts, diagnostic) => {
-      for (const signal of diagnostic.strategySignals) {
-        if (signal.signal === 'HOLD') continue
-        counts[signal.strategyId] = (counts[signal.strategyId] ?? 0) + 1
-      }
+  // Keep zero-valued entries for every strategy selected by the run. Without
+  // this, a missing key is ambiguous in the dashboard: it could mean the
+  // strategy was never evaluated, or that it was evaluated and produced only
+  // HOLD decisions. Explicit zeros make thin evidence (especially RSI) honest
+  // and comparable across cycles without changing execution behavior.
+  const signalCountsByStrategy = run.strategies.reduce<Record<string, number>>(
+    (counts, strategyId) => {
+      counts[strategyId] = 0
       return counts
     },
     {},
   )
+  for (const diagnostic of diagnostics) {
+    for (const signal of diagnostic.strategySignals) {
+      if (signal.signal === 'HOLD') continue
+      signalCountsByStrategy[signal.strategyId] =
+        (signalCountsByStrategy[signal.strategyId] ?? 0) + 1
+    }
+  }
   const signalEvaluations = diagnostics.reduce(
     (count, diagnostic) => count + diagnostic.strategySignals.length,
     0,
