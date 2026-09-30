@@ -75,12 +75,49 @@ describe('HARP route stats', () => {
     }
     expect(
       parseHarpRouteStats({ ...statsFixture(), coverage })?.coverage,
-    ).toEqual(coverage)
+    ).toEqual({ ...coverage, by_agent: [] })
     expect(parseHarpRouteStats(statsFixture())?.coverage).toBeNull()
     expect(
       parseHarpRouteStats({ ...statsFixture(), coverage: { plans: -1 } })
         ?.coverage,
     ).toBeNull()
+  })
+
+  it('folds pre-rename agent names into personas', () => {
+    const stats = parseHarpRouteStats({
+      ...statsFixture([
+        row({ agents: ['DevOps / SRE Engineer', 'VESTA', 'ADA'], observed: 2 }),
+      ]),
+      coverage: {
+        plans: 6,
+        reported: 2,
+        rate: 0.333,
+        by_host: [{ host: 'paperclip', plans: 6, reported: 2 }],
+        by_agent: [
+          {
+            host: 'paperclip',
+            agent: 'Engineering Manager',
+            plans: 3,
+            reported: 1,
+          },
+          { host: 'paperclip', agent: 'MINERVA', plans: 2, reported: 1 },
+          { host: 'paperclip', agent: 'ASTRA', plans: 1, reported: 0 },
+        ],
+      },
+    })
+    expect(stats?.routes[0]).toMatchObject({
+      observed: 2,
+      agents: ['CASSIA', 'VESTA'],
+    })
+    expect(stats?.coverage?.by_agent).toEqual([
+      { agent: 'MINERVA', plans: 5, reported: 2 },
+      { agent: 'ASTRA', plans: 1, reported: 0 },
+    ])
+    expect(parseHarpRouteStats(statsFixture([row({ agents: [1] })]))).toBeNull()
+    expect(parseHarpRouteStats(statsFixture())?.routes[0]).toMatchObject({
+      observed: 0,
+      agents: [],
+    })
   })
 
   it('clamps the window to 1..365 days', () => {

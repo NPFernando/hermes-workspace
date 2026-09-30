@@ -57,6 +57,8 @@ const STATS = {
       escalated: 0,
       success_rate: 0.25,
       demoted: true,
+      observed: 0,
+      agents: [],
     },
     {
       task_family: 'code_review',
@@ -68,6 +70,8 @@ const STATS = {
       escalated: 0,
       success_rate: 0.667,
       demoted: false,
+      observed: 1,
+      agents: ['CASSIA', 'VESTA'],
     },
   ],
 }
@@ -110,6 +114,9 @@ describe('HarpRouteOutcomesPanel', () => {
     expect(text).toContain('openrouter/weak/model')
     expect(text).toContain('demoted')
     expect(text).toContain('25%')
+    expect(text).toContain('1 observed')
+    expect(text).toContain('CASSIA')
+    expect(text).toContain('VESTA')
     await view.cleanup()
   })
 
@@ -142,11 +149,14 @@ describe('HarpRouteOutcomesPanel', () => {
           reported: 0,
           rate: 0,
           by_host: [{ host: 'paperclip', plans: 29, reported: 0 }],
+          by_agent: [{ agent: 'MINERVA', plans: 5, reported: 1 }],
         },
       }),
     )
     expect(covered.container.textContent).toContain('0 of 29 plans reported')
     expect(covered.container.textContent).toContain('paperclip 0/29')
+    expect(covered.container.textContent).toContain('Coverage by agent')
+    expect(covered.container.textContent).toContain('MINERVA1/5')
     await covered.cleanup()
     const failing = await render(async () =>
       Response.json(

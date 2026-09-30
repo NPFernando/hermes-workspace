@@ -57,6 +57,17 @@ function Stat({
   )
 }
 
+function PersonaChip({ name, detail }: { name: string; detail?: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-[var(--theme-border)] bg-[var(--theme-hover)] px-1.5 py-0.5 font-sans text-[10px] font-medium text-[var(--theme-text)]">
+      {name}
+      {detail ? (
+        <span className="tabular-nums text-[var(--theme-muted)]">{detail}</span>
+      ) : null}
+    </span>
+  )
+}
+
 /** Outcome learning: how planned routes actually performed (harp-route-stats-v1). Read-only. */
 export function HarpRouteOutcomesPanel() {
   const [days, setDays] = useState<number>(30)
@@ -195,6 +206,21 @@ export function HarpRouteOutcomesPanel() {
                             demoted
                           </span>
                         )}
+                        {r.observed > 0 && (
+                          <span
+                            className="ml-2 rounded bg-sky-100 px-1.5 py-0.5 font-sans text-[10px] text-sky-700 dark:bg-sky-950/40 dark:text-sky-300"
+                            title="Outcomes from shadow-mode runs: success rates only, never tier raises"
+                          >
+                            {r.observed} observed
+                          </span>
+                        )}
+                        {r.agents.length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {r.agents.map((a) => (
+                              <PersonaChip key={a} name={a} />
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td className="py-1.5 pr-3 text-right tabular-nums">
                         {r.n}
@@ -216,6 +242,23 @@ export function HarpRouteOutcomesPanel() {
               </table>
             </div>
           )}
+
+          {data.coverage && data.coverage.by_agent.length > 0 ? (
+            <div className="mt-3">
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--theme-muted)]">
+                Coverage by agent (reported / planned)
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {data.coverage.by_agent.map((a) => (
+                  <PersonaChip
+                    key={a.agent}
+                    name={a.agent}
+                    detail={`${a.reported}/${a.plans}`}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
         </>
       ) : null}
     </div>

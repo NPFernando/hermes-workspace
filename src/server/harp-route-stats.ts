@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { personaName } from './agent-personas'
 
 /** One row of harp-route-stats-v1 `routes`. */
 export type HarpRouteStatsRow = {
@@ -14,6 +15,10 @@ export type HarpRouteStatsRow = {
   escalated: number
   success_rate: number
   demoted: boolean
+  /** Optional (1.1.0): how many of n were observed (shadow-mode) outcomes. */
+  observed: number
+  /** Optional (1.2.0): personas whose outcomes fed this route. */
+  agents: Array<string>
 }
 
 /** harp-route-stats-v1: outcome learning aggregates from `harp route stats --json`. */
@@ -33,6 +38,8 @@ export type HarpRouteCoverage = {
   reported: number
   rate: number | null
   by_host: Array<{ host: string; plans: number; reported: number }>
+  /** Optional (1.2.0): per persona, old agent names folded in; most plans first. */
+  by_agent: Array<{ agent: string; plans: number; reported: number }>
 }
 
 const STATS_TIMEOUT_MS = 15_000
@@ -53,6 +60,12 @@ function isName(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0
 }
 
+function parseAgents(value: unknown): Array<string> | null {
+  if (value === undefined) return []
+  if (!Array.isArray(value) || !value.every(isName)) return null
+  return [...new Set(value.map(personaName))].sort()
+}
+
 function parseRow(value: unknown): HarpRouteStatsRow | null {
   if (!isRecord(value)) return null
   const { task_family, provider, model, n, success, failure, escalated } = value
@@ -60,6 +73,9 @@ function parseRow(value: unknown): HarpRouteStatsRow | null {
   if (![n, success, failure, escalated].every(isCount)) return null
   if (!isRate(value.success_rate) || typeof value.demoted !== 'boolean')
     return null
+  const observed = value.observed ?? 0
+  const agents = parseAgents(value.agents)
+  if (!isCount(observed) || !agents) return null
   return {
     task_family,
     provider,
@@ -70,6 +86,8 @@ function parseRow(value: unknown): HarpRouteStatsRow | null {
     escalated: escalated as number,
     success_rate: value.success_rate,
     demoted: value.demoted,
+    observed,
+    agents,
   }
 }
 
@@ -85,7 +103,27 @@ function parseCoverage(value: unknown): HarpRouteCoverage | null {
     if (!isCount(raw.plans) || !isCount(raw.reported)) return null
     byHost.push({ host: raw.host, plans: raw.plans, reported: raw.reported })
   }
-  return { plans, reported, rate, by_host: byHost }
+  const byAgent = new Map<string, { plans: number; reported: number }>()
+  const rawAgents = value.by_agent ?? []
+  if (!Array.isArray(rawAgents)) return null
+  for (const raw of rawAgents) {
+    if (!isRecord(raw) || !isName(raw.agent)) return null
+    if (!isCount(raw.plans) || !isCount(raw.reported)) return null
+    const agent = personaName(raw.agent)
+    const row = byAgent.get(agent) ?? { plans: 0, reported: 0 }
+    row.plans += raw.plans
+    row.reported += raw.reported
+    byAgent.set(agent, row)
+  }
+  return {
+    plans,
+    reported,
+    rate,
+    by_host: byHost,
+    by_agent: [...byAgent]
+      .map(([agent, row]) => ({ agent, ...row }))
+      .sort((a, b) => b.plans - a.plans || a.agent.localeCompare(b.agent)),
+  }
 }
 
 /** Validate a harp-route-stats-v1 payload; null when it does not match the contract. */
