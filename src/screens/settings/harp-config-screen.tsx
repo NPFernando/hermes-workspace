@@ -14,6 +14,7 @@ import {
   ToggleOnIcon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import { HarpRouteOutcomesPanel } from './components/harp-route-outcomes-panel'
 import type * as React from 'react'
 import type {
   HarpBlocklistEntry,
@@ -1470,6 +1471,8 @@ export function HarpConfigScreen() {
         isLoading={observability.isLoading}
         error={observability.error}
       />
+
+      <HarpRouteOutcomesPanel />
 
       <HarpSelectorPreviewPanel
         view={selectorPreview.data}
