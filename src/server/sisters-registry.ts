@@ -233,6 +233,7 @@ function readDelegationProfiles(hermesRoot: string): Array<Sister> {
 
 let _cached: Array<Sister> | null = null
 let _cachedAt = 0
+let _aliases = new Map<string, string>()
 const CACHE_TTL = 30_000
 
 export function listSisters(skipCache = false): Array<Sister> {
@@ -244,15 +245,28 @@ export function listSisters(skipCache = false): Array<Sister> {
   const delegation = readDelegationProfiles(hermesRoot)
   const business = readBusinessAgents(hermesRoot)
 
-  // De-duplicate: AI sisters take priority over delegation profiles with same id
+  // De-duplicate: AI sisters take priority over delegation profiles with the same
+  // id — or the same persona name (legacy `coder` is Ada, `builder` Maya, `researcher`
+  // Luna). Folded ids still resolve through getSisterById; files are left untouched.
   const seen = new Set<string>()
+  const aiByName = new Map(ai.map((s) => [s.name.toLowerCase(), s.id]))
+  const aliases = new Map<string, string>()
   const deduped: Array<Sister> = []
   for (const s of [...ai, ...delegation, ...business]) {
+    const persona =
+      s.type === 'delegation_profile'
+        ? aiByName.get(s.name.toLowerCase())
+        : undefined
+    if (persona && persona !== s.id) {
+      aliases.set(s.id, persona)
+      continue
+    }
     if (!seen.has(s.id)) {
       seen.add(s.id)
       deduped.push(s)
     }
   }
+  _aliases = aliases
 
   // Attach growth level (filesystem reads — tolerate errors)
   const result = deduped.map((s) => {
@@ -281,7 +295,9 @@ export function listSisters(skipCache = false): Array<Sister> {
 }
 
 export function getSisterById(id: string): Sister | undefined {
-  return listSisters().find((s) => s.id === id)
+  const sisters = listSisters()
+  const target = _aliases.get(id) ?? id
+  return sisters.find((s) => s.id === target)
 }
 
 export function invalidateSistersCache(): void {
