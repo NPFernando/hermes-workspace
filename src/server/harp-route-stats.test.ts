@@ -107,7 +107,7 @@ describe('HARP route stats', () => {
     })
     expect(stats?.routes[0]).toMatchObject({
       observed: 2,
-      agents: ['ADA', 'VESTA'],
+      agents: ['CASSIA', 'VESTA'],
     })
     expect(stats?.coverage?.by_agent).toEqual([
       { agent: 'MINERVA', plans: 5, reported: 2 },

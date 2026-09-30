@@ -71,7 +71,7 @@ const STATS = {
       success_rate: 0.667,
       demoted: false,
       observed: 1,
-      agents: ['ADA', 'VESTA'],
+      agents: ['CASSIA', 'VESTA'],
     },
   ],
 }
@@ -115,7 +115,7 @@ describe('HarpRouteOutcomesPanel', () => {
     expect(text).toContain('demoted')
     expect(text).toContain('25%')
     expect(text).toContain('1 observed')
-    expect(text).toContain('ADA')
+    expect(text).toContain('CASSIA')
     expect(text).toContain('VESTA')
     await view.cleanup()
   })
