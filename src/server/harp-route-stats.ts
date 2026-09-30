@@ -24,6 +24,15 @@ export type HarpRouteStats = {
   demote_below: number
   routes: Array<HarpRouteStatsRow>
   classifier: { agreed: number; corrected: number; accuracy: number | null }
+  /** Optional in the contract: planned routes in the window and how many reported back. */
+  coverage: HarpRouteCoverage | null
+}
+
+export type HarpRouteCoverage = {
+  plans: number
+  reported: number
+  rate: number | null
+  by_host: Array<{ host: string; plans: number; reported: number }>
 }
 
 const STATS_TIMEOUT_MS = 15_000
@@ -64,6 +73,21 @@ function parseRow(value: unknown): HarpRouteStatsRow | null {
   }
 }
 
+function parseCoverage(value: unknown): HarpRouteCoverage | null {
+  if (!isRecord(value)) return null
+  const { plans, reported, rate } = value
+  if (!isCount(plans) || !isCount(reported)) return null
+  if (rate !== null && !isRate(rate)) return null
+  if (!Array.isArray(value.by_host)) return null
+  const byHost: HarpRouteCoverage['by_host'] = []
+  for (const raw of value.by_host) {
+    if (!isRecord(raw) || !isName(raw.host)) return null
+    if (!isCount(raw.plans) || !isCount(raw.reported)) return null
+    byHost.push({ host: raw.host, plans: raw.plans, reported: raw.reported })
+  }
+  return { plans, reported, rate, by_host: byHost }
+}
+
 /** Validate a harp-route-stats-v1 payload; null when it does not match the contract. */
 export function parseHarpRouteStats(value: unknown): HarpRouteStats | null {
   if (!isRecord(value) || value.contract !== 'harp-route-stats-v1') return null
@@ -97,6 +121,7 @@ export function parseHarpRouteStats(value: unknown): HarpRouteStats | null {
       corrected: classifier.corrected,
       accuracy: classifier.accuracy,
     },
+    coverage: parseCoverage(value.coverage),
   }
 }
 

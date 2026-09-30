@@ -66,6 +66,23 @@ describe('HARP route stats', () => {
     ).toBeNull()
   })
 
+  it('parses optional coverage and tolerates older HARP without it', () => {
+    const coverage = {
+      plans: 4,
+      reported: 1,
+      rate: 0.25,
+      by_host: [{ host: 'paperclip', plans: 4, reported: 1 }],
+    }
+    expect(
+      parseHarpRouteStats({ ...statsFixture(), coverage })?.coverage,
+    ).toEqual(coverage)
+    expect(parseHarpRouteStats(statsFixture())?.coverage).toBeNull()
+    expect(
+      parseHarpRouteStats({ ...statsFixture(), coverage: { plans: -1 } })
+        ?.coverage,
+    ).toBeNull()
+  })
+
   it('clamps the window to 1..365 days', () => {
     expect(clampDays('7')).toBe(7)
     expect(clampDays(null)).toBe(30)

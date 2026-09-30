@@ -132,6 +132,22 @@ describe('HarpRouteOutcomesPanel', () => {
     )
     expect(empty.container.textContent).toContain('No outcomes reported yet')
     await empty.cleanup()
+    const covered = await render(async () =>
+      Response.json({
+        ...STATS,
+        outcomes: 0,
+        routes: [],
+        coverage: {
+          plans: 29,
+          reported: 0,
+          rate: 0,
+          by_host: [{ host: 'paperclip', plans: 29, reported: 0 }],
+        },
+      }),
+    )
+    expect(covered.container.textContent).toContain('0 of 29 plans reported')
+    expect(covered.container.textContent).toContain('paperclip 0/29')
+    await covered.cleanup()
     const failing = await render(async () =>
       Response.json(
         { ok: false, error: 'HARP route stats are unavailable' },

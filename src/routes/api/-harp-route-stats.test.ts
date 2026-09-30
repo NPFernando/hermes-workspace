@@ -43,6 +43,7 @@ describe('GET /api/harp-route-stats', () => {
       demote_below: 0.5,
       routes: [],
       classifier: { agreed: 0, corrected: 0, accuracy: null },
+      coverage: null,
     })
     const response = await handler({ request: new Request(`${url}?days=7`) })
     expect(response.status).toBe(200)
