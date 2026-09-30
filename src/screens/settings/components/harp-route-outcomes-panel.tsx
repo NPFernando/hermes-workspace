@@ -122,7 +122,7 @@ export function HarpRouteOutcomesPanel() {
         </p>
       ) : data ? (
         <>
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-4">
             <Stat
               label="Reported outcomes"
               value={String(data.outcomes)}
@@ -138,6 +138,15 @@ export function HarpRouteOutcomesPanel() {
               value={percent(data.classifier.accuracy)}
               hint={`${data.classifier.agreed} agreed · ${data.classifier.corrected} corrected`}
             />
+            <Stat
+              label="Outcome coverage"
+              value={data.coverage ? percent(data.coverage.rate) : '—'}
+              hint={
+                data.coverage
+                  ? `${data.coverage.reported} of ${data.coverage.plans} plans reported`
+                  : 'not reported by this HARP version'
+              }
+            />
           </div>
 
           {data.routes.length === 0 ? (
@@ -145,6 +154,16 @@ export function HarpRouteOutcomesPanel() {
               No outcomes reported yet. Agents report with{' '}
               <code>harp_route_outcome</code> (MCP) or{' '}
               <code>harp route outcome &lt;plan_id&gt; --outcome success</code>.
+              {data.coverage && data.coverage.by_host.length > 0 ? (
+                <>
+                  {' '}
+                  Plans awaiting outcomes:{' '}
+                  {data.coverage.by_host
+                    .map((h) => `${h.host} ${h.reported}/${h.plans}`)
+                    .join(', ')}
+                  .
+                </>
+              ) : null}
             </p>
           ) : (
             <div className="mt-3 overflow-x-auto">
