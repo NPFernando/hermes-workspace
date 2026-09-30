@@ -280,7 +280,7 @@ const REASON_MAP: Record<string, string> = {
   helena: 'legal or compliance question — routing to Helena',
   bia: 'security or risk topic — routing to Bia',
   nova: 'browser or visual task — routing to Nova',
-  daine: 'data or analytics request — routing to Daine',
+  daine: 'data or analytics request — routing to Daiane',
   vitoria: 'creative or content task — routing to Vitoria',
   larissa: 'customer communication — routing to Larissa',
   clara: 'sales or lead task — routing to Clara',
