@@ -44,6 +44,8 @@ describe('operational monitor', () => {
     expect(status.service).toMatchObject({ residentMemoryKb: null, oomDetected: true })
     expect(status.service.uptimeSeconds).toBeGreaterThan(0)
     expect(status.deploymentHistory).toEqual(['deploy succeeded at commit abc'])
+    expect(status.serviceHealthHistory).toHaveLength(1)
+    expect(status.serviceHealthHistory[0]).toMatchObject({ activeState: 'active', pid: '22' })
     expect(status.issues).toContainEqual(expect.objectContaining({ code: 'oom_event', level: 'warning' }))
     expect(status.issues).toContainEqual(expect.objectContaining({ code: 'service_errors', level: 'warning' }))
   })

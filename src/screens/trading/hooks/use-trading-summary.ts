@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-export type TradingEngineArmState = 'live' | 'paper' | 'gated' | 'disabled'
+export type TradingEngineArmState = 'live' | 'sandbox' | 'paper' | 'gated' | 'disabled'
 
 export type TradingEngineStatus = {
   id: string
@@ -14,6 +14,12 @@ export type TradingSummary = {
   emergencyKillSwitch: boolean
   todayPnlQuote: number
   totalPnlQuote: number
+  paperPnlQuote: number
+  sandboxPnlQuote: number
+  livePnlQuote: number
+  paperTrades: number
+  sandboxTrades: number
+  liveTrades: number
   openPositions: number
   winRate: number | null
   engines: Array<TradingEngineStatus>
@@ -29,13 +35,17 @@ export type AccountOverview = {
   tradingMode: string
   clientAvailable: boolean
   balanceFetchOk: boolean
+  reconciliation: {
+    status: 'not_applicable' | 'aligned' | 'drift_detected' | 'unavailable'
+    detail: string
+  }
   baseline: AccountBaseline | null
-  availableQuote: number
+  availableQuote: number | null
   deployedQuote: number
   unrealizedPnlQuote: number
   realizedPnlQuote: number
   todayPnlQuote: number
-  equityQuote: number
+  equityQuote: number | null
   netVsBaselineQuote: number | null
   archivedPositionsCount: number
   archivedTradesCount: number

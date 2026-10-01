@@ -2,7 +2,8 @@
 
 Every successful `scripts/deploy.sh` run appends one sanitized JSONL entry to
 `.runtime/deployment-history.jsonl`. The dashboard reads this file and shows
-the deployed commit, previous rollback target, build and runtime checks, plus
+the deployment correlation ID, deployed commit, previous rollback target, build
+and runtime checks, plus
 links to the source commit, CI checks, and deployment record when the deploy
 environment provides them.
 

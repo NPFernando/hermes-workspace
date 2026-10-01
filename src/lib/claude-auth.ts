@@ -1,6 +1,8 @@
 export interface AuthStatus {
   authenticated: boolean
   authRequired: boolean
+  /** Epoch milliseconds for the current session, when password protection is enabled. */
+  expiresAt?: number | null
   error?: string
 }
 

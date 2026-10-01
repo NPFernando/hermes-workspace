@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Same isolation pattern as trading-execution-gate.test.ts / rebalance-engine.test.ts:
 // point HOME at a temp dir so readFinanceStore/writeFinanceStore never touch the
@@ -20,7 +20,7 @@ const state = vi.hoisted(() => ({
       enoughDataForLiveManual: false,
       canIncreaseRisk: false,
     },
-  } as unknown as Record<string, unknown>,
+  },
   engineHistory: {
     positions: [] as Array<Record<string, unknown>>,
     trades: [] as Array<Record<string, unknown>>,
@@ -28,32 +28,32 @@ const state = vi.hoisted(() => ({
     archivedTrades: [] as Array<Record<string, unknown>>,
   },
   guardReviews: [] as Array<Record<string, unknown>>,
+  strategyOverrides: [] as Array<Record<string, unknown>>,
   ledgerRecords: [] as Array<Record<string, unknown>>,
   breakerTripped: false,
 }))
 
 vi.mock('./demo-trading-engine', async () => {
   const actual =
-    await vi.importActual<typeof import('./demo-trading-engine')>(
-      './demo-trading-engine',
-    )
+    await vi.importActual('./demo-trading-engine')
   return {
     ...actual,
     decisionQualityReport: () => state.decisionQuality,
     getFullEngineHistory: () => state.engineHistory,
     strategyGuardReview: () => state.guardReviews,
+    strategyOverrideState: () => ({
+      active: state.strategyOverrides,
+      history: [],
+    }),
   }
 })
 vi.mock('./trading-ledger', async () => {
-  const actual =
-    await vi.importActual<typeof import('./trading-ledger')>('./trading-ledger')
+  const actual = await vi.importActual('./trading-ledger')
   return { ...actual, buildLedgerRecords: () => state.ledgerRecords }
 })
 vi.mock('./connectivity-breaker', async () => {
   const actual =
-    await vi.importActual<typeof import('./connectivity-breaker')>(
-      './connectivity-breaker',
-    )
+    await vi.importActual('./connectivity-breaker')
   return { ...actual, isConnectivityBreakerTripped: () => state.breakerTripped }
 })
 
@@ -75,6 +75,7 @@ function resetMockState() {
     archivedTrades: [],
   }
   state.guardReviews = []
+  state.strategyOverrides = []
   state.ledgerRecords = []
   state.breakerTripped = false
 }
@@ -96,6 +97,7 @@ beforeEach(async () => {
   const financeStore = await import('./finance-store')
   const db = financeStore.readFinanceStore()
   delete (db.settings as Record<string, unknown>).liveReadiness
+  delete (db.settings as Record<string, unknown>).tradingConnectivityVerification
   db.settings.emergencyKillSwitch = true
   db.settings.executionAccount = 'paper'
   db.settings.tradingMode = 'observe_only'
@@ -118,6 +120,7 @@ async function makeEverythingReady(now: Date) {
   const financeStore = await import('./finance-store')
   const db = financeStore.readFinanceStore()
   db.settings.emergencyKillSwitch = false
+  db.settings.emergencyKillSwitchTestedAt = now.toISOString()
   db.settings.executionAccount = 'binance_testnet'
   db.settings.tradingMode = 'testnet_execute'
   db.settings.livePerOrderCapUsdt = 10
@@ -136,6 +139,8 @@ async function makeEverythingReady(now: Date) {
       correlationBucketsEnabled: false,
       correlationBuckets: {},
       maxBucketExposureQuote: 100,
+      maxTotalExposureQuote: 100,
+      maxSymbolExposureQuote: 50,
     },
   }
   financeStore.writeFinanceStore(db)
@@ -178,6 +183,14 @@ async function makeEverythingReady(now: Date) {
   process.env.BINANCE_API_KEY = 'live-key'
   process.env.BINANCE_API_SECRET = 'live-secret'
   process.env.BINANCE_ALLOW_LIVE_TRADING = 'I_APPROVE_BINANCE_LIVE_TRADING'
+  const readiness = await import('./trading-readiness')
+  db.settings.tradingConnectivityVerification = {
+    checkedAt: now.toISOString(),
+    credentialFingerprint: readiness.tradingCredentialFingerprint(),
+    testnet: { ok: true, detail: 'test fixture' },
+    live: { ok: true, detail: 'test fixture' },
+  }
+  financeStore.writeFinanceStore(db)
 }
 
 describe('assessReadiness — fail-closed on missing/stale evidence', () => {
@@ -222,6 +235,26 @@ describe('assessReadiness — fail-closed on missing/stale evidence', () => {
     expect(gate?.detail).toMatch(/sma_crossover/)
   })
 
+  it('does not require recent samples for a strategy with an active disabled override', async () => {
+    await makeEverythingReady(new Date())
+    state.strategyOverrides = [
+      {
+        id: 'override_sma_crossover_test',
+        strategyId: 'sma_crossover',
+        mode: 'disabled',
+      },
+    ]
+    state.guardReviews = [
+      { strategyId: 'sma_crossover', window: { sufficientSample: false } },
+      { strategyId: 'rsi_reversion', window: { sufficientSample: true } },
+    ]
+    const readiness = await import('./trading-readiness')
+    const snapshot = readiness.assessReadiness(new Date())
+    const gate = snapshot.gates.find((g) => g.id === 'strategy_sample_size')
+    expect(gate?.pass).toBe(true)
+    expect(gate?.detail).toMatch(/all 1 enabled strategies/)
+  })
+
   it('fails ledger_integrity on malformed ledger records (missing/invalid price or quantity)', async () => {
     await makeEverythingReady(new Date())
     state.ledgerRecords = [{ status: 'open', quantity: -1, entryPrice: 100 }]
@@ -229,6 +262,19 @@ describe('assessReadiness — fail-closed on missing/stale evidence', () => {
     const snapshot = readiness.assessReadiness(new Date())
     expect(snapshot.gates.find((g) => g.id === 'ledger_integrity')?.pass).toBe(
       false,
+    )
+  })
+
+  it('accepts valid order-level BUY/SELL records with only one side price', async () => {
+    await makeEverythingReady(new Date())
+    state.ledgerRecords = [
+      { status: 'closed', quantity: 1, entryPrice: 100, exitPrice: null },
+      { status: 'closed', quantity: 1, entryPrice: null, exitPrice: 101 },
+    ]
+    const readiness = await import('./trading-readiness')
+    const snapshot = readiness.assessReadiness(new Date())
+    expect(snapshot.gates.find((g) => g.id === 'ledger_integrity')?.pass).toBe(
+      true,
     )
   })
 

@@ -31,6 +31,11 @@ export function AccountOverviewCard() {
   const [recording, setRecording] = useState(false)
   const [recordError, setRecordError] = useState<string | null>(null)
   const [, setTick] = useState(0)
+  const liveAccount = account
+    ? ['live_manual_approval', 'live_monitored', 'live_auto_trade'].includes(
+        account.tradingMode,
+      )
+    : false
 
   useEffect(() => {
     // Re-render every few seconds so the "as of Xs ago" label ticks up even
@@ -40,7 +45,7 @@ export function AccountOverviewCard() {
   }, [])
 
   async function recordBaseline() {
-    if (!account) return
+    if (!account || account.equityQuote === null) return
     setRecording(true)
     setRecordError(null)
     try {
@@ -86,9 +91,10 @@ export function AccountOverviewCard() {
         <div>
           <h2 className="text-lg font-semibold">Trading Account Overview</h2>
           <p className="mt-1 text-sm text-[var(--theme-muted)]">
-            {account.label} — this account can be reset at any time; nothing
-            here is real money. It's used to validate the engine and tune its
-            buy/sell instinct before any live trading is ever considered.
+            {account.label} —{' '}
+            {liveAccount
+              ? 'real-money account state; verify every balance and reconciliation signal before relying on it.'
+              : 'resettable validation state; nothing here is real money.'}
           </p>
           <p className="mt-1 text-xs text-[var(--theme-muted)]">
             Balance/price data as of {formatAsOf(account.asOfMs)} (refreshes
@@ -98,7 +104,7 @@ export function AccountOverviewCard() {
         <button
           type="button"
           onClick={() => void recordBaseline()}
-          disabled={recording}
+          disabled={recording || account.equityQuote === null}
           className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] px-3 py-2 text-xs font-medium text-[var(--theme-text)] hover:bg-[color-mix(in_srgb,var(--theme-text)_6%,transparent)] disabled:opacity-50"
         >
           {recording ? 'Recording…' : 'Record current equity as new baseline'}
@@ -122,6 +128,11 @@ export function AccountOverviewCard() {
           until the next refresh; this isn't necessarily your real balance.
         </p>
       )}
+      {account.reconciliation.status !== 'not_applicable' && (
+        <p className={`mt-2 text-xs ${account.reconciliation.status === 'aligned' ? 'text-emerald-300' : 'text-[var(--theme-warning)]'}`}>
+          Live account reconciliation: {account.reconciliation.status.replace('_', ' ')} — {account.reconciliation.detail}
+        </p>
+      )}
       <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard
           label="Starting baseline"
@@ -131,11 +142,22 @@ export function AccountOverviewCard() {
               : 'Not set yet'
           }
         />
-        <StatCard label="Available" value={formatUsdt(account.availableQuote)} />
+        <StatCard
+          label="Available"
+          value={
+            account.availableQuote === null
+              ? 'Unavailable'
+              : formatUsdt(account.availableQuote)
+          }
+        />
         <StatCard label="Deployed" value={formatUsdt(account.deployedQuote)} />
         <StatCard
           label="Current equity"
-          value={formatUsdt(account.equityQuote)}
+          value={
+            account.equityQuote === null
+              ? 'Unavailable'
+              : formatUsdt(account.equityQuote)
+          }
         />
         <StatCard
           label="Realized P&L (all-time)"

@@ -22,6 +22,8 @@ restarting the service, or advancing the marker, run:
 Preview output is JSON containing the current commit, `origin/main` target,
 whether the checkout is dirty, the changed-file count, changed runtime files,
 migration/schema files, the rollback commit/artifact availability, the required
-security-evidence gate, and the action that a normal deployment would take. The
-preview may refresh the local remote-tracking reference, but never merges,
-builds, restarts, or writes deployment state.
+security-evidence gate, the action that a normal deployment would take, and a
+read-only `live` object containing service state, deployment marker, served
+build, on-disk artifact build, and a coherence flag. The preview may refresh the
+local remote-tracking reference, but never merges, builds, restarts, or writes
+deployment state.

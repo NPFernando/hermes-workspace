@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
-import { readFile, stat } from 'node:fs/promises'
+import { readFile, readdir, stat } from 'node:fs/promises'
 import { readFileSync } from 'node:fs'
 import { join, extname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -8,6 +8,65 @@ import server from './dist/server/server.js'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const CLIENT_DIR = join(__dirname, 'dist', 'client')
+
+// Keep the boot-time persistence probe and the bundled finance modules on
+// the same configuration path.  Production stores the Postgres credentials
+// in ~/.hermes/.env, while systemd intentionally does not export them as
+// process arguments.  Loading only these four names (and never logging them)
+// prevents a false "persistence unavailable" result from leaving automation
+// lazy after restart.
+for (const envPath of [
+  join(process.env.HERMES_HOME || join(process.env.HOME || '', '.hermes'), '.env'),
+  join(process.env.HERMES_HOME || join(process.env.HOME || '', '.hermes'), '.hermes.backup', '.env'),
+]) {
+  try {
+    const contents = readFileSync(envPath, 'utf8')
+    for (const line of contents.split('\n')) {
+      const match = line.match(/^(HERMES_PG_(?:PASSWORD|HOST|PORT|USER))=(.*)$/)
+      if (match && !process.env[match[1]]) {
+        process.env[match[1]] = match[2].trim().replace(/^"|"$/g, '')
+      }
+    }
+  } catch {
+    // CI and the JSON/test harness do not have the production env file.
+  }
+}
+
+// TanStack's server route chunk is normally loaded lazily on the first
+// request. Trading validation and account-reconciliation timers are started
+// by that chunk, so a quiet service restart could leave an active paper run
+// stale until an authenticated finance request happened to arrive. Preload
+// the generated router chunk at process boot; its existing singleton guards
+// keep this idempotent and the route remains available through the normal
+// request path. The build always emits exactly one router-*.js asset.
+const SERVER_ASSET_DIR = join(__dirname, 'dist', 'server', 'assets')
+const financePersistenceConfigured =
+  process.env.HERMES_FINANCE_STORE !== 'json' &&
+  (Boolean(process.env.HERMES_PG_PASSWORD) ||
+    await (async () => {
+      for (const envPath of [
+        join(process.env.HERMES_HOME || join(process.env.HOME || '', '.hermes'), '.env'),
+        join(process.env.HOME || '', '.hermes', '.hermes.backup', '.env'),
+      ]) {
+        try {
+          const contents = await readFile(envPath, 'utf8')
+          if (/^HERMES_PG_PASSWORD=.+$/m.test(contents)) return true
+        } catch {
+          // The built-in JSON/test harness does not have production secrets.
+        }
+      }
+      return false
+    })())
+
+if (financePersistenceConfigured) {
+  const routerAsset = (await readdir(SERVER_ASSET_DIR)).find(
+    (name) => /^router-[A-Za-z0-9_-]+\.js$/.test(name),
+  )
+  if (!routerAsset) {
+    throw new Error('server router asset is missing; cannot start automation safely')
+  }
+  await import(join(SERVER_ASSET_DIR, routerAsset))
+}
 
 // A short artifact fingerprint lets read-only release checks distinguish a
 // healthy process serving an older build from the build just verified. It is
@@ -27,6 +86,10 @@ const WORKSPACE_BUILD_ID = (() => {
     return 'unknown'
   }
 })()
+// Make the identity captured when this process starts available to the
+// server-side observability payload. This lets operators distinguish the
+// artifact currently on disk from the artifact actually serving requests.
+process.env.HERMES_RUNTIME_BUILD_ID = WORKSPACE_BUILD_ID
 
 const port = parseInt(process.env.PORT || '3000', 10)
 const HTTP_METRIC_WINDOW_MS = 15 * 60 * 1000

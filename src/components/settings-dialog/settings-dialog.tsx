@@ -5,11 +5,13 @@ import {
   BubbleChatDoneIcon,
   Cancel01Icon,
   CloudIcon,
+  Database02Icon,
   LanguageCircleIcon,
   MessageMultiple01Icon,
   Notification03Icon,
   PaintBoardIcon,
   Settings02Icon,
+  ShieldKeyIcon,
   VolumeHighIcon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -22,6 +24,8 @@ import { AgentBehaviorContent } from './sections/agent-behavior-content'
 import { VoiceContent } from './sections/voice-content'
 import { DisplayContent } from './sections/display-content'
 import { LanguageContent } from './sections/language-content'
+import { BackupsContent } from './sections/backups-content'
+import { SecurityContent } from './sections/security-content'
 import type * as React from 'react'
 import {
   DialogClose,
@@ -35,6 +39,8 @@ import { Button } from '@/components/ui/button'
 
 type SectionId =
   | 'claude'
+  | 'backups'
+  | 'security'
   | 'agent'
   | 'voice'
   | 'display'
@@ -44,7 +50,9 @@ type SectionId =
   | 'language'
 
 const SECTIONS: Array<{ id: SectionId; label: string; icon: any }> = [
-  { id: 'claude', label: 'Model & Provider', icon: CloudIcon },
+  { id: 'claude', label: 'Providers', icon: CloudIcon },
+  { id: 'backups', label: 'Backups', icon: Database02Icon },
+  { id: 'security', label: 'Security', icon: ShieldKeyIcon },
   { id: 'agent', label: 'Agent', icon: Settings02Icon },
   { id: 'voice', label: 'Voice', icon: VolumeHighIcon },
   { id: 'display', label: 'Display', icon: BubbleChatDoneIcon },
@@ -88,6 +96,8 @@ class SettingsErrorBoundary extends Component<
 
 const CONTENT_MAP: Record<SectionId, () => React.JSX.Element> = {
   claude: HermesContent,
+  backups: BackupsContent,
+  security: SecurityContent,
   agent: AgentBehaviorContent,
   voice: VoiceContent,
   display: DisplayContent,

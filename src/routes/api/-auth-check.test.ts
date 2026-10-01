@@ -6,6 +6,7 @@ const state = vi.hoisted(() => ({ authenticated: false }))
 
 vi.mock('../../server/auth-middleware', () => ({
   isAuthenticated: vi.fn(() => state.authenticated),
+  getSessionExpiry: vi.fn(() => null),
   isPasswordProtectionEnabled: vi.fn(() => true),
 }))
 
@@ -33,6 +34,7 @@ describe('auth-check API', () => {
     expect(await response.json()).toEqual({
       authenticated: true,
       authRequired: true,
+      expiresAt: null,
     })
   })
 
@@ -45,6 +47,7 @@ describe('auth-check API', () => {
     expect(await response.json()).toEqual({
       authenticated: false,
       authRequired: true,
+      expiresAt: null,
     })
   })
 })

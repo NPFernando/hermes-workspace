@@ -256,6 +256,23 @@ describe('startValidationRun — strict rejection', () => {
     expect(paperRun.state.active).toHaveLength(2)
   })
 
+  it('allows a paper-only sidecar while testnet remains the global mode', async () => {
+    await setMode('testnet_execute')
+    const { startValidationRun } = await import('./validation-run')
+    const result = await startValidationRun({
+      stage: 'paper',
+      strategies: ['rsi_reversion'],
+      budgets: VALID_BUDGETS,
+      autoRun: true,
+    })
+    expect(result.run).toMatchObject({
+      stage: 'paper',
+      executionMode: 'paper',
+      autoRun: true,
+      status: 'active',
+    })
+  })
+
   it('starts successfully with valid, bounded input and records a baseline', async () => {
     await setMode('testnet_execute')
     const { startValidationRun } = await import('./validation-run')
@@ -318,6 +335,45 @@ describe('runValidationCycle', () => {
     expect(result.cycle?.actions.some((a) => a.action === 'OPEN')).toBe(true)
     expect(result.run?.progress.cyclesRun).toBe(1)
     expect(result.run?.progress.tradesOpened).toBeGreaterThanOrEqual(1)
+    expect(result.run?.evidence.signalEvaluations).toBeGreaterThan(0)
+    expect(result.run?.evidence.signalCountsByStrategy.rsi_reversion).toBeGreaterThan(0)
+  })
+
+  it('records an explicit zero for an evaluated strategy with only HOLD signals', async () => {
+    await setMode('testnet_execute')
+    const { startValidationRun, runValidationCycle } =
+      await import('./validation-run')
+    await startValidationRun({
+      stage: 'sandbox',
+      strategies: ['sma_crossover'],
+      budgets: VALID_BUDGETS,
+    })
+    const result = await runValidationCycle('sandbox', {
+      client: fakeClient({ getKlines: async () => flatHighCandles(100) }) as never,
+    })
+    expect(result.ok).toBe(true)
+    expect(result.run?.evidence.signalCountsByStrategy).toMatchObject({
+      sma_crossover: 0,
+    })
+  })
+
+  it('runs a paper sidecar through the no-order paper client while global mode is testnet', async () => {
+    await setMode('testnet_execute')
+    const { startValidationRun, runValidationCycle } =
+      await import('./validation-run')
+    await startValidationRun({
+      stage: 'paper',
+      strategies: ['rsi_reversion'],
+      budgets: VALID_BUDGETS,
+    })
+    const result = await runValidationCycle('paper', {
+      client: fakeClient() as never,
+    })
+    expect(result.ok).toBe(true)
+    expect(result.run?.executionMode).toBe('paper')
+    expect(result.run?.progress.cyclesRun).toBe(1)
+    expect(result.cycle?.executionMode).toBe('paper')
+    expect(result.run?.evidence.signalEvaluations).toBeGreaterThan(0)
   })
 
   it('debounces back-to-back automated cycles but never a manual one', async () => {
@@ -429,6 +485,37 @@ describe('runValidationCycle', () => {
 })
 
 describe('restart recovery (time-budget reconciliation)', () => {
+  it('normalizes legacy runs with automation-health fields missing', async () => {
+    await setMode('testnet_execute')
+    const { startValidationRun, reviewValidationRuns } =
+      await import('./validation-run')
+    await startValidationRun({
+      stage: 'sandbox',
+      strategies: ['rsi_reversion'],
+      budgets: VALID_BUDGETS,
+    })
+
+    const store = await import('./finance-store')
+    const db = store.readFinanceStore()
+    const settings = db.settings as Record<string, unknown>
+    const state = settings.validationRuns as {
+      active: Array<{ progress: Record<string, unknown> }>
+    }
+    delete state.active[0].progress.lastSuccessfulCycleAt
+    delete state.active[0].progress.consecutiveFailures
+    delete state.active[0].progress.nextRetryAt
+    state.active[0].progress.lastCycleAt = '2026-09-27T17:04:00.012Z'
+    state.active[0].progress.lastCycleRan = true
+    store.writeFinanceStore(db)
+
+    const restored = reviewValidationRuns()
+    expect(restored.active[0]?.progress).toMatchObject({
+      lastSuccessfulCycleAt: '2026-09-27T17:04:00.012Z',
+      consecutiveFailures: 0,
+      nextRetryAt: null,
+    })
+  })
+
   it('moves an overdue active run to history purely from wall-clock age, with no in-memory timer', async () => {
     await setMode('testnet_execute')
     const { startValidationRun, reviewValidationRuns } =

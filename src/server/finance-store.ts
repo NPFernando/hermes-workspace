@@ -897,6 +897,9 @@ export type FinanceSettings = {
   tradingMode: TradingMode
   liveTradingEnabled: boolean
   emergencyKillSwitch: boolean
+  /** Set only after the cutoff has been explicitly engaged and then disarmed. */
+  emergencyKillSwitchTestedAt?: string | null
+  emergencyKillSwitchLastEngagedAt?: string | null
   monitoringActive: boolean // for live_monitored mode
   autonomousTradingEnabled: boolean // for live_auto_trade mode
   primaryTradingProvider: 'binance'
@@ -904,8 +907,21 @@ export type FinanceSettings = {
   executionAccount: 'paper' | 'binance_testnet' | 'binance_live'
   paperShadowEnabled: boolean
   livePerOrderCapUsdt: number
+  liveAllocationCapUsdt?: number
+  liveDailyLossCapUsdt?: number
   liveBinanceApprovedAt?: string | null
   liveBinanceApprovalId?: string | null
+  /** Short-lived, read-only exchange account verification used by the
+   * staged live-readiness gate. The fingerprint is a one-way identifier of
+   * the configured credentials/base URLs; secrets are never persisted. */
+  tradingConnectivityVerification?: {
+    checkedAt: string
+    credentialFingerprint: string
+    testnet: { ok: boolean; detail: string }
+    live: { ok: boolean; detail: string }
+  } | null
+  /** Last persisted read-only local-position versus exchange-balance reconciliation. */
+  tradingAccountReconciliation?: Record<string, unknown> | null
   /**
    * Per-engine tunable config blobs, each resolved against its own engine's
    * defaults at read time (resolveGridEngineConfig, EngineConfig in
@@ -951,6 +967,7 @@ export type FinanceSettings = {
    * this one).
    */
   validationRuns?: Record<string, unknown>
+  testnetExecutionProbe?: Record<string, unknown>
 }
 
 export type FinanceDatabase = {
@@ -1098,8 +1115,11 @@ function defaultSettings(): FinanceSettings {
     executionAccount: 'paper',
     paperShadowEnabled: true,
     livePerOrderCapUsdt: 10,
+    liveAllocationCapUsdt: 25,
+    liveDailyLossCapUsdt: 2.5,
     liveBinanceApprovedAt: null,
     liveBinanceApprovalId: null,
+    tradingConnectivityVerification: null,
   }
 }
 
@@ -3225,6 +3245,9 @@ export function effectiveAccountBalance(
 }
 
 export function financeSummary(db: FinanceDatabase) {
+  const liveBinanceApprovalRecorded = Boolean(db.settings.liveBinanceApprovedAt)
+  const liveBinanceApprovalConfigured =
+    process.env.BINANCE_ALLOW_LIVE_TRADING === 'I_APPROVE_BINANCE_LIVE_TRADING'
   // PF-201: the reporting currency. Stored amounts stay LKR-denominated
   // (`convertedLkrAmount`, `wealthGoalTargetLkr`, …); this only changes what
   // the aggregate `*Lkr` figures below are *expressed* in. Default 'LKR' keeps
@@ -3390,7 +3413,12 @@ export function financeSummary(db: FinanceDatabase) {
     executionAccount: db.settings.executionAccount,
     paperShadowEnabled: db.settings.paperShadowEnabled,
     livePerOrderCapUsdt: db.settings.livePerOrderCapUsdt,
-    liveBinanceApproved: Boolean(db.settings.liveBinanceApprovedAt),
+    liveAllocationCapUsdt: db.settings.liveAllocationCapUsdt,
+    liveDailyLossCapUsdt: db.settings.liveDailyLossCapUsdt,
+    // Fail closed when the explicit process-level approval marker is absent;
+    // the readiness account-connectivity gate uses the same requirement.
+    liveBinanceApproved:
+      liveBinanceApprovalRecorded && liveBinanceApprovalConfigured,
     ibkrStatus: db.settings.ibkrStatus,
   }
 }

@@ -2,10 +2,13 @@ import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
 import { z } from 'zod'
 import {
+  clearSessionCookie,
   createSessionCookie,
   generateSessionToken,
+  getSessionTokenFromCookie,
   isPasswordProtectionEnabled,
   passwordRole,
+  revokeSessionToken,
   storeSessionToken,
 } from '../../server/auth-middleware'
 import {
@@ -23,6 +26,14 @@ const AuthSchema = z.object({
 export const Route = createFileRoute('/api/auth')({
   server: {
     handlers: {
+      DELETE: async ({ request }) => {
+        const token = getSessionTokenFromCookie(request.headers.get('cookie'))
+        if (token) revokeSessionToken(token)
+        return json(
+          { ok: true },
+          { headers: { 'Set-Cookie': clearSessionCookie() } },
+        )
+      },
       POST: async ({ request }) => {
         const csrfCheck = requireJsonContentType(request)
         if (csrfCheck) return csrfCheck

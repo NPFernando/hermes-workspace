@@ -19,11 +19,10 @@
  *    `runTradingCycle()` already enforces; it only narrows it further via
  *    `RunCycleOptions.config.enabledStrategies`.
  *  - Only one active run per stage at a time (a second `start` for the
- *    same stage is a conflict and is rejected), and a run's declared stage
- *    must match the trading system's *current* execution mode (a "sandbox"
- *    run cannot be started/continued while `tradingMode` resolves to
- *    `paper`, and vice versa) — this keeps run-attributed evidence from
- *    silently mixing paper and sandbox activity.
+ *    same stage is a conflict and is rejected). A sandbox run must match the
+ *    current execution mode. A paper run may also run as a paper-only
+ *    sidecar while the global mode is testnet; the engine's cycle serializer
+ *    still prevents overlap and all trade attribution remains mode-scoped.
  *  - This module never calls a Binance client, never writes an order, and
  *    never flips any risk-control setting. It only calls the existing,
  *    already-gated `runTradingCycle()` (same gates as the "Run cycle"
@@ -87,6 +86,9 @@ export interface ValidationRunProgress {
   lastCycleRan: boolean | null
   lastCycleReason: string | null
   currentExposureQuote: number
+  lastSuccessfulCycleAt?: string | null
+  consecutiveFailures?: number
+  nextRetryAt?: string | null
 }
 
 export interface ValidationRunErrorEntry {
@@ -103,6 +105,12 @@ export interface ValidationRunEvidence {
    * trades that had a paired shadow comparison; null when none did. */
   avgSlippageQuote: number | null
   shadowComparisonsSampled: number
+  /** Signal observations are diagnostic only and never count as trades or P/L. */
+  signalEvaluations: number
+  signalCountsByStrategy: Record<string, number>
+  councilNonActionSignals: number
+  /** Bounded counts of why a non-HOLD council signal did not trade. */
+  nonActionReasonCounts: Record<string, number>
   errors: Array<ValidationRunErrorEntry>
 }
 
@@ -113,6 +121,8 @@ export interface ValidationRun {
   strategies: Array<string>
   /** When true, the server advances this run on the normal validation cadence. */
   autoRun: boolean
+  /** Bounded per-run cadence; the scheduler polls more frequently and runs only when due. */
+  cycleIntervalMinutes?: number
   status: ValidationRunStatus
   budgets: ValidationRunBudgets
   baseline: ValidationRunBaseline
@@ -157,7 +167,7 @@ export interface ValidationRunReconciliation {
 const HISTORY_CAP = 50
 const ERRORS_CAP = 50
 
-const MAX_DURATION_MS = 14 * 24 * 60 * 60 * 1000 // 14 days
+const MAX_DURATION_MS = 30 * 24 * 60 * 60 * 1000 // 30 days, matching the evidence freshness window
 const MIN_DURATION_MS = 60_000 // 1 minute
 const MAX_CYCLES = 500
 const MAX_TRADES = 300
@@ -167,16 +177,46 @@ function emptyState(): ValidationRunState {
   return { active: [], history: [] }
 }
 
+function normalizeValidationRun(run: ValidationRun): ValidationRun {
+  const progress = run.progress
+  const rawEvidence = run.evidence as unknown as Partial<ValidationRunEvidence>
+  const lastCycleAt = progress.lastCycleAt ?? null
+  const lastCycleRan = progress.lastCycleRan ?? null
+  return {
+    ...run,
+    autoRun: run.autoRun === true,
+    progress: {
+      ...progress,
+      lastCycleAt,
+      lastCycleRan,
+      lastSuccessfulCycleAt:
+        progress.lastSuccessfulCycleAt ??
+        (lastCycleRan === true ? lastCycleAt : null),
+      consecutiveFailures: progress.consecutiveFailures ?? 0,
+      nextRetryAt: progress.nextRetryAt ?? null,
+    },
+    evidence: {
+      ...run.evidence,
+      signalEvaluations: rawEvidence.signalEvaluations ?? 0,
+      signalCountsByStrategy: rawEvidence.signalCountsByStrategy ?? {},
+      councilNonActionSignals: rawEvidence.councilNonActionSignals ?? 0,
+      nonActionReasonCounts: rawEvidence.nonActionReasonCounts ?? {},
+    },
+  }
+}
+
 function loadState(): ValidationRunState {
   const db = readFinanceStore()
-  const raw = db.settings.validationRuns
+  const raw = (db.settings as Record<string, unknown>).validationRuns
   if (!raw || typeof raw !== 'object') return emptyState()
   const state = raw as Partial<ValidationRunState>
   return {
     active: Array.isArray(state.active)
-      ? state.active.map((run) => ({ ...run, autoRun: run.autoRun === true }))
+      ? state.active.map((run) => normalizeValidationRun(run))
       : [],
-    history: Array.isArray(state.history) ? state.history : [],
+    history: Array.isArray(state.history)
+      ? state.history.map((run) => normalizeValidationRun(run))
+      : [],
   }
 }
 
@@ -369,6 +409,7 @@ export interface StartValidationRunInput {
   budgets: unknown
   notes?: unknown
   autoRun?: unknown
+  cycleIntervalMinutes?: unknown
 }
 
 export interface StartValidationRunResult {
@@ -405,7 +446,8 @@ export async function startValidationRun(
     )
   }
   const currentStage = stageForExecutionMode(resolvedMode)
-  if (currentStage !== stage) {
+  const paperSidecar = stage === 'paper' && resolvedMode === 'testnet'
+  if (currentStage !== stage && !paperSidecar) {
     throw new Error(
       `Requested stage "${stage}" does not match the current tradingMode's execution mode ("${resolvedMode}", stage "${currentStage}") — switch tradingMode before starting this run.`,
     )
@@ -464,6 +506,12 @@ export async function startValidationRun(
       'budgets.maxExposureQuote',
     ),
   }
+  const cycleIntervalMinutes = normalizeBudget(
+    input.cycleIntervalMinutes ?? DEFAULT_CYCLE_INTERVAL_MINUTES,
+    MIN_CYCLE_INTERVAL_MINUTES,
+    MAX_CYCLE_INTERVAL_MINUTES,
+    'cycleIntervalMinutes',
+  )
 
   const state = loadState()
   const conflict = state.active.find((r) => r.stage === stage)
@@ -492,9 +540,10 @@ export async function startValidationRun(
   const run: ValidationRun = {
     id: `validation_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     stage,
-    executionMode: resolvedMode,
+    executionMode: paperSidecar ? 'paper' : resolvedMode,
     strategies,
     autoRun: input.autoRun === true,
+    cycleIntervalMinutes,
     status: 'active',
     budgets,
     baseline,
@@ -506,6 +555,9 @@ export async function startValidationRun(
       lastCycleRan: null,
       lastCycleReason: null,
       currentExposureQuote: 0,
+      lastSuccessfulCycleAt: null,
+      consecutiveFailures: 0,
+      nextRetryAt: null,
     },
     evidence: {
       ledgerRecordIds: [],
@@ -513,6 +565,10 @@ export async function startValidationRun(
       feesQuote: 0,
       avgSlippageQuote: null,
       shadowComparisonsSampled: 0,
+      signalEvaluations: 0,
+      signalCountsByStrategy: {},
+      councilNonActionSignals: 0,
+      nonActionReasonCounts: {},
       errors: [],
     },
     readinessImpact: null,
@@ -569,9 +625,17 @@ export interface RunValidationCycleResult {
 }
 
 const RACE_REASON = 'a trading cycle is already in progress'
-const AUTO_CYCLE_INTERVAL_MS = 20 * 60_000
-const AUTO_CYCLE_STALE_AFTER_MS = AUTO_CYCLE_INTERVAL_MS + 60_000
+const DEFAULT_CYCLE_INTERVAL_MINUTES = 20
+const MIN_CYCLE_INTERVAL_MINUTES = 5
+const MAX_CYCLE_INTERVAL_MINUTES = 120
+const AUTO_CYCLE_POLL_INTERVAL_MS = 60_000
 const AUTO_CYCLE_RECOVERY_COOLDOWN_MS = 5 * 60_000
+// A validation cycle normally completes well inside the 60-second scheduler
+// poll. Keep the scheduler from being held indefinitely by an upstream or
+// persistence operation that outlives the individual Binance request guards.
+// This timeout does not cancel the underlying cycle; the per-stage guard below
+// prevents a second cycle from being started while that promise is settling.
+const AUTO_CYCLE_TIMEOUT_MS = 90_000
 // The ~20-minute cadence above is enforced only by the setInterval that
 // calls runAutomaticValidationTick — runValidationCycle itself has never
 // had a time-based guard, only cycle/trade *count* budgets. In production
@@ -599,31 +663,108 @@ function validationAutomationDisabled(): boolean {
 }
 let validationAutomationTimer: ReturnType<typeof setInterval> | null = null
 let validationAutomationTickInProgress = false
+let validationAutomationTickStartedAt = 0
+let validationAutomationTickGeneration = 0
 let validationAutomationLastTickAt = 0
+const validationAutomationStagesInProgress = new Set<ValidationStage>()
+
+function automaticRunDue(run: ValidationRun, now: number): boolean {
+  const retryAt = run.progress.nextRetryAt
+    ? Date.parse(run.progress.nextRetryAt)
+    : Number.NaN
+  if (Number.isFinite(retryAt) && now < retryAt) return false
+  const lastAttempt = run.progress.lastCycleAt
+    ? Date.parse(run.progress.lastCycleAt)
+    : Number.NaN
+  if (!Number.isFinite(lastAttempt)) return true
+  const intervalMinutes =
+    typeof run.cycleIntervalMinutes === 'number' &&
+    Number.isFinite(run.cycleIntervalMinutes)
+      ? run.cycleIntervalMinutes
+      : DEFAULT_CYCLE_INTERVAL_MINUTES
+  return now - lastAttempt >= intervalMinutes * 60_000
+}
 
 async function runAutomaticValidationTick(source: 'startup' | 'interval' | 'recovery') {
-  if (validationAutomationTickInProgress) return
-  validationAutomationTickInProgress = true
-  validationAutomationLastTickAt = Date.now()
-  appendAuditLog('validation_run_automation_tick', {
-    at: new Date(validationAutomationLastTickAt).toISOString(),
-    source,
-  })
-  try {
-    const active = reviewValidationRuns().active.filter((run) => run.autoRun)
-    for (const run of active) {
-      try {
-        await runValidationCycle(run.stage, { automated: true })
-      } catch (error) {
-        console.error(
-          `[validation-run] automated ${run.stage} cycle failed:`,
-          error,
-        )
-      }
-    }
-  } finally {
+  if (validationAutomationTickInProgress) {
+    const ageMs = Date.now() - validationAutomationTickStartedAt
+    if (ageMs <= AUTO_CYCLE_TIMEOUT_MS + AUTO_CYCLE_POLL_INTERVAL_MS) return
+    // A persistence/readiness operation can outlive the per-stage timeout and
+    // leave the process-local tick flag set forever. Invalidate that stale
+    // generation so a later authenticated read or interval can recover. The
+    // stage-level in-flight set still prevents duplicate cycles if the old
+    // promise eventually resumes.
+    appendAuditLog('validation_run_automation_tick_recovered', {
+      staleAgeMs: ageMs,
+      source,
+    })
+    validationAutomationTickGeneration += 1
     validationAutomationTickInProgress = false
   }
+  const generation = ++validationAutomationTickGeneration
+  validationAutomationTickInProgress = true
+  validationAutomationTickStartedAt = Date.now()
+  validationAutomationLastTickAt = Date.now()
+  try {
+    appendAuditLog('validation_run_automation_tick', {
+      at: new Date(validationAutomationLastTickAt).toISOString(),
+      source,
+    })
+    const now = Date.now()
+    const active = reviewValidationRuns().active.filter(
+      (run) => run.autoRun && automaticRunDue(run, now),
+    )
+    for (const run of active) {
+      await runAutomaticValidationCycle(run.stage)
+    }
+  } finally {
+    if (generation === validationAutomationTickGeneration) {
+      validationAutomationTickInProgress = false
+      validationAutomationTickStartedAt = 0
+    }
+  }
+}
+
+/**
+ * Run one automated stage without allowing a stalled async operation to block
+ * every other scheduled stage forever. The underlying promise is allowed to
+ * settle safely after the timeout; keeping its stage marked in-flight avoids
+ * duplicate work and relies on runTradingCycle's existing global serialization
+ * as a second safety barrier.
+ */
+async function runAutomaticValidationCycle(stage: ValidationStage): Promise<void> {
+  if (validationAutomationStagesInProgress.has(stage)) return
+  validationAutomationStagesInProgress.add(stage)
+
+  const cyclePromise = runValidationCycle(stage, { automated: true }).catch(
+    (error) => {
+      console.error(`[validation-run] automated ${stage} cycle failed:`, error)
+    },
+  )
+  let timeout!: ReturnType<typeof setTimeout>
+  const timeoutPromise = new Promise<'timeout'>((resolve) => {
+    timeout = setTimeout(() => {
+      appendAuditLog('validation_run_automation_cycle_timeout', {
+        stage,
+        timeoutMs: AUTO_CYCLE_TIMEOUT_MS,
+      })
+      resolve('timeout')
+    }, AUTO_CYCLE_TIMEOUT_MS)
+  })
+
+  const outcome = await Promise.race([
+    cyclePromise.then(() => 'completed' as const),
+    timeoutPromise,
+  ])
+  clearTimeout(timeout)
+
+  if (outcome === 'timeout') {
+    void cyclePromise.finally(() => {
+      validationAutomationStagesInProgress.delete(stage)
+    })
+    return
+  }
+  validationAutomationStagesInProgress.delete(stage)
 }
 
 /**
@@ -635,11 +776,12 @@ export function ensureValidationRunAutomation(): void {
   if (validationAutomationDisabled()) return
   if (validationAutomationTimer) return
   appendAuditLog('validation_run_automation_started', {
-    cadenceMs: AUTO_CYCLE_INTERVAL_MS,
+    pollIntervalMs: AUTO_CYCLE_POLL_INTERVAL_MS,
+    defaultCycleIntervalMinutes: DEFAULT_CYCLE_INTERVAL_MINUTES,
   })
   validationAutomationTimer = setInterval(
     () => void runAutomaticValidationTick('interval'),
-    AUTO_CYCLE_INTERVAL_MS,
+    AUTO_CYCLE_POLL_INTERVAL_MS,
   )
   validationAutomationTimer.unref()
   void runAutomaticValidationTick('startup')
@@ -647,18 +789,23 @@ export function ensureValidationRunAutomation(): void {
 
 /**
  * Recovery hook for long-lived server processes where a timer was lost or
- * delayed. It is intentionally bounded and can only request one tick after
- * the normal cadence plus a small grace period has elapsed.
+ * delayed. It only requests work when a persisted auto-run is actually due,
+ * and the cooldown prevents repeated authenticated reads from multiplying
+ * recovery ticks while a cycle is still settling.
  */
 export function recoverValidationRunAutomationIfStale(): void {
   ensureValidationRunAutomation()
   const now = Date.now()
   if (
     validationAutomationTickInProgress ||
-    now - validationAutomationLastTickAt < AUTO_CYCLE_STALE_AFTER_MS
+    now - validationAutomationLastTickAt < AUTO_CYCLE_RECOVERY_COOLDOWN_MS
   ) {
     return
   }
+  const hasDueAutoRun = reviewValidationRuns().active.some(
+    (run) => run.autoRun && automaticRunDue(run, now),
+  )
+  if (!hasDueAutoRun) return
   validationAutomationLastTickAt = now
   void runAutomaticValidationTick('recovery')
 }
@@ -692,7 +839,8 @@ export async function runValidationCycle(
   const resolvedMode = executionModeForTradingMode(
     db.settings.tradingMode,
   )
-  if (resolvedMode !== run.executionMode) {
+  const paperSidecar = run.executionMode === 'paper' && resolvedMode === 'testnet'
+  if (resolvedMode !== run.executionMode && !paperSidecar) {
     return {
       ok: false,
       message: `tradingMode changed since this run started (now resolves to ${resolvedMode ?? 'no execution mode'}, run expects ${run.executionMode}) — stop this validation run before changing modes.`,
@@ -737,6 +885,7 @@ export async function runValidationCycle(
   const cycle = await runTradingCycle({
     force: options.force === true,
     client: options.client,
+    executionModeOverride: paperSidecar ? 'paper' : undefined,
     config: { enabledStrategies: run.strategies },
   })
 
@@ -811,6 +960,79 @@ export async function runValidationCycle(
 
   const openedCount = cycle.actions.filter((a) => a.action === 'OPEN').length
   const closedCount = newTrades.length
+  const diagnostics = cycle.diagnostics?.symbols ?? []
+  // Keep zero-valued entries for every strategy selected by the run. Without
+  // this, a missing key is ambiguous in the dashboard: it could mean the
+  // strategy was never evaluated, or that it was evaluated and produced only
+  // HOLD decisions. Explicit zeros make thin evidence (especially RSI) honest
+  // and comparable across cycles without changing execution behavior.
+  const signalCountsByStrategy = run.strategies.reduce<Record<string, number>>(
+    (counts, strategyId) => {
+      counts[strategyId] = 0
+      return counts
+    },
+    {},
+  )
+  for (const diagnostic of diagnostics) {
+    for (const signal of diagnostic.strategySignals) {
+      if (signal.signal === 'HOLD') continue
+      signalCountsByStrategy[signal.strategyId] =
+        (signalCountsByStrategy[signal.strategyId] ?? 0) + 1
+    }
+  }
+  const signalEvaluations = diagnostics.reduce(
+    (count, diagnostic) => count + diagnostic.strategySignals.length,
+    0,
+  )
+  const councilNonActionSignals = diagnostics.filter(
+    (diagnostic) =>
+      diagnostic.councilSignal !== 'HOLD' &&
+      diagnostic.finalAction !== 'OPEN' &&
+      diagnostic.finalAction !== 'CLOSE',
+  ).length
+  const nonActionReasonCounts = diagnostics.reduce<Record<string, number>>(
+    (counts, diagnostic) => {
+      if (
+        diagnostic.councilSignal === 'HOLD' ||
+        diagnostic.finalAction === 'OPEN' ||
+        diagnostic.finalAction === 'CLOSE'
+      ) {
+        return counts
+      }
+      const rawReason = diagnostic.finalReason?.trim()
+      const reason = rawReason
+        ? rawReason.slice(0, 160)
+        : `final_action:${diagnostic.finalAction ?? 'none'}`
+      const key = Object.prototype.hasOwnProperty.call(counts, reason)
+        ? reason
+        : Object.keys(counts).length < 32
+          ? reason
+          : 'other'
+      counts[key] = (counts[key] ?? 0) + 1
+      return counts
+    },
+    {},
+  )
+  const nextNonActionReasonCounts = { ...run.evidence.nonActionReasonCounts }
+  for (const [reason, count] of Object.entries(nonActionReasonCounts)) {
+    const key = Object.prototype.hasOwnProperty.call(
+      nextNonActionReasonCounts,
+      reason,
+    )
+      ? reason
+      : Object.keys(nextNonActionReasonCounts).length < 32
+        ? reason
+        : 'other'
+    nextNonActionReasonCounts[key] =
+      (nextNonActionReasonCounts[key] ?? 0) + count
+  }
+  const nextSignalCountsByStrategy = {
+    ...run.evidence.signalCountsByStrategy,
+  }
+  for (const [strategyId, count] of Object.entries(signalCountsByStrategy)) {
+    nextSignalCountsByStrategy[strategyId] =
+      (nextSignalCountsByStrategy[strategyId] ?? 0) + count
+  }
   const realizedPnlQuote =
     run.evidence.realizedPnlQuote + newTrades.reduce((s, t) => s + t.pnlQuote, 0)
   const feesQuote =
@@ -834,6 +1056,24 @@ export async function runValidationCycle(
       lastCycleRan: cycle.ran,
       lastCycleReason: cycle.reason ?? null,
       currentExposureQuote: currentExposureQuote(run.executionMode, run.strategies),
+      lastSuccessfulCycleAt: cycle.ran
+        ? cycle.ranAt
+        : (run.progress.lastSuccessfulCycleAt ?? null),
+      consecutiveFailures:
+        cycle.ran || cycle.reason === RACE_REASON
+          ? 0
+          : (run.progress.consecutiveFailures ?? 0) + 1,
+      nextRetryAt:
+        cycle.ran || cycle.reason === RACE_REASON
+          ? null
+          : new Date(
+              now +
+                Math.min(
+                  30 * 60_000,
+                  5 * 60_000 *
+                    2 ** Math.min(3, run.progress.consecutiveFailures ?? 0),
+                ),
+            ).toISOString(),
     },
     evidence: {
       ledgerRecordIds: [...run.evidence.ledgerRecordIds, ...ledgerIds].slice(
@@ -843,6 +1083,11 @@ export async function runValidationCycle(
       feesQuote,
       avgSlippageQuote,
       shadowComparisonsSampled,
+      signalEvaluations: run.evidence.signalEvaluations + signalEvaluations,
+      signalCountsByStrategy: nextSignalCountsByStrategy,
+      councilNonActionSignals:
+        run.evidence.councilNonActionSignals + councilNonActionSignals,
+      nonActionReasonCounts: nextNonActionReasonCounts,
       errors: errors.slice(-ERRORS_CAP),
     },
     updatedAt: new Date(now).toISOString(),

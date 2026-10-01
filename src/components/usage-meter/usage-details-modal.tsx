@@ -56,6 +56,32 @@ type ProviderUsage = {
   updatedAt: number
 }
 
+type UsageBudget = {
+  level: string
+  limitUsd: number | null
+  usedUsd: number | null
+  remainingUsd: number | null
+  percentUsed: number | null
+  message: string
+}
+
+type UsageAnomaly = {
+  displayName: string
+  label: string
+  day: string
+  ratio: number
+  severity: 'warning' | 'critical'
+  message: string
+}
+
+type UsageHistoryPoint = {
+  day: string
+  displayName: string
+  label: string
+  measure: 'quota' | 'spend'
+  used: number
+}
+
 type UsageDetailsModalProps = {
   usage: UsageSummary
   error: string | null
@@ -65,6 +91,10 @@ type UsageDetailsModalProps = {
   onRefreshProviders?: () => Promise<void>
   preferredProvider?: string | null
   onSetPreferredProvider?: (provider: string) => void
+  sharedBudget?: UsageBudget | null
+  monthlyBudget?: UsageBudget | null
+  history?: Array<UsageHistoryPoint>
+  anomalies?: Array<UsageAnomaly>
 }
 
 function formatCurrency(value: number): string {
@@ -275,6 +305,10 @@ export function UsageDetailsModal({
   onRefreshProviders,
   preferredProvider,
   onSetPreferredProvider,
+  sharedBudget,
+  monthlyBudget,
+  history = [],
+  anomalies = [],
 }: UsageDetailsModalProps) {
   const [activeTab, setActiveTab] = useState<'session' | 'providers'>(
     'providers',
@@ -484,6 +518,80 @@ export function UsageDetailsModal({
                 {isRefreshing ? 'Refreshing...' : '🔄 Refresh'}
               </Button>
             </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              {[['Daily budget', sharedBudget], ['Monthly budget', monthlyBudget]].map(
+                ([label, budget]) => {
+                  const item = budget as UsageBudget | null
+                  const percent = item?.percentUsed
+                  return (
+                    <div
+                      key={label as string}
+                      className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-[var(--theme-muted)]">
+                          {label as string}
+                        </span>
+                        <span className="text-[10px] font-medium uppercase text-[var(--theme-muted)]">
+                          {item?.level ?? 'unavailable'}
+                        </span>
+                      </div>
+                      <div className="mt-2 text-sm font-medium text-[var(--theme-text)]">
+                        {item?.usedUsd !== null && item?.usedUsd !== undefined
+                          ? `$${item.usedUsd.toFixed(2)}`
+                          : 'No spend data'}
+                        {item?.limitUsd !== null && item?.limitUsd !== undefined
+                          ? ` / $${item.limitUsd.toFixed(2)}`
+                          : ''}
+                      </div>
+                      {percent !== null && percent !== undefined ? (
+                        <div className="mt-2 h-1.5 rounded-full bg-[var(--theme-hover)]">
+                          <div
+                            className={`h-1.5 rounded-full ${percent >= 90 ? 'bg-red-500' : percent >= 75 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                            style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
+                          />
+                        </div>
+                      ) : null}
+                      <p className="mt-2 text-[10px] text-[var(--theme-muted)]">
+                        {item?.message ?? 'Configure a budget to enable this signal.'}
+                      </p>
+                    </div>
+                  )
+                },
+              )}
+            </div>
+
+            {anomalies.length > 0 ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <div className="mb-2 text-sm font-semibold text-amber-800">Usage anomalies</div>
+                <div className="space-y-1.5">
+                  {anomalies.map((anomaly) => (
+                    <div key={`${anomaly.displayName}-${anomaly.label}-${anomaly.day}`} className="flex flex-wrap items-center justify-between gap-2 text-xs text-amber-800">
+                      <span>{anomaly.message}</span>
+                      <span className="font-medium uppercase">{anomaly.severity}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {history.length > 0 ? (
+              <div className="rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] p-4">
+                <div className="mb-2 text-sm font-semibold text-[var(--theme-text)]">Daily trend samples</div>
+                <div className="grid gap-1.5">
+                  {history
+                    .filter((point) => point.measure === 'spend')
+                    .slice(-7)
+                    .map((point) => (
+                      <div key={`${point.day}-${point.displayName}-${point.label}`} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="text-[var(--theme-muted)]">{point.day} · {point.displayName}</span>
+                        <span className="font-medium text-[var(--theme-text)]">${point.used.toFixed(2)}</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            ) : null}
 
             <div className="grid gap-3">
               {providerUsage.length === 0 ? (

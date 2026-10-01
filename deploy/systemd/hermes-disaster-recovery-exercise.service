@@ -1,0 +1,19 @@
+[Unit]
+Description=Hermes quarterly disaster-recovery restore exercise
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/hermes-workspace-deploy
+EnvironmentFile=-/home/ubuntu/.hermes/.env
+Environment=HERMES_DR_EVIDENCE_DIR=/home/ubuntu/.hermes-data/dr-exercises
+ExecStart=/home/ubuntu/.hermes/node/bin/pnpm run dr:exercise -- --run
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/.hermes-data/dr-exercises
+

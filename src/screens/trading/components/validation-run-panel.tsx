@@ -67,8 +67,9 @@ export function validationRecommendationLabel(
  * Controlled paper/sandbox evidence-collection runs. Exactly one active run
  * per stage; starting one requires explicit, bounded time/cycle/trade/
  * exposure budgets (no "unlimited" option) and is rejected server-side on
- * live mode, an out-of-range/missing budget, a stage/tradingMode mismatch,
- * or an already-active run for that stage. "Run cycle" attributes one
+ * live mode, an out-of-range/missing budget, or an already-active run for
+ * that stage. Paper may run as a bounded sidecar while testnet is active.
+ * "Run cycle" attributes one
  * `runTradingCycle()` call (same gates as the main "Run cycle" button,
  * narrowed to this run's selected strategies) to the run's evidence.
  */
@@ -78,6 +79,7 @@ export function ValidationRunPanel({
   reconciliation,
   diagnostics,
   trends,
+  testnetProbe,
   onPayload,
 }: {
   catalog: Array<StrategyCatalogEntry>
@@ -85,6 +87,7 @@ export function ValidationRunPanel({
   reconciliation: FinancePayload['validationReconciliation']
   diagnostics: FinancePayload['lastCycleDiagnostics']
   trends: FinancePayload['tradingCycleDiagnosticTrends']
+  testnetProbe: FinancePayload['testnetExecutionProbe']
   onPayload: (payload: FinancePayload) => void
 }) {
   const { run, busy, error } = useFinanceAction<
@@ -101,6 +104,7 @@ export function ValidationRunPanel({
   const [maxCycles, setMaxCycles] = useState(20)
   const [maxTrades, setMaxTrades] = useState(15)
   const [maxExposureQuote, setMaxExposureQuote] = useState(100)
+  const [cycleIntervalMinutes, setCycleIntervalMinutes] = useState(20)
   const [notes, setNotes] = useState('')
   const [autoRun, setAutoRun] = useState(false)
 
@@ -108,13 +112,15 @@ export function ValidationRunPanel({
   const activeRun = activeByStage.get(stage) ?? null
   const activeReconciliation =
     reconciliation.active.find((item) => item.stage === stage) ?? null
-  const activePaperRun = activeByStage.get('paper') ?? null
-  const latestCompletedRun = state.history[0]
-  const latestCompletedTrend = trends[latestCompletedRun.stage]
+  const latestCompletedRun = state.history.at(0) ?? null
+  const latestCompletedTrend = latestCompletedRun
+    ? trends[latestCompletedRun.stage]
+    : null
   const latestCompletedAt =
-    latestCompletedRun.endedAt ||
-    latestCompletedRun.updatedAt ||
-    latestCompletedRun.createdAt
+    latestCompletedRun?.endedAt ||
+    latestCompletedRun?.updatedAt ||
+    latestCompletedRun?.createdAt ||
+    null
   const completedPaperRun = state.history.some(
     (validationRun) => validationRun.stage === 'paper',
   )
@@ -123,9 +129,7 @@ export function ValidationRunPanel({
       ? 'Continue the bounded paper run until its checkpoint; zero trades or low samples are incomplete evidence.'
       : 'Continue the bounded sandbox run and reconcile fills, attribution, account state, and risk before any expansion.'
     : stage === 'sandbox'
-      ? activePaperRun
-        ? 'Sandbox is blocked while the paper run is active. Review and finalize paper evidence first.'
-        : completedPaperRun
+      ? completedPaperRun
           ? 'Review the completed paper checkpoint before starting a separate sandbox run.'
           : 'Start and complete a paper run before using sandbox/testnet.'
       : 'Start a bounded paper run with the selected strategies and automatic cycles only when ready.'
@@ -170,8 +174,21 @@ export function ValidationRunPanel({
         },
         notes: notes.trim() || undefined,
         autoRun,
+        cycleIntervalMinutes,
       },
       'start',
+    )
+  }
+
+  async function runTestnetProbe() {
+    setMessage(null)
+    await run(
+      {
+        action: 'run_testnet_execution_probe',
+        roundTrips: 20,
+        quotePerRoundTrip: 10,
+      },
+      'testnet-probe',
     )
   }
 
@@ -259,9 +276,47 @@ export function ValidationRunPanel({
           Evidence is stage-separated and bounded. It does not authorize live
           trading or prove profitability by itself.
         </p>
+        {stage === 'sandbox' && (
+          <div className="mt-4 rounded-2xl border border-[color-mix(in_srgb,var(--theme-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-accent)_8%,transparent)] p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold">Testnet execution probe</p>
+                <p className="mt-1 text-xs text-[var(--theme-muted)]">
+                  Runs up to 20 tiny BTC/ETH round trips to verify fills, fees,
+                  and slippage. Results stay separate from strategy P&amp;L.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => void runTestnetProbe()}
+                className="rounded-xl border border-[var(--theme-accent)]/40 px-3 py-2 text-xs text-[var(--theme-accent)] disabled:opacity-50"
+              >
+                Run 20-trade testnet probe
+              </button>
+            </div>
+            {testnetProbe?.latest && (
+              <p className="mt-3 text-xs text-[var(--theme-muted)]">
+                Latest: {testnetProbe.latest.status} · {testnetProbe.latest.roundTripsCompleted}/
+                {testnetProbe.latest.roundTripsRequested} round trips · fees{' '}
+                {testnetProbe.latest.feesQuote.toFixed(4)} USDT · slippage{' '}
+                {testnetProbe.latest.averageSlippagePct == null
+                  ? 'n/a'
+                  : `${(testnetProbe.latest.averageSlippagePct * 100).toFixed(4)}%`}
+              </p>
+            )}
+            {testnetProbe?.aggregate && (
+              <p className="mt-1 text-xs text-[var(--theme-muted)]">
+                Aggregate probe evidence: {testnetProbe.aggregate.completedRoundTrips} completed round trips across{' '}
+                {testnetProbe.aggregate.completedRuns} run(s) · fees{' '}
+                {testnetProbe.aggregate.feesQuote.toFixed(4)} USDT.
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
-      {state.history.length > 0 && (
+      {latestCompletedRun && latestCompletedTrend && (
         <div className="mt-4 rounded-2xl border border-[color-mix(in_srgb,var(--theme-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--theme-accent)_8%,transparent)] p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -272,7 +327,7 @@ export function ValidationRunPanel({
                 {validationStageLabel(latestCompletedRun.stage)}
               </h3>
               <p className="mt-1 text-xs text-[var(--theme-muted)]">
-                {formatDateTime(latestCompletedAt)}{' '}
+                {formatDateTime(latestCompletedAt ?? latestCompletedRun.createdAt)}{' '}
                 · {latestCompletedRun.strategies.join(', ')}
               </p>
             </div>
@@ -411,6 +466,20 @@ export function ValidationRunPanel({
                   : diagnostics.reason ?? 'Cycle did not complete.'}{' '}
                 · {ageLabel(diagnostics.ranAt)}
               </p>
+              {diagnostics.capitalProtection && (
+                <div className={`mt-3 rounded-xl border p-3 text-xs ${diagnostics.capitalProtection.manualReviewRequired ? 'border-amber-500/40 bg-amber-500/10' : 'border-[var(--theme-border)]/70'}`}>
+                  <div className="flex flex-wrap justify-between gap-2 font-medium">
+                    <span>Capital protection: {diagnostics.capitalProtection.action}</span>
+                    <span>{diagnostics.capitalProtection.newEntriesAllowed ? 'entries allowed' : 'entries paused'}</span>
+                  </div>
+                  <p className="mt-1 text-[var(--theme-muted)]">{diagnostics.capitalProtection.detail}</p>
+                  {diagnostics.capitalProtection.withdrawalEligible && (
+                    <p className="mt-1 text-amber-300">
+                      Manual withdrawal review: up to {diagnostics.capitalProtection.recommendedWithdrawalQuote.toFixed(2)} USDT recommended. Withdrawals remain disabled.
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="mt-3 grid gap-3 lg:grid-cols-2">
                 {diagnostics.symbols.map((item) => (
                   <div
@@ -469,6 +538,9 @@ export function ValidationRunPanel({
               <p className="mt-1 text-xs text-[var(--theme-muted)]">
                 started {formatDateTime(activeRun.createdAt)} · last cycle{' '}
                 {ageLabel(activeRun.progress.lastCycleAt)}
+                {activeRun.autoRun
+                  ? ` · every ${activeRun.cycleIntervalMinutes ?? 20}m`
+                  : ''}
                 {activeRun.autoRun ? ' · automatic cycles enabled' : ''}
                 {activeRun.progress.lastCycleReason
                   ? ` (${activeRun.progress.lastCycleReason})`
@@ -536,6 +608,46 @@ export function ValidationRunPanel({
               Ledger records:{' '}
               <span className="text-[var(--theme-text)]">
                 {activeRun.evidence.ledgerRecordIds.length}
+              </span>
+            </p>
+            <p>
+              Signal observations:{' '}
+              <span className="text-[var(--theme-text)]">
+                {activeRun.evidence.signalEvaluations} ·{' '}
+                {activeRun.evidence.councilNonActionSignals} council non-action
+              </span>
+            </p>
+            <p>
+              Strategy signals:{' '}
+              <span className="text-[var(--theme-text)]">
+                {Object.entries(activeRun.evidence.signalCountsByStrategy)
+                  .map(([strategyId, count]) => `${strategyId}:${count}`)
+                  .join(' · ') || 'none'}
+              </span>
+            </p>
+            <p className="sm:col-span-2">
+              Non-action reasons:{' '}
+              <span className="text-[var(--theme-text)]">
+                {Object.entries(activeRun.evidence.nonActionReasonCounts)
+                  .sort(([, a], [, b]) => b - a)
+                  .slice(0, 6)
+                  .map(([reason, count]) => `${count}× ${reason}`)
+                  .join(' · ') || 'none recorded'}
+              </span>
+            </p>
+            <p>
+              Last successful cycle:{' '}
+              <span className="text-[var(--theme-text)]">
+                {ageLabel(activeRun.progress.lastSuccessfulCycleAt ?? null)}
+              </span>
+            </p>
+            <p>
+              Retry state:{' '}
+              <span className="text-[var(--theme-text)]">
+                {activeRun.progress.consecutiveFailures ?? 0} consecutive failure(s)
+                {activeRun.progress.nextRetryAt
+                  ? ` · next ${ageLabel(activeRun.progress.nextRetryAt)}`
+                  : ''}
               </span>
             </p>
           </div>
@@ -647,6 +759,19 @@ export function ValidationRunPanel({
                 className="rounded-xl border border-[var(--theme-border)] bg-transparent px-2 py-1.5 text-[var(--theme-text)] outline-none"
               />
             </label>
+            <label className="flex flex-col gap-1 text-xs text-[var(--theme-muted)]">
+              Auto cycle interval (minutes)
+              <input
+                type="number"
+                min={5}
+                max={120}
+                value={cycleIntervalMinutes}
+                onChange={(event) =>
+                  setCycleIntervalMinutes(Number(event.target.value))
+                }
+                className="rounded-xl border border-[var(--theme-border)] bg-transparent px-2 py-1.5 text-[var(--theme-text)] outline-none"
+              />
+            </label>
           </div>
           <label className="flex flex-col gap-1 text-xs text-[var(--theme-muted)]">
             Notes (optional)
@@ -665,8 +790,9 @@ export function ValidationRunPanel({
               className="mt-0.5"
             />
             <span>
-              Advance automatically every 20 minutes using the existing
-              trading-cycle safety gates. Stop or expiry still ends the run.
+              Advance automatically every {cycleIntervalMinutes} minutes using
+              the existing trading-cycle safety gates. Failed attempts use
+              bounded exponential backoff. Stop or expiry still ends the run.
             </span>
           </label>
           <div>

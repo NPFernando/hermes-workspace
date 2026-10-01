@@ -10,6 +10,7 @@ import { DemoTradingPanel } from './demo-trading-panel'
 import { GridTradingPanel } from './grid-trading-panel'
 import { TradingLedgerPanel } from './components/trading-ledger-panel'
 import { LiveReadinessCard } from './components/live-readiness-card'
+import { AutomationHealthCard } from './components/automation-health-card'
 import { LivePriceTicker } from './components/live-price-ticker'
 import { IntelligenceSummaryPanel, NewsResearchPanel } from './components/news-research-panel'
 import { GuardEvidencePanel } from './components/guard-evidence-panel'
@@ -18,6 +19,7 @@ import { ValidationRunPanel } from './components/validation-run-panel'
 import { SignalSettingsPanel } from './components/signal-settings-panel'
 import { TradingControls } from './components/trading-controls'
 import { PerformancePanel } from './components/performance-panel'
+import { StrategyScorecard } from './components/strategy-scorecard'
 import { StrategyEligibilityAuditPanel } from './components/strategy-eligibility-audit-panel'
 import { PaperDecisionQualityPanel } from './components/paper-decision-quality-panel'
 import {
@@ -213,6 +215,7 @@ export function TradingScreen() {
           payload={payload}
           onPayload={(next) => setPayload(next as FinancePayload)}
         />
+        <AutomationHealthCard payload={payload} onPayload={setPayload} />
         <TradingSummaryStrip />
         <TradingControls summary={summary} onPayload={setPayload} />
       </DashboardGroup>
@@ -238,6 +241,7 @@ export function TradingScreen() {
         <NewsResearchPanel payload={payload} onPayload={setPayload} />
         <IntelligenceSummaryPanel onPayload={setPayload} />
         <PerformancePanel perf={payload.demoPerformance} />
+        <StrategyScorecard rows={payload.strategyScorecard} />
         <StrategyEligibilityAuditPanel audit={payload.strategyEligibilityAudit} />
         <PaperDecisionQualityPanel report={payload.paperDecisionQuality} />
         <DecisionQualityPanel
@@ -257,6 +261,7 @@ export function TradingScreen() {
           reconciliation={payload.validationReconciliation}
           diagnostics={payload.lastCycleDiagnostics}
           trends={payload.tradingCycleDiagnosticTrends}
+          testnetProbe={payload.testnetExecutionProbe}
           onPayload={setPayload}
         />
       </DashboardGroup>

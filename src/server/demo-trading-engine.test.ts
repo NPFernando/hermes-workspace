@@ -405,6 +405,24 @@ describe('runTradingCycle gating', () => {
     expect(res.ran).toBe(true)
   })
 
+  it('paper mode never delegates order placement to a supplied exchange client', async () => {
+    await setMode('paper_trade')
+    const placeOrder = vi.fn(() => {
+      throw new Error('paper mode must not call exchange placement')
+    })
+    const { runTradingCycle } = await import('./demo-trading-engine')
+    const res = await runTradingCycle({
+      client: fakeClient({
+        getKlines: async () => breakoutCandles(),
+        placeOrder,
+      }) as never,
+      config: { symbols: ['BTCUSDT'], enabledStrategies: ['breakout'] },
+    })
+    expect(res.ran).toBe(true)
+    expect(res.actions.some((action) => action.action === 'OPEN')).toBe(true)
+    expect(placeOrder).not.toHaveBeenCalled()
+  })
+
   it('persists market observations without duplicating candles across cycles', async () => {
     await setMode('testnet_execute')
     const base = Date.UTC(2026, 0, 1)
@@ -938,7 +956,11 @@ describe('runTradingCycle open → close → score', () => {
   })
 
   it('derives the base asset and sums only base-asset commissions', async () => {
-    const { baseAssetOf, orderBaseFee } = await import('./demo-trading-engine')
+    const {
+      baseAssetOf,
+      orderBaseFee,
+      reconcileLivePositionBalances,
+    } = await import('./demo-trading-engine')
     expect(baseAssetOf('SOLUSDT')).toBe('SOL')
     expect(baseAssetOf('btcusdt')).toBe('BTC')
     expect(baseAssetOf('BTCEUR')).toBe('')
@@ -949,6 +971,55 @@ describe('runTradingCycle open → close → score', () => {
     ]
     expect(orderBaseFee(fills, 'SOL')).toBeCloseTo(0.0003, 10)
     expect(orderBaseFee(fills, '')).toBe(0)
+    expect(
+      reconcileLivePositionBalances(
+        [{ symbol: 'SOLUSDT', quantity: 1 }],
+        [{ asset: 'SOL', free: 1, locked: 0 }],
+      ),
+    ).toBeNull()
+    expect(
+      reconcileLivePositionBalances(
+        [{ symbol: 'SOLUSDT', quantity: 1 }],
+        [{ asset: 'SOL', free: 0.5, locked: 0 }],
+      ),
+    ).toMatch(/exceeds exchange SOL balance/)
+  })
+
+  it('halts automation when account reconciliation finds an asset shortfall', async () => {
+    await setMode('testnet_execute')
+    const store = await import('./finance-store')
+    const db = store.readFinanceStore()
+    db.strategy_results.push({
+      kind: 'demo_open_position',
+      id: 'reconcile-position',
+      symbol: 'BTCUSDT',
+      strategyId: 'rsi_reversion',
+      entryPrice: 100,
+      quantity: 0.25,
+      entryQuote: 25,
+      entryFeeQuote: 0.025,
+      openedAt: new Date().toISOString(),
+      executionMode: 'testnet',
+    })
+    store.writeFinanceStore(db)
+
+    const { reconcileTradingAccount } = await import('./trading-reconciliation')
+    const report = await reconcileTradingAccount(
+      fakeClient({
+        getAccount: async () => ({
+          accountType: 'SPOT',
+          canTrade: true,
+          balances: [{ asset: 'USDT', free: 5000, locked: 0 }],
+        }),
+        getMyTrades: async () => [],
+      }) as never,
+    )
+
+    expect(report.status).toBe('drift_detected')
+    expect(report.mismatches.some((message) => message.includes('BTC'))).toBe(
+      true,
+    )
+    expect(store.readFinanceStore().settings.emergencyKillSwitch).toBe(true)
   })
 
   it('stores net quantity at entry when the buy fee is taken in the base asset', async () => {
@@ -2094,6 +2165,7 @@ describe('sandbox experiments', () => {
       multiplier: 0.5,
       source: 'experiment',
     })
+    expect(result.experiment?.durationMinutes).toBe(60)
   })
 
   it('does not apply an override when the size cap is 1 (tracking only)', async () => {
@@ -2638,7 +2710,7 @@ describe('applyRecommendedSafeguards', () => {
     expect(result.applied.liveTradingEnabled).toBe(false)
   })
 
-  it('keeps live manual mode only when live was already armed and quality is ready', async () => {
+  it('never lets safeguard automation re-arm live mode', async () => {
     await armLiveMode()
     await seedLiveReadyEvidence()
     const { applyRecommendedSafeguards } = await import('./demo-trading-engine')
@@ -2646,10 +2718,10 @@ describe('applyRecommendedSafeguards', () => {
     const result = applyRecommendedSafeguards()
 
     expect(result.applied.recommendedMode).toBe('live_manual_approval')
-    expect(result.applied.liveRecommendationDeferred).toBe(false)
-    expect(result.applied.tradingMode).toBe('live_manual_approval')
-    expect(result.applied.executionAccount).toBe('binance_live')
-    expect(result.applied.liveTradingEnabled).toBe(true)
+    expect(result.applied.liveRecommendationDeferred).toBe(true)
+    expect(result.applied.tradingMode).toBe('testnet_execute')
+    expect(result.applied.executionAccount).toBe('binance_testnet')
+    expect(result.applied.liveTradingEnabled).toBe(false)
   })
 })
 
@@ -3100,6 +3172,10 @@ describe('learning cycle', () => {
           },
         ],
         asOfMs: Date.now(),
+        reconciliation: {
+          status: 'not_applicable',
+          detail: 'paper fixture',
+        },
       },
       true,
     )
@@ -3120,6 +3196,61 @@ describe('learning cycle', () => {
 })
 
 describe('strategyGuardReview', () => {
+  it('enables the automatic strategy guard by default', async () => {
+    const { DEFAULT_ENGINE_CONFIG } = await import('./demo-trading-engine')
+
+    expect(DEFAULT_ENGINE_CONFIG.strategyGuardEnabled).toBe(true)
+  })
+
+  it('caps scorecard confidence when historical trades are outside the recent window', async () => {
+    const store = await import('./finance-store')
+    const db = store.readFinanceStore()
+    const oldClosedAt = new Date(Date.now() - 30 * 24 * 60 * 60_000).toISOString()
+    db.strategy_results = Array.from({ length: 30 }, (_, index) => ({
+      kind: 'demo_trade_log',
+      id: `old_rsi_${index}`,
+      symbol: 'BTCUSDT',
+      strategyId: 'rsi_reversion',
+      entryPrice: 100,
+      exitPrice: 102,
+      quantity: 1,
+      entryQuote: 100,
+      exitQuote: 102,
+      pnlQuote: 2,
+      feesQuote: 0,
+      reason: 'historical evidence',
+      openedAt: oldClosedAt,
+      closedAt: oldClosedAt,
+      executionMode: 'paper',
+    }))
+    store.writeFinanceStore(db)
+
+    const { strategyScorecard } = await import('./demo-trading-engine')
+    const row = strategyScorecard().find((r) => r.strategyId === 'rsi_reversion')
+
+    expect(row?.totalTrades).toBe(30)
+    expect(row?.recentSampleSufficient).toBe(false)
+    expect(row?.confidence).toBe('low')
+  })
+
+  it('includes enabled strategies with zero closed trades as low-confidence rows', async () => {
+    const { strategyScorecard } = await import('./demo-trading-engine')
+    const row = strategyScorecard().find((entry) => entry.strategyId === 'rsi_reversion')
+
+    expect(row).toMatchObject({
+      strategyId: 'rsi_reversion',
+      totalTrades: 0,
+      totalPnlQuote: 0,
+      winRate: 0,
+      profitFactor: 0,
+      expectancyQuote: 0,
+      averageHoldingMinutes: 0,
+      averageSlippageQuote: null,
+      confidence: 'low',
+      recentSampleSufficient: false,
+    })
+  })
+
   it('flags insufficient evidence when the window has too few trades', async () => {
     const { strategyGuardReview } = await import('./demo-trading-engine')
     const review = strategyGuardReview()

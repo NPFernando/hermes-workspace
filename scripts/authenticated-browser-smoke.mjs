@@ -8,8 +8,13 @@
  *
  * Set AUTH_E2E_EXPECTED_BUILD to the build header captured before a rollback
  * to prove the authenticated browser is served by the restored artifact.
+ * Set AUTH_E2E_EVIDENCE_PATH to write a sanitized, value-free JSON evidence
+ * artifact after the run; passwords, cookies, page text, and tokens are never
+ * written.
  */
 import { chromium } from 'playwright'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { dirname } from 'node:path'
 
 const baseUrl = (
   process.env.AUTH_E2E_BASE_URL ||
@@ -53,9 +58,14 @@ const page = await context.newPage()
 page.setDefaultNavigationTimeout(90_000)
 let failures = 0
 const pageErrors = []
+const evidenceChecks = []
 page.on('pageerror', (error) => pageErrors.push(error.message))
 
 function check(condition, message) {
+  evidenceChecks.push({
+    label: message.split(' (url=')[0].replace(/: .+$/, ''),
+    passed: Boolean(condition),
+  })
   if (condition) console.log(`✅ ${message}`)
   else {
     console.error(`❌ ${message}`)
@@ -223,10 +233,91 @@ try {
       label: 'Dify status API returns an authenticated provider result',
     },
     {
+      path: '/api/provider-usage',
+      valid: (body) =>
+        body?.ok === true &&
+        Array.isArray(body?.providers) &&
+        Array.isArray(body?.history) &&
+        Array.isArray(body?.anomalies) &&
+        body?.monthlyBudget &&
+        typeof body.monthlyBudget === 'object',
+      label: 'provider usage API returns budgets and anomaly telemetry',
+    },
+    {
       path: '/api/swarm-dispatch',
       valid: (body) =>
-        Array.isArray(body?.waiting) && Array.isArray(body?.recent),
-      label: 'queue API returns an authenticated recovery snapshot',
+        body?.mode === 'postgres' &&
+        (body?.active === null || typeof body?.active === 'object') &&
+        Array.isArray(body?.waiting) &&
+        Array.isArray(body?.recent) &&
+        Array.isArray(body?.retryAudits) &&
+        [...(body.waiting || []), ...(body.recent || [])].every(
+          (item) =>
+            typeof item?.priority === 'number' &&
+            typeof item?.assignmentCount === 'number' &&
+            ['pending', 'paused', 'running', 'succeeded', 'failed', 'cancelled', 'interrupted'].includes(item?.status) &&
+            ('deadLetterAt' in item) &&
+            ('retryOfJobId' in item),
+        ),
+      label: 'queue API exposes durable priority retry and dead-letter controls',
+    },
+    {
+      path: '/api/cross-repository-release-status',
+      valid: (body) =>
+        body?.ok === true &&
+        typeof body.generatedAt === 'string' &&
+        Array.isArray(body.repositories) &&
+        body.repositories.length > 0 &&
+        body.repositories.every(
+          (repository) =>
+            typeof repository?.slug === 'string' &&
+            ['pass', 'fail', 'running', 'degraded', 'unavailable'].includes(repository?.status),
+        ),
+      label: 'unified release dashboard API returns repository evidence',
+    },
+    {
+      path: '/api/secret-rotation',
+      valid: (body) =>
+        body?.ok === true &&
+        Array.isArray(body?.statuses) &&
+        body?.summary &&
+        typeof body.summary.expired === 'number' &&
+        typeof body.summary.untracked === 'number',
+      label: 'credential rotation API returns value-blind expiry evidence',
+    },
+    {
+      path: '/api/feature-flags',
+      valid: (body) =>
+        body?.ok === true &&
+        Array.isArray(body?.flags) &&
+        body.flags.length > 0 &&
+        body.flags.every(
+          (flag) =>
+            typeof flag?.name === 'string' &&
+            typeof flag?.enabled === 'boolean' &&
+            typeof flag?.rolloutPercent === 'number' &&
+            typeof flag?.enabledForSubject === 'boolean',
+        ),
+      label: 'feature-flag API returns staged rollout decisions',
+    },
+    {
+      path: '/api/ops-observability',
+      valid: (body) =>
+        body?.ok === true &&
+        body?.safeMode &&
+        typeof body.safeMode.enabled === 'boolean' &&
+        body?.runtimeBuild &&
+        ['pass', 'degraded'].includes(body.runtimeBuild.status) &&
+        typeof body.runtimeBuild.detail === 'string' &&
+        Array.isArray(body?.deploymentJournal) &&
+        body.deploymentJournal.some(
+          (entry) =>
+            typeof entry?.deploymentId === 'string' &&
+            entry.deploymentId.length > 0 &&
+            typeof entry?.at === 'string' &&
+            typeof entry?.commit === 'string',
+        ),
+      label: 'ops API returns safe-mode, runtime-build, and deployment-correlation evidence',
     },
   ]
   for (const api of authenticatedApiChecks) {
@@ -318,10 +409,50 @@ try {
   await page.getByText('Settings', { exact: true }).last().click()
   await page.waitForURL(/\/settings(?:[/?]|$)/)
   check(true, 'mobile command search opens Settings')
+
+  // Exercise the reversible account-disconnect path. Re-authenticate in the
+  // same browser context so the remaining smoke checks and evidence stay
+  // authenticated without retaining the revoked session.
+  const signOut = page.getByRole('button', { name: 'Sign out', exact: true })
+  await signOut.waitFor({ state: 'visible', timeout: 30_000 })
+  await signOut.click()
+  await page.waitForURL(/\/login(?:[/?]|$)/)
+  check(true, 'account session disconnect returns to sign-in')
+  const relogin = page.locator('#lp-pw')
+  await relogin.fill(password)
+  await page.getByRole('button', { name: 'Sign In', exact: true }).click()
+  await page.getByRole('heading', { name: /Hermes Workspace/i, level: 1 }).waitFor({
+    state: 'visible',
+    timeout: initialAuthTimeout,
+  })
+  const reauth = await page.evaluate(async () =>
+    (await fetch('/api/auth-check', { cache: 'no-store' })).json(),
+  )
+  check(
+    reauth?.authenticated === true,
+    'account session can re-authenticate after disconnect',
+  )
   await page.setViewportSize({ width: 1280, height: 900 })
 } finally {
   await context.close()
   await browser.close()
+}
+
+const evidencePath = process.env.AUTH_E2E_EVIDENCE_PATH?.trim()
+if (evidencePath) {
+  mkdirSync(dirname(evidencePath), { recursive: true, mode: 0o700 })
+  writeFileSync(
+    evidencePath,
+    `${JSON.stringify({
+      version: 1,
+      generatedAt: new Date().toISOString(),
+      baseUrl,
+      expectedBuild,
+      ok: failures === 0,
+      checks: evidenceChecks,
+    }, null, 2)}\n`,
+    { mode: 0o600 },
+  )
 }
 
 process.exitCode = failures > 0 ? 1 : 0

@@ -24,6 +24,12 @@ Review tracked credentials and expiry state:
 pnpm secrets:rotation status
 ```
 
+The default value-blind audit set includes workspace authentication, Google
+OAuth, agent-provider credentials, Dify, Telegram, PostgreSQL, and encrypted
+Finance off-site backup settings. A key is never considered healthy from
+metadata alone: the status report also checks whether the key is configured in
+the supported runtime environment.
+
 Metadata is stored under `.runtime/secret-rotation.json` and append-only audit
 events under `.runtime/secret-rotation-audit.jsonl`, both mode `0600`. The tool
 does not load or print values, edit environment files, rotate credentials, or

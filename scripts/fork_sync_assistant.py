@@ -268,6 +268,15 @@ def render_summary(payload: object) -> str:
         lines.append("Rebase simulation: no conflicts in the disposable worktree")
     elif rebase_simulation == "conflicts":
         lines.append("Rebase simulation: conflicts detected in the disposable worktree")
+    preservation = payload.get("customChangePreservation")
+    if isinstance(preservation, dict):
+        lines.append(
+            "Custom-change preservation: "
+            f'{preservation.get("status", "unknown")} '
+            f'(committed {len(preservation.get("committedPaths", [])) if isinstance(preservation.get("committedPaths"), list) else "?"}, '
+            f'untracked included {len(preservation.get("untrackedPathsIncluded", [])) if isinstance(preservation.get("untrackedPathsIncluded"), list) else "?"}, '
+            f'excluded {len(preservation.get("untrackedPathsExcluded", [])) if isinstance(preservation.get("untrackedPathsExcluded"), list) else "?"})'
+        )
     risk_flags = payload.get("riskFlags")
     if isinstance(risk_flags, list) and risk_flags:
         lines.append("Risk flags: " + ", ".join(str(value) for value in risk_flags))
@@ -584,6 +593,15 @@ def preview(repo: Path, remote: str, branch: str | None,
         "tests": [],
         "mergeApplied": False,
         "pushed": False,
+        "customChangePreservation": {
+            "status": "pending",
+            "committedPaths": [],
+            "trackedWorkingCopyPaths": tracked,
+            "untrackedPaths": untracked,
+            "untrackedPathsIncluded": [],
+            "untrackedPathsExcluded": untracked,
+            "conflictPaths": [],
+        },
     }
     if base_result.returncode:
         shallow = run_git(
@@ -657,6 +675,15 @@ def preview(repo: Path, remote: str, branch: str | None,
             root, "log", "--pretty=format:%h %s", f"{head}..{upstream_head}", "-n", "30"
         ).stdout.splitlines(),
     })
+    report["customChangePreservation"] = {
+        "status": "pending",
+        "committedPaths": local_files,
+        "trackedWorkingCopyPaths": tracked,
+        "untrackedPaths": untracked,
+        "untrackedPathsIncluded": [],
+        "untrackedPathsExcluded": untracked,
+        "conflictPaths": [],
+    }
     if fetch_fallback_reason:
         report["details"] = fetch_fallback_reason
     if upstream_head == head and not tracked and not untracked:
@@ -700,6 +727,15 @@ def preview(repo: Path, remote: str, branch: str | None,
                     risk_flags.append("untracked-working-copy-edits-included-in-preview")
                 if excluded:
                     risk_flags.append("untracked-working-copy-paths-excluded-from-preview")
+            report["customChangePreservation"] = {
+                "status": "pending",
+                "committedPaths": local_files,
+                "trackedWorkingCopyPaths": tracked,
+                "untrackedPaths": untracked,
+                "untrackedPathsIncluded": report["untrackedFilesIncluded"],
+                "untrackedPathsExcluded": report["untrackedFilesExcluded"],
+                "conflictPaths": [],
+            }
             if patch or report["untrackedFilesIncluded"]:
                 temporary_commit = run_git(
                     worktree, "-c", "user.name=Fork Sync Preview",
@@ -727,6 +763,15 @@ def preview(repo: Path, remote: str, branch: str | None,
                     "conflictFiles": conflicts,
                     "details": (rebase.stderr.strip() or rebase.stdout.strip())[-1500:],
                 })
+                report["customChangePreservation"] = {
+                    "status": "needs-review",
+                    "committedPaths": local_files,
+                    "trackedWorkingCopyPaths": tracked,
+                    "untrackedPaths": untracked,
+                    "untrackedPathsIncluded": report["untrackedFilesIncluded"],
+                    "untrackedPathsExcluded": report["untrackedFilesExcluded"],
+                    "conflictPaths": conflicts,
+                }
                 return report
 
             report["rebaseSimulation"] = "no-conflicts"
@@ -769,6 +814,15 @@ def preview(repo: Path, remote: str, branch: str | None,
                 "tests": test_results,
                 "untrackedChangesRequireReview": bool(untracked),
             })
+            report["customChangePreservation"] = {
+                "status": "preserved" if safe_snapshot and report["rebaseSimulation"] == "no-conflicts" else "needs-review",
+                "committedPaths": local_files,
+                "trackedWorkingCopyPaths": tracked,
+                "untrackedPaths": untracked,
+                "untrackedPathsIncluded": report["untrackedFilesIncluded"],
+                "untrackedPathsExcluded": report["untrackedFilesExcluded"],
+                "conflictPaths": [],
+            }
             return report
         finally:
             if added:

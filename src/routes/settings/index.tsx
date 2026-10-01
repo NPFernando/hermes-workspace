@@ -30,6 +30,7 @@ import { NetworkAccessSection } from '@/screens/settings/sections/network-access
 import { WhatsNewSection } from '@/screens/settings/sections/whats-new-section'
 import { ClaudeConfigSection } from '@/screens/settings/sections/claude-config-section'
 import { ConnectionSection } from '@/screens/settings/sections/connection-section'
+import { AccountSessionSection } from '@/screens/settings/sections/account-session-section'
 import { useNotificationCenterStore } from '@/stores/notification-center-store'
 
 const VALID_SECTION_IDS: ReadonlyArray<SettingsNavId> = SETTINGS_NAV_ITEMS.map(
@@ -105,6 +106,7 @@ function SettingsRoute() {
         <div className="flex-1 min-w-0 flex flex-col gap-4">
           {/* -- Connection ------------------ */}
           {activeSection === 'connection' && <ConnectionSection />}
+          {activeSection === 'account' && <AccountSessionSection />}
 
           {/* ── Hermes Agent ──────────────────────────────────── */}
           {activeSection === 'claude' && (

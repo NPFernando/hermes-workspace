@@ -29,6 +29,8 @@ import {
   cancelSwarmDispatchQueueJob,
   enqueueSwarmDispatch,
   getSwarmDispatchQueueSnapshot,
+  pauseSwarmDispatchQueueJob,
+  resumeSwarmDispatchQueueJob,
   retrySwarmDispatchQueueJob,
   startSwarmDispatchQueueWorker,
   waitForSwarmDispatchQueueJob,
@@ -2092,6 +2094,7 @@ export const Route = createFileRoute('/api/swarm-dispatch')({
           )
         }
         let body: {
+          action?: unknown
           acknowledgePossibleDuplicate?: unknown
           approvalNote?: unknown
         }
@@ -2099,9 +2102,34 @@ export const Route = createFileRoute('/api/swarm-dispatch')({
           body = (await request.json()) as {
             acknowledgePossibleDuplicate?: unknown
             approvalNote?: unknown
+            action?: unknown
           }
         } catch {
           return json({ error: 'Invalid JSON body' }, { status: 400 })
+        }
+        if (body.action !== undefined && body.action !== 'pause' && body.action !== 'resume') {
+          return json({ error: 'Queue action must be pause or resume.' }, { status: 400 })
+        }
+        if (body.action === 'pause' || body.action === 'resume') {
+          try {
+            const result =
+              body.action === 'pause'
+                ? await pauseSwarmDispatchQueueJob(id)
+                : await resumeSwarmDispatchQueueJob(id)
+            if (!result.found) {
+              return json({ error: 'Queue job not found.' }, { status: 404 })
+            }
+            if (body.action === 'resume') ensureSwarmDispatchQueueWorker()
+            return json(result)
+          } catch (error) {
+            return json(
+              { error: safeErrorMessage(error) },
+              {
+                status:
+                  error instanceof SwarmDispatchQueueUnavailableError ? 503 : 500,
+              },
+            )
+          }
         }
         const approvalNote =
           typeof body.approvalNote === 'string' ? body.approvalNote.trim() : ''

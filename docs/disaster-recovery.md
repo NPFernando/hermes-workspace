@@ -74,3 +74,22 @@ The service owner schedules this exercise once per quarter and after any
 database migration that changes Finance tables. Deployment evidence and the
 exercise JSON are linked from the production change journal; the JSON is
 retained according to the operator's backup-retention policy.
+
+## Automated quarterly run and dashboard download
+
+Install the supplied units after reviewing the environment and confirming the
+deployment checkout path:
+
+```sh
+sudo install -m 0644 deploy/systemd/hermes-disaster-recovery-exercise.{service,timer} /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable hermes-disaster-recovery-exercise.timer
+sudo systemctl start hermes-disaster-recovery-exercise.timer
+systemctl list-timers hermes-disaster-recovery-exercise.timer
+```
+
+The timer runs `pnpm dr:exercise -- --run` on the quarterly systemd calendar,
+with persistence for missed runs and a randomized delay. The authenticated
+Agent control plane lists the latest sanitized evidence and exposes a private,
+no-store JSON download. The download intentionally excludes child command
+output, database names, credentials, backup contents, and remote paths.

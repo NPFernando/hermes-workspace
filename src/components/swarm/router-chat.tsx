@@ -64,6 +64,7 @@ type QueueStatus = {
     startedAt: number | null
     status: string
     cancelRequestedAt: number | null
+    pausedAt: number | null
     leaseExpiresAt: number | null
     deadLetterAt: number | null
     retryOfJobId: string | null
@@ -77,6 +78,7 @@ type QueueStatus = {
     startedAt: number | null
     status: string
     cancelRequestedAt: number | null
+    pausedAt: number | null
     leaseExpiresAt: number | null
     deadLetterAt: number | null
     retryOfJobId: string | null
@@ -89,6 +91,7 @@ type QueueStatus = {
     startedAt: number | null
     status: string
     cancelRequestedAt: number | null
+    pausedAt: number | null
     leaseExpiresAt: number | null
     deadLetterAt: number | null
     retryOfJobId: string | null
@@ -175,6 +178,7 @@ export function RouterChat({
     null,
   )
   const [retryingQueueId, setRetryingQueueId] = useState<string | null>(null)
+  const [togglingQueueId, setTogglingQueueId] = useState<string | null>(null)
   const [results, setResults] = useState<DispatchResponse | null>(null)
   const [followUp, setFollowUp] = useState<FollowUpResponse | null>(null)
   const pacingTasks =
@@ -483,6 +487,25 @@ export function RouterChat({
       )
     } finally {
       setRetryingQueueId(null)
+    }
+  }
+
+  async function toggleQueuePause(id: string, action: 'pause' | 'resume') {
+    setTogglingQueueId(id)
+    try {
+      const response = await fetch(`/api/swarm-dispatch?id=${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      })
+      const result = (await response.json().catch(() => null)) as { error?: string } | null
+      if (!response.ok) throw new Error(result?.error ?? `HTTP ${response.status}`)
+      const refreshed = await fetch('/api/swarm-dispatch', { cache: 'no-store' })
+      if (refreshed.ok) setQueueStatus((await refreshed.json()) as QueueStatus)
+    } catch (error) {
+      setDispatchError(error instanceof Error ? error.message : `Could not ${action} queued dispatch.`)
+    } finally {
+      setTogglingQueueId(null)
     }
   }
 
@@ -836,19 +859,28 @@ export function RouterChat({
                         >
                           <span>
                             #{job.position} · P{job.priority} · {job.assignmentCount} task
-                            {job.assignmentCount === 1 ? '' : 's'} · pending
+                            {job.assignmentCount === 1 ? '' : 's'} · {job.status}
                           </span>
-                          <button
-                            type="button"
-                            disabled={cancellingQueueId === job.id}
-                            onClick={() => void cancelQueueJob(job.id)}
-                            className="text-[var(--theme-danger)] underline disabled:opacity-50"
-                            aria-label={`Cancel queued batch ${job.id}`}
-                          >
-                            {cancellingQueueId === job.id
-                              ? 'Cancelling…'
-                              : 'Cancel'}
-                          </button>
+                          <span className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              disabled={togglingQueueId === job.id}
+                              onClick={() => void toggleQueuePause(job.id, job.status === 'paused' ? 'resume' : 'pause')}
+                              className="text-[var(--theme-accent)] underline disabled:opacity-50"
+                              aria-label={`${job.status === 'paused' ? 'Resume' : 'Pause'} queued batch ${job.id}`}
+                            >
+                              {togglingQueueId === job.id ? 'Saving…' : job.status === 'paused' ? 'Resume' : 'Pause'}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={cancellingQueueId === job.id}
+                              onClick={() => void cancelQueueJob(job.id)}
+                              className="text-[var(--theme-danger)] underline disabled:opacity-50"
+                              aria-label={`Cancel queued batch ${job.id}`}
+                            >
+                              {cancellingQueueId === job.id ? 'Cancelling…' : 'Cancel'}
+                            </button>
+                          </span>
                         </div>
                       ))}
                       {queueStatus.recent.slice(0, 3).map((job) => (

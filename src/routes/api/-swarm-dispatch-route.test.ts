@@ -11,6 +11,8 @@ const queue = vi.hoisted(() => ({
   retry: vi.fn(),
   snapshot: vi.fn(),
   cancel: vi.fn(),
+  pause: vi.fn(),
+  resume: vi.fn(),
   start: vi.fn(),
 }))
 
@@ -46,6 +48,8 @@ vi.mock('../../server/swarm-dispatch-queue', () => {
     retrySwarmDispatchQueueJob: queue.retry,
     getSwarmDispatchQueueSnapshot: queue.snapshot,
     cancelSwarmDispatchQueueJob: queue.cancel,
+    pauseSwarmDispatchQueueJob: queue.pause,
+    resumeSwarmDispatchQueueJob: queue.resume,
     startSwarmDispatchQueueWorker: queue.start,
     enqueueSwarmDispatch: vi.fn(),
     waitForSwarmDispatchQueueJob: vi.fn(),
@@ -156,5 +160,32 @@ describe('swarm dispatch queue API authorization and retry', () => {
       alreadyQueued: false,
       auditId: '00000000-0000-4000-8000-000000000002',
     })
+  })
+
+  it('pauses and resumes a queued job without requiring retry approval', async () => {
+    state.authenticated = true
+    vi.mocked(queue.pause).mockResolvedValueOnce({ found: true, status: 'paused' })
+    const id = '00000000-0000-4000-8000-000000000000'
+    const paused = await handlers.PATCH({
+      request: new Request(`http://localhost/api/swarm-dispatch?id=${id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'pause' }),
+      }),
+    })
+    expect(paused.status).toBe(200)
+    expect(queue.pause).toHaveBeenCalledWith(id)
+    expect(queue.retry).not.toHaveBeenCalled()
+
+    vi.mocked(queue.resume).mockResolvedValueOnce({ found: true, status: 'pending' })
+    const resumed = await handlers.PATCH({
+      request: new Request(`http://localhost/api/swarm-dispatch?id=${id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'resume' }),
+      }),
+    })
+    expect(resumed.status).toBe(200)
+    expect(queue.resume).toHaveBeenCalledWith(id)
   })
 })

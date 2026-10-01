@@ -123,6 +123,21 @@ describe('agent control plane dashboard', () => {
           },
         ],
       },
+      'dr-evidence': {
+        ok: true,
+        evidence: [
+          {
+            file: 'exercise-20260918060000.json',
+            generatedAt: '2026-09-18T06:00:00.000Z',
+            mode: 'run',
+            nonDestructive: true,
+            ok: true,
+            results: [
+              { name: 'finance-restore', status: 'passed', detail: null },
+            ],
+          },
+        ],
+      },
     }
 
     await act(async () => {
@@ -144,6 +159,8 @@ describe('agent control plane dashboard', () => {
     expect(host.textContent).toContain('1 recent dead-lettered')
     expect(host.textContent).toContain('3 configured · degraded')
     expect(host.textContent).toContain('1 session(s)')
+    expect(host.textContent).toContain('Passing · latest exercise')
+    expect(host.textContent).toContain('1 checks')
     expect(host.textContent).toContain('no agent reply inferred')
     expect(host.textContent).not.toContain('private context omitted')
     expect(host.querySelector('a[href="/swarm2"]')?.textContent).toContain(
@@ -153,7 +170,7 @@ describe('agent control plane dashboard', () => {
       'Open approval review',
     )
     expect(queryState.keys.sort()).toEqual(
-      ['harp-readiness', 'queue', 'workers', 'workspace-session-health'].sort(),
+      ['dr-evidence', 'harp-readiness', 'queue', 'workers', 'workspace-session-health'].sort(),
     )
   })
 })

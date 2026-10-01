@@ -16,7 +16,9 @@ beforeEach(() => {
   delete process.env.TRUST_PROXY
   delete process.env.HERMES_PASSWORD
   delete process.env.HERMES_E2E_PASSWORD
+  delete process.env.HERMES_AUTH_FAILURE_LOG
   delete process.env.CLAUDE_PASSWORD
+  delete process.env.HERMES_AUTH_FAILURE_LOG
   delete process.env.HERMES_E2E_PASSWORD
 })
 
@@ -100,6 +102,22 @@ describe('getRequestIp (#125)', () => {
     const { getRequestIp } = await import('./auth-middleware')
     const ip = getRequestIp(makeRequest({ 'x-real-ip': '198.51.100.5' }))
     expect(ip).toBe('198.51.100.5')
+  })
+})
+
+describe('authentication observability', () => {
+  it('accepts safe request IDs and replaces unsafe or oversized values', async () => {
+    const { getRequestCorrelationId } = await import('./auth-middleware')
+    expect(
+      getRequestCorrelationId(
+        new Request('http://localhost/', { headers: { 'x-request-id': 'deploy-123' } }),
+      ),
+    ).toBe('deploy-123')
+    expect(
+      getRequestCorrelationId(
+        new Request('http://localhost/', { headers: { 'x-request-id': 'bad id' } }),
+      ),
+    ).toMatch(/^[0-9a-f-]{36}$/)
   })
 })
 

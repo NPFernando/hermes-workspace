@@ -50,6 +50,18 @@ type ProviderUsageResponse = {
     periodDays: number
     message: string
   }
+  anomalies?: Array<{
+    provider: string
+    displayName: string
+    label: string
+    measure: 'quota' | 'spend'
+    day: string
+    used: number
+    baseline: number
+    ratio: number
+    severity: 'warning' | 'critical'
+    message: string
+  }>
   error?: string
 }
 
@@ -494,6 +506,7 @@ export function AiUsagePanel({
   const lastUpdated = query.data?.updatedAt
   const sharedBudget = query.data?.sharedBudget
   const monthlyBudget = query.data?.monthlyBudget
+  const anomalies = query.data?.anomalies ?? []
   const days = historyRange === 31 ? lastThirtyOneUtcDays() : lastSevenUtcDays()
   const trendSeries: Array<{
     key: string
@@ -759,6 +772,47 @@ export function AiUsagePanel({
                 values={series.values}
                 formatValue={series.formatValue}
               />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {anomalies.length > 0 ? (
+        <section
+          aria-label="Usage anomaly alerts"
+          className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-xs font-semibold text-[var(--theme-text)]">
+              Usage anomaly alerts
+            </h3>
+            <span className="text-[10px] text-[var(--theme-muted)]">
+              latest sample vs recent baseline
+            </span>
+          </div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {anomalies.map((anomaly) => (
+              <div
+                key={`${anomaly.provider}:${anomaly.label}:${anomaly.measure}:${anomaly.day}`}
+                className={`rounded-md border px-2 py-2 text-xs ${
+                  anomaly.severity === 'critical'
+                    ? 'border-red-500/40 bg-red-500/5'
+                    : 'border-amber-500/30'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-[var(--theme-text)]">
+                    {anomaly.displayName} · {anomaly.label}
+                  </span>
+                  <span className="uppercase text-[10px] text-amber-300">
+                    {anomaly.severity}
+                  </span>
+                </div>
+                <p className="mt-1 text-[var(--theme-muted)]">
+                  {anomaly.message} Latest {anomaly.used.toFixed(2)} vs baseline{' '}
+                  {anomaly.baseline.toFixed(2)} ({anomaly.day}).
+                </p>
+              </div>
             ))}
           </div>
         </section>
