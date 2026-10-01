@@ -230,4 +230,65 @@ describe('LearnedCapabilitiesPanel', () => {
     expect(r.container.textContent).toContain('Nothing learned yet')
     await r.unmount()
   })
+
+  it('only shows Forget when a handler is wired', async () => {
+    const r = await renderInto(
+      <LearnedCapabilitiesPanel
+        view={view([{ ...base, model: 'claude-haiku-4-5', option: 'effort' }])}
+      />,
+    )
+    expect(
+      r.container.querySelector('[data-testid="forget-capability"]'),
+    ).toBeNull()
+    await r.unmount()
+  })
+
+  it('confirms, then forgets the clicked entry', async () => {
+    const onForget = vi.fn()
+    const confirm = vi.spyOn(window, 'confirm')
+    const caps = view([
+      { ...base, model: 'gpt-6-sol', option: 'model' },
+      { ...base, model: 'claude-haiku-4-5', option: 'effort' },
+    ])
+    const r = await renderInto(
+      <LearnedCapabilitiesPanel view={caps} onForget={onForget} />,
+    )
+    const buttons = r.container.querySelectorAll<HTMLButtonElement>(
+      '[data-testid="forget-capability"]',
+    )
+    expect(buttons).toHaveLength(2)
+
+    confirm.mockReturnValueOnce(false)
+    await React.act(async () => buttons[1].click())
+    expect(onForget).not.toHaveBeenCalled()
+
+    confirm.mockReturnValueOnce(true)
+    await React.act(async () => buttons[1].click())
+    expect(confirm).toHaveBeenLastCalledWith(
+      'Forget what HARP learned about effort on claude-haiku-4-5?',
+    )
+    expect(onForget).toHaveBeenCalledWith({
+      model: 'claude-haiku-4-5',
+      option: 'effort',
+    })
+    confirm.mockRestore()
+    await r.unmount()
+  })
+
+  it('shows progress and errors from the forget call', async () => {
+    const r = await renderInto(
+      <LearnedCapabilitiesPanel
+        view={view([{ ...base, model: 'gpt-6-sol', option: 'model' }])}
+        onForget={() => {}}
+        forgettingKey="gpt-6-sol:model"
+        forgetError="HARP API unavailable"
+      />,
+    )
+    const btn = buttonByText(r.container, 'Forgetting')
+    expect(btn.disabled).toBe(true)
+    expect(r.container.querySelector('[role="alert"]')?.textContent).toContain(
+      'HARP API unavailable',
+    )
+    await r.unmount()
+  })
 })

@@ -79,6 +79,7 @@ import { Route as ApiFinanceExportRouteImport } from './routes/api/finance-expor
 import { Route as ApiFinanceUploadRouteImport } from './routes/api/finance-upload'
 import { Route as ApiGatewayReprobeRouteImport } from './routes/api/gateway-reprobe'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-status'
+import { Route as ApiHarpCapabilityForgetRouteImport } from './routes/api/harp-capability-forget'
 import { Route as ApiHarpConfigRouteImport } from './routes/api/harp-config'
 import { Route as ApiHarpObservabilityRouteImport } from './routes/api/harp-observability'
 import { Route as ApiHarpRouteStatsRouteImport } from './routes/api/harp-route-stats'
@@ -613,6 +614,11 @@ const ApiGatewayReprobeRoute = ApiGatewayReprobeRouteImport.update({
 const ApiGatewayStatusRoute = ApiGatewayStatusRouteImport.update({
   id: '/api/gateway-status',
   path: '/api/gateway-status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHarpCapabilityForgetRoute = ApiHarpCapabilityForgetRouteImport.update({
+  id: '/api/harp-capability-forget',
+  path: '/api/harp-capability-forget',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiHarpConfigRoute = ApiHarpConfigRouteImport.update({
@@ -1617,6 +1623,7 @@ export interface FileRoutesByFullPath {
   '/api/finance-upload': typeof ApiFinanceUploadRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
+  '/api/harp-capability-forget': typeof ApiHarpCapabilityForgetRoute
   '/api/harp-config': typeof ApiHarpConfigRoute
   '/api/harp-observability': typeof ApiHarpObservabilityRoute
   '/api/harp-route-stats': typeof ApiHarpRouteStatsRoute
@@ -1872,6 +1879,7 @@ export interface FileRoutesByTo {
   '/api/finance-upload': typeof ApiFinanceUploadRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
+  '/api/harp-capability-forget': typeof ApiHarpCapabilityForgetRoute
   '/api/harp-config': typeof ApiHarpConfigRoute
   '/api/harp-observability': typeof ApiHarpObservabilityRoute
   '/api/harp-route-stats': typeof ApiHarpRouteStatsRoute
@@ -2129,6 +2137,7 @@ export interface FileRoutesById {
   '/api/finance-upload': typeof ApiFinanceUploadRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
+  '/api/harp-capability-forget': typeof ApiHarpCapabilityForgetRoute
   '/api/harp-config': typeof ApiHarpConfigRoute
   '/api/harp-observability': typeof ApiHarpObservabilityRoute
   '/api/harp-route-stats': typeof ApiHarpRouteStatsRoute
@@ -2387,6 +2396,7 @@ export interface FileRouteTypes {
     | '/api/finance-upload'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
+    | '/api/harp-capability-forget'
     | '/api/harp-config'
     | '/api/harp-observability'
     | '/api/harp-route-stats'
@@ -2642,6 +2652,7 @@ export interface FileRouteTypes {
     | '/api/finance-upload'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
+    | '/api/harp-capability-forget'
     | '/api/harp-config'
     | '/api/harp-observability'
     | '/api/harp-route-stats'
@@ -2898,6 +2909,7 @@ export interface FileRouteTypes {
     | '/api/finance-upload'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
+    | '/api/harp-capability-forget'
     | '/api/harp-config'
     | '/api/harp-observability'
     | '/api/harp-route-stats'
@@ -3155,6 +3167,7 @@ export interface RootRouteChildren {
   ApiFinanceUploadRoute: typeof ApiFinanceUploadRoute
   ApiGatewayReprobeRoute: typeof ApiGatewayReprobeRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
+  ApiHarpCapabilityForgetRoute: typeof ApiHarpCapabilityForgetRoute
   ApiHarpConfigRoute: typeof ApiHarpConfigRoute
   ApiHarpObservabilityRoute: typeof ApiHarpObservabilityRoute
   ApiHarpRouteStatsRoute: typeof ApiHarpRouteStatsRoute
@@ -3791,6 +3804,13 @@ declare module '@tanstack/react-router' {
       path: '/api/gateway-status'
       fullPath: '/api/gateway-status'
       preLoaderRoute: typeof ApiGatewayStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/harp-capability-forget': {
+      id: '/api/harp-capability-forget'
+      path: '/api/harp-capability-forget'
+      fullPath: '/api/harp-capability-forget'
+      preLoaderRoute: typeof ApiHarpCapabilityForgetRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/harp-config': {
@@ -5411,6 +5431,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFinanceUploadRoute: ApiFinanceUploadRoute,
   ApiGatewayReprobeRoute: ApiGatewayReprobeRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
+  ApiHarpCapabilityForgetRoute: ApiHarpCapabilityForgetRoute,
   ApiHarpConfigRoute: ApiHarpConfigRoute,
   ApiHarpObservabilityRoute: ApiHarpObservabilityRoute,
   ApiHarpRouteStatsRoute: ApiHarpRouteStatsRoute,

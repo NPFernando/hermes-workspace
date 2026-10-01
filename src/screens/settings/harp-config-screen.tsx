@@ -91,6 +91,22 @@ async function fetchHarpObservability(): Promise<HarpObservabilityView> {
   return data as HarpObservabilityView
 }
 
+async function forgetHarpCapability(entry: {
+  model: string
+  option: string
+}): Promise<void> {
+  const res = await fetch('/api/harp-capability-forget', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(entry),
+  })
+  const data = (await res.json().catch(() => ({}))) as {
+    ok?: boolean
+    error?: string
+  }
+  if (!res.ok || !data.ok) throw new Error(data.error ?? `HTTP ${res.status}`)
+}
+
 type HarpSelectorApiResponse = {
   ok: boolean
   error?: string
@@ -571,8 +587,14 @@ function HarpObservabilityPanel({
 
 export function LearnedCapabilitiesPanel({
   view,
+  onForget,
+  forgettingKey,
+  forgetError,
 }: {
   view?: HarpObservabilityView
+  onForget?: (entry: { model: string; option: string }) => void
+  forgettingKey?: string | null
+  forgetError?: string | null
 }) {
   if (!view) return null
   const caps = view.learnedCapabilities
@@ -586,12 +608,22 @@ export function LearnedCapabilitiesPanel({
       <p className="mb-2 text-[11px] text-[var(--theme-muted)]">
         {active.length} active · {caps.length - active.length} expired
       </p>
+      {forgetError && (
+        <p
+          role="alert"
+          className="mb-2 rounded-md bg-red-50 px-2 py-1 text-[11px] text-red-700 dark:bg-red-950/40 dark:text-red-300"
+        >
+          Forget failed: {forgetError}
+        </p>
+      )}
       <div className="space-y-1.5">
         {caps.map((c) => {
           const isModel = c.option === 'model'
+          const key = `${c.model}:${c.option}`
+          const forgetting = forgettingKey === key
           return (
             <div
-              key={`${c.model}:${c.option}`}
+              key={key}
               data-testid="learned-capability"
               className={cn(
                 'rounded-lg bg-surface px-2 py-1.5',
@@ -622,6 +654,30 @@ export function LearnedCapabilitiesPanel({
                 <span className="shrink-0 text-[10px] text-[var(--theme-muted)]">
                   {c.count}× · last {compactDateTime(c.lastSeenAt)}
                 </span>
+                {onForget && (
+                  <button
+                    type="button"
+                    data-testid="forget-capability"
+                    disabled={forgetting}
+                    title="Remove this learned entry so plans use the model/option again"
+                    onClick={() => {
+                      const what = isModel
+                        ? c.model
+                        : `${c.option} on ${c.model}`
+                      if (
+                        typeof window !== 'undefined' &&
+                        !window.confirm(
+                          `Forget what HARP learned about ${what}?`,
+                        )
+                      )
+                        return
+                      onForget({ model: c.model, option: c.option })
+                    }}
+                    className="shrink-0 rounded-md border border-[var(--theme-border)] px-1.5 py-0.5 text-[10px] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-text)] disabled:opacity-50"
+                  >
+                    {forgetting ? 'Forgetting…' : 'Forget'}
+                  </button>
+                )}
               </div>
               <p className="mt-0.5 truncate text-[10px] text-[var(--theme-muted)]">
                 {isModel
@@ -646,13 +702,7 @@ export function LearnedCapabilitiesPanel({
             <code className="font-mono text-[10px]">
               model-capabilities.json
             </code>
-            . Undo an entry with{' '}
-            <code className="font-mono text-[10px]">capability_forget</code>{' '}
-            (MCP or{' '}
-            <code className="font-mono text-[10px]">
-              POST /v1/capability/forget
-            </code>
-            ).
+            . Wrong entries can be undone here with Forget.
           </p>
         )}
       </div>
@@ -1524,6 +1574,15 @@ export function HarpConfigScreen() {
     mutation.mutate(p)
   }
 
+  const forgetCapability = useMutation({
+    mutationFn: forgetHarpCapability,
+    onSettled: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['harp-observability'],
+      })
+    },
+  })
+
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 py-8 text-sm text-[var(--theme-muted)]">
@@ -1622,7 +1681,18 @@ export function HarpConfigScreen() {
 
       <HarpRouteOutcomesPanel />
 
-      <LearnedCapabilitiesPanel view={observability.data} />
+      <LearnedCapabilitiesPanel
+        view={observability.data}
+        onForget={(entry) => forgetCapability.mutate(entry)}
+        forgettingKey={
+          forgetCapability.isPending
+            ? `${forgetCapability.variables.model}:${forgetCapability.variables.option}`
+            : null
+        }
+        forgetError={
+          forgetCapability.error ? forgetCapability.error.message : null
+        }
+      />
 
       <HarpSelectorPreviewPanel
         view={selectorPreview.data}
