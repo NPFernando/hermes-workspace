@@ -15,8 +15,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 
-import { CombosSection } from './harp-config-screen'
+import { CombosSection, LearnedCapabilitiesPanel } from './harp-config-screen'
 import type { HarpCombosView } from '@/server/harp-config-store'
+import type {
+  HarpLearnedCapability,
+  HarpObservabilityView,
+} from '@/server/harp-observability'
 
 async function renderInto(element: React.ReactElement) {
   const container = document.createElement('div')
@@ -168,5 +172,123 @@ describe('CombosSection — patch bodies', () => {
 
     expect(patch).not.toHaveBeenCalled()
     await unmount()
+  })
+})
+
+describe('LearnedCapabilitiesPanel', () => {
+  function view(caps: Array<HarpLearnedCapability>) {
+    return { learnedCapabilities: caps } as unknown as HarpObservabilityView
+  }
+  const base = {
+    learnedAt: '2026-10-01T12:00:00Z',
+    lastSeenAt: '2026-10-01T12:00:00Z',
+    count: 1,
+    source: 'paperclip:run:abc',
+    signature: null,
+    expiresAt: null,
+    ttlDays: null,
+    active: true,
+  }
+
+  it('labels unusable models, rejected options and expired blocks', async () => {
+    const r = await renderInto(
+      <LearnedCapabilitiesPanel
+        view={view([
+          {
+            ...base,
+            model: 'gpt-6-sol',
+            option: 'model',
+            expiresAt: '2026-10-08T12:00:00Z',
+            ttlDays: 7,
+          },
+          { ...base, model: 'claude-haiku-4-5', option: 'effort' },
+          {
+            ...base,
+            model: 'old-model',
+            option: 'model',
+            active: false,
+            expiresAt: '2026-09-01T00:00:00Z',
+          },
+        ])}
+      />,
+    )
+    const rows = r.container.querySelectorAll(
+      '[data-testid="learned-capability"]',
+    )
+    expect(rows).toHaveLength(3)
+    expect(rows[0].textContent).toContain('unusable')
+    expect(rows[0].textContent).toContain('(7d)')
+    expect(rows[1].textContent).toContain('rejects option')
+    expect(rows[1].textContent).toContain('claude-haiku-4-5 · effort')
+    expect(rows[2].textContent).toContain('expired')
+    expect(r.container.textContent).toContain('2 active · 1 expired')
+    await r.unmount()
+  })
+
+  it('explains the empty state', async () => {
+    const r = await renderInto(<LearnedCapabilitiesPanel view={view([])} />)
+    expect(r.container.textContent).toContain('Nothing learned yet')
+    await r.unmount()
+  })
+
+  it('only shows Forget when a handler is wired', async () => {
+    const r = await renderInto(
+      <LearnedCapabilitiesPanel
+        view={view([{ ...base, model: 'claude-haiku-4-5', option: 'effort' }])}
+      />,
+    )
+    expect(
+      r.container.querySelector('[data-testid="forget-capability"]'),
+    ).toBeNull()
+    await r.unmount()
+  })
+
+  it('confirms, then forgets the clicked entry', async () => {
+    const onForget = vi.fn()
+    const confirm = vi.spyOn(window, 'confirm')
+    const caps = view([
+      { ...base, model: 'gpt-6-sol', option: 'model' },
+      { ...base, model: 'claude-haiku-4-5', option: 'effort' },
+    ])
+    const r = await renderInto(
+      <LearnedCapabilitiesPanel view={caps} onForget={onForget} />,
+    )
+    const buttons = r.container.querySelectorAll<HTMLButtonElement>(
+      '[data-testid="forget-capability"]',
+    )
+    expect(buttons).toHaveLength(2)
+
+    confirm.mockReturnValueOnce(false)
+    await React.act(async () => buttons[1].click())
+    expect(onForget).not.toHaveBeenCalled()
+
+    confirm.mockReturnValueOnce(true)
+    await React.act(async () => buttons[1].click())
+    expect(confirm).toHaveBeenLastCalledWith(
+      'Forget what HARP learned about effort on claude-haiku-4-5?',
+    )
+    expect(onForget).toHaveBeenCalledWith({
+      model: 'claude-haiku-4-5',
+      option: 'effort',
+    })
+    confirm.mockRestore()
+    await r.unmount()
+  })
+
+  it('shows progress and errors from the forget call', async () => {
+    const r = await renderInto(
+      <LearnedCapabilitiesPanel
+        view={view([{ ...base, model: 'gpt-6-sol', option: 'model' }])}
+        onForget={() => {}}
+        forgettingKey="gpt-6-sol:model"
+        forgetError="HARP API unavailable"
+      />,
+    )
+    const btn = buttonByText(r.container, 'Forgetting')
+    expect(btn.disabled).toBe(true)
+    expect(r.container.querySelector('[role="alert"]')?.textContent).toContain(
+      'HARP API unavailable',
+    )
+    await r.unmount()
   })
 })
