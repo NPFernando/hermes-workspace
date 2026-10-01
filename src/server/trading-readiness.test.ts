@@ -223,6 +223,29 @@ describe('assessReadiness — fail-closed on missing/stale evidence', () => {
     expect(gate?.evidenceAgeMs).toBeGreaterThan(30 * 24 * 60 * 60 * 1000)
   })
 
+  it('accepts a fresh completed controlled sandbox probe independently of strategy trades', async () => {
+    const now = new Date('2026-09-29T09:00:00.000Z')
+    const financeStore = await import('./finance-store')
+    const db = financeStore.readFinanceStore()
+    db.settings.testnetExecutionProbe = {
+      latest: {
+        status: 'completed',
+        roundTripsCompleted: 20,
+        completedAt: '2026-09-29T08:30:00.000Z',
+        averageSlippagePct: 0.000001,
+        fills: Array.from({ length: 20 }, (_, index) => ({ index })),
+      },
+      history: [],
+    }
+    financeStore.writeFinanceStore(db)
+    const readiness = await import('./trading-readiness')
+    const gate = readiness
+      .assessReadiness(now)
+      .gates.find((item) => item.id === 'sandbox_evidence')
+    expect(gate?.pass).toBe(true)
+    expect(gate?.detail).toMatch(/controlled testnet probe completed 20/)
+  })
+
   it('fails strategy_sample_size when an enabled strategy has insufficient window sample', async () => {
     await makeEverythingReady(new Date())
     state.guardReviews = [

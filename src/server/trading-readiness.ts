@@ -59,7 +59,9 @@ import { isConnectivityBreakerTripped } from './connectivity-breaker'
 import {
   createDemoClientFromEnv,
   createLiveClientFromEnv,
+  createLiveReadOnlyClientFromEnv,
 } from './binance-demo-client'
+import { testnetExecutionProbeSummary } from './testnet-execution-probe'
 import {
   liveRiskCapsAreValid,
   resolveLiveRiskCaps,
@@ -90,6 +92,7 @@ const APPROVAL_HISTORY_CAP = 20
 
 const MIN_PAPER_TRADES = 20
 const MIN_TESTNET_TRADES = 10
+const MIN_SANDBOX_PROBE_ROUND_TRIPS = 20
 const MAX_EVIDENCE_AGE_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
 const MAX_CONNECTIVITY_VERIFICATION_AGE_MS = 15 * 60 * 1000
 const MAX_LIVE_PER_ORDER_CAP_USDT = 50
@@ -245,6 +248,45 @@ function evidenceGate(
   return { id, label, pass, blocking: true, detail, evidenceAgeMs }
 }
 
+function sandboxEvidenceGate(
+  db: FinanceDatabase,
+  trades: Array<{ closedAt: string }>,
+  enoughSample: boolean,
+  now: number,
+): ReadinessGate {
+  const settings = db.settings as Record<string, unknown>
+  const probe = testnetExecutionProbeSummary(settings.testnetExecutionProbe)
+  const latest = probe?.latest
+  const probePass =
+    latest?.status === 'completed' &&
+    latest.roundTripsCompleted >= MIN_SANDBOX_PROBE_ROUND_TRIPS &&
+    Array.isArray(latest.fills) &&
+    latest.fills.length >= MIN_SANDBOX_PROBE_ROUND_TRIPS &&
+    latest.averageSlippagePct !== null
+  if (probePass) {
+    const evidenceAgeMs = now - Date.parse(latest.completedAt)
+    const fresh = evidenceAgeMs >= 0 && evidenceAgeMs <= MAX_EVIDENCE_AGE_MS
+    return {
+      id: 'sandbox_evidence',
+      label: 'Sandbox / testnet evidence',
+      pass: fresh,
+      blocking: true,
+      detail: fresh
+        ? `controlled testnet probe completed ${latest.roundTripsCompleted} round trip(s), with fees and slippage recorded`
+        : `latest controlled testnet probe is stale (max ${MAX_EVIDENCE_AGE_MS / 86_400_000} days)`,
+      evidenceAgeMs,
+    }
+  }
+  return evidenceGate(
+    'sandbox_evidence',
+    'Sandbox / testnet evidence',
+    trades,
+    enoughSample,
+    MIN_TESTNET_TRADES,
+    now,
+  )
+}
+
 function ledgerIntegrityGate(): ReadinessGate {
   const storage = financeStorageStatus()
   // Postgres is the sole store now — only a genuinely unreachable store blocks
@@ -366,7 +408,7 @@ function accountConnectivityGate(db: FinanceDatabase, now: number): ReadinessGat
   const settings = db.settings as Record<string, unknown>
   const breakerTripped = isConnectivityBreakerTripped()
   const testnet = createDemoClientFromEnv()
-  const live = createLiveClientFromEnv()
+  const live = createLiveReadOnlyClientFromEnv()
   const verification = settings.tradingConnectivityVerification as
     | {
         checkedAt?: unknown
@@ -446,7 +488,9 @@ export async function verifyTradingConnectivity(
   now: Date = new Date(),
 ): Promise<TradingConnectivityVerification> {
   const check = async (
-    client: ReturnType<typeof createDemoClientFromEnv> | ReturnType<typeof createLiveClientFromEnv>,
+    client:
+      | ReturnType<typeof createDemoClientFromEnv>
+      | ReturnType<typeof createLiveReadOnlyClientFromEnv>,
   ): Promise<{ ok: boolean; detail: string }> => {
     if (!client.client) return { ok: false, detail: client.reason ?? 'client unavailable' }
     try {
@@ -463,7 +507,7 @@ export async function verifyTradingConnectivity(
   }
   const [testnet, live] = await Promise.all([
     check(createDemoClientFromEnv()),
-    check(createLiveClientFromEnv()),
+    check(createLiveReadOnlyClientFromEnv()),
   ])
   const result: TradingConnectivityVerification = {
     checkedAt: now.toISOString(),
@@ -628,12 +672,10 @@ export function assessReadiness(now: Date = new Date()): ReadinessSnapshot {
       MIN_PAPER_TRADES,
       nowMs,
     ),
-    evidenceGate(
-      'sandbox_evidence',
-      'Sandbox / testnet evidence',
+    sandboxEvidenceGate(
+      db,
       testnetTrades,
       quality.validations.enoughDataForTestnet,
-      MIN_TESTNET_TRADES,
       nowMs,
     ),
     ledgerIntegrityGate(),

@@ -11,6 +11,7 @@ import {
   assertLiveBaseUrl,
   createDemoClientFromEnv,
   createLiveClientFromEnv,
+  createLiveReadOnlyClientFromEnv,
   floorToStep,
 } from './binance-demo-client'
 
@@ -450,5 +451,19 @@ describe('createLiveClientFromEnv', () => {
       BINANCE_TESTNET_API_KEY: 'testnet',
     })
     expect(client?.host).toBe('api.binance.com')
+  })
+})
+
+describe('createLiveReadOnlyClientFromEnv', () => {
+  it('builds a connectivity-only client without live-order approval', () => {
+    const { client, reason } = createLiveReadOnlyClientFromEnv({
+      BINANCE_API_KEY: 'live',
+      BINANCE_API_SECRET: 'secret',
+      BINANCE_BASE_URL: 'https://api.binance.com/api',
+      BINANCE_TESTNET_API_KEY: 'testnet',
+    })
+    expect(reason).toBeUndefined()
+    expect(client?.environment).toBe('live')
+    expect(client).not.toHaveProperty('placeOrder')
   })
 })
