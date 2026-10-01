@@ -534,7 +534,7 @@ export interface LiveClientConfig {
 }
 
 export class BinanceLiveClient extends SignedBinanceClient {
-  readonly environment: BinanceExecutionEnvironment = 'live'
+  readonly environment = 'live' as const
 
   constructor(config: LiveClientConfig) {
     if (
