@@ -1006,14 +1006,13 @@ export async function runValidationCycle(
   if (!cycle.ran && cycle.reason) {
     errors.push({ at: cycle.ranAt, message: cycle.reason })
   }
-  for (const action of cycle.actions) {
-    if (action.action === 'BLOCKED') {
-      errors.push({
-        at: cycle.ranAt,
-        message: `${action.symbol}: ${action.reason}`,
-      })
-    }
-  }
+  // A successful cycle may contain BLOCKED actions when the guardian or
+  // decision-quality layer vetoes an otherwise valid entry. Those are
+  // controlled safety outcomes, not cycle failures: diagnostics and
+  // nonActionReasonCounts already preserve the reason for the dashboard.
+  // Keep `errors` reserved for a cycle that did not run or an actual
+  // execution/persistence failure, so scheduler health cannot be confused
+  // with intentional risk protection.
 
   const openedCount = cycle.actions.filter((a) => a.action === 'OPEN').length
   const closedCount = newTrades.length

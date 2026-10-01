@@ -202,6 +202,20 @@ function unauthorized() {
   return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
 }
 
+function gmailSyncErrorMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error)
+  if (/invalid_grant|expired|revoked/i.test(raw)) {
+    return 'Gmail needs reconnecting — token expired or was revoked.'
+  }
+  if (/Gmail is not connected/i.test(raw)) {
+    return 'Gmail is not connected.'
+  }
+  if (/Gmail token refresh failed/i.test(raw)) {
+    return 'Gmail token refresh failed — reconnect Gmail in Settings.'
+  }
+  return safeErrorMessage(error)
+}
+
 /**
  * add_record/update_record/delete_record are only ever called from the
  * Personal Finance screen's generic DataTable/panels (confirmed: no trading
@@ -2607,7 +2621,7 @@ export const Route = createFileRoute('/api/finance')({
               appendAuditLog('gmail_sync_run', { ...result })
               return json({ ok: true, result })
             } catch (error) {
-              const message = safeErrorMessage(error)
+              const message = gmailSyncErrorMessage(error)
               recordGmailSyncError(message)
               return json({ ok: false, error: message }, { status: 502 })
             }

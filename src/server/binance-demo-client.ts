@@ -558,6 +558,16 @@ export class BinanceLiveClient extends SignedBinanceClient {
 }
 
 /**
+ * The readiness workflow may authenticate a production account without being
+ * authorized to place production orders. Keep that capability type narrow so
+ * a connectivity check cannot accidentally become an execution path.
+ */
+export interface BinanceReadOnlyConnectivityClient {
+  readonly environment: 'live'
+  getAccount: () => Promise<BinanceAccount>
+}
+
+/**
  * Build a demo client from environment variables, or return null (with a
  * reason) when demo credentials are absent/misconfigured. Never throws for
  * missing config - callers degrade gracefully.
@@ -619,6 +629,45 @@ export function createLiveClientFromEnv(env: NodeJS.ProcessEnv = process.env): {
       testnetApiKey: env.BINANCE_TESTNET_API_KEY,
     })
     return { client }
+  } catch (err) {
+    return {
+      client: null,
+      reason: err instanceof Error ? err.message : String(err),
+    }
+  }
+}
+
+/** Build a production client for account authentication only. The explicit
+ * live-trading approval remains required by createLiveClientFromEnv(), which
+ * is the only factory used by order-capable execution paths. */
+export function createLiveReadOnlyClientFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): {
+  client: BinanceReadOnlyConnectivityClient | null
+  reason?: string
+} {
+  const apiKey = env.BINANCE_API_KEY?.trim()
+  const apiSecret = env.BINANCE_API_SECRET?.trim()
+  const baseUrl = env.BINANCE_BASE_URL?.trim() || 'https://api.binance.com'
+  if (!apiKey || !apiSecret) {
+    return {
+      client: null,
+      reason: 'BINANCE_API_KEY / BINANCE_API_SECRET not set',
+    }
+  }
+  try {
+    const client = new BinanceLiveClient({
+      apiKey,
+      apiSecret,
+      baseUrl,
+      testnetApiKey: env.BINANCE_TESTNET_API_KEY,
+    })
+    return {
+      client: {
+        environment: client.environment,
+        getAccount: client.getAccount.bind(client),
+      },
+    }
   } catch (err) {
     return {
       client: null,
