@@ -9,6 +9,9 @@ import { safeErrorMessage } from './rate-limit'
 //   1. gateway routing telemetry  (~/.local/state/hermes/harp-routing.jsonl)
 //   2. route-combo shadow log      (~/.hermes/logs/harp-combo-shadow.log)
 //   3. model-discovery status      (Postgres harp.model_discovery_runs + harp.models)
+//   4. learned model capabilities  (~/.local/state/universal-harp/model-capabilities.json):
+//      models/options HARP learned from real failed runs (e.g. a model rejecting
+//      `effort`, or a model unusable on this account until its block expires)
 //
 // Every source here is append-only or a plain SELECT — this module never runs
 // the selector (harp-select-route.py appends a synthetic record to the combo
@@ -18,7 +21,8 @@ import { safeErrorMessage } from './rate-limit'
 // ── Path resolution ────────────────────────────────────────────────────────
 
 function routingLogPath(): string {
-  if (process.env.HARP_ROUTING_LOG_PATH) return process.env.HARP_ROUTING_LOG_PATH
+  if (process.env.HARP_ROUTING_LOG_PATH)
+    return process.env.HARP_ROUTING_LOG_PATH
   const stateHome =
     process.env.XDG_STATE_HOME ?? path.join(os.homedir(), '.local', 'state')
   return path.join(stateHome, 'hermes', 'harp-routing.jsonl')
@@ -32,6 +36,15 @@ function comboShadowLogPath(): string {
     process.env.CLAUDE_HOME ??
     path.join(os.homedir(), '.hermes')
   return path.join(hermesHome, 'logs', 'harp-combo-shadow.log')
+}
+
+function capabilitiesPath(): string {
+  if (process.env.HARP_MODEL_CAPABILITIES_PATH)
+    return process.env.HARP_MODEL_CAPABILITIES_PATH
+  const stateDir =
+    process.env.UNIVERSAL_HARP_STATE_DIR ??
+    path.join(os.homedir(), '.local', 'state', 'universal-harp')
+  return path.join(stateDir, 'model-capabilities.json')
 }
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -80,6 +93,21 @@ export type HarpDiscoveryStatus = {
   error?: string
 }
 
+/** One option HARP learned a model does not support (`model` = the model itself is unusable). */
+export type HarpLearnedCapability = {
+  model: string
+  option: string
+  learnedAt: string | null
+  lastSeenAt: string | null
+  count: number
+  source: string | null
+  signature: string | null
+  /** Only `model` entries expire (access can come back); null = permanent. */
+  expiresAt: string | null
+  ttlDays: number | null
+  active: boolean
+}
+
 export type HarpObservabilityView = {
   generatedAt: string
   routingLogPath: string
@@ -96,6 +124,8 @@ export type HarpObservabilityView = {
   }
   comboShadow: Array<HarpComboShadowEntry>
   discovery: HarpDiscoveryStatus
+  capabilitiesPath: string
+  learnedCapabilities: Array<HarpLearnedCapability>
 }
 
 // ── JSONL tail ─────────────────────────────────────────────────────────────
@@ -279,6 +309,60 @@ print(json.dumps(out, default=str))
   }
 }
 
+// ── Learned model capabilities ──────────────────────────────────────────────
+
+// Mirrors HARP's model_capabilities: an entry is active until its expires_at
+// (unparseable or missing expiry = active). Expired entries are kept so the UI
+// can show that a block lapsed and the model is being tried again.
+export function getLearnedCapabilities(
+  now: Date = new Date(),
+): Array<HarpLearnedCapability> {
+  let data: unknown
+  try {
+    data = JSON.parse(fs.readFileSync(capabilitiesPath(), 'utf8'))
+  } catch {
+    return []
+  }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return []
+  const out: Array<HarpLearnedCapability> = []
+  for (const [model, entry] of Object.entries(
+    data as Record<string, unknown>,
+  )) {
+    const unsupported =
+      entry && typeof entry === 'object'
+        ? (entry as Record<string, unknown>).unsupported
+        : null
+    if (!unsupported || typeof unsupported !== 'object') continue
+    for (const [option, raw] of Object.entries(
+      unsupported as Record<string, unknown>,
+    )) {
+      const rec = (raw && typeof raw === 'object' ? raw : {}) as Record<
+        string,
+        unknown
+      >
+      const expiresAt = asOptString(rec.expires_at) ?? null
+      const expiryMs = expiresAt ? Date.parse(expiresAt) : NaN
+      out.push({
+        model,
+        option,
+        learnedAt: asOptString(rec.learned_at) ?? null,
+        lastSeenAt: asOptString(rec.last_seen_at) ?? null,
+        count: asOptNumber(rec.count) ?? 1,
+        source: asOptString(rec.source) ?? null,
+        signature: asOptString(rec.signature) ?? null,
+        expiresAt,
+        ttlDays: asOptNumber(rec.ttl_days) ?? null,
+        active: Number.isNaN(expiryMs) || expiryMs > now.getTime(),
+      })
+    }
+  }
+  return out.sort(
+    (a, b) =>
+      Number(b.active) - Number(a.active) ||
+      (b.lastSeenAt ?? '').localeCompare(a.lastSeenAt ?? ''),
+  )
+}
+
 // ── View ───────────────────────────────────────────────────────────────────
 
 const DECISION_TAIL = 40
@@ -317,5 +401,7 @@ export function getHarpObservabilityView(): HarpObservabilityView {
     },
     comboShadow,
     discovery: getDiscoveryStatus(),
+    capabilitiesPath: capabilitiesPath(),
+    learnedCapabilities: getLearnedCapabilities(),
   }
 }
