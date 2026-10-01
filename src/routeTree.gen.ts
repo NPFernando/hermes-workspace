@@ -81,8 +81,10 @@ import { Route as ApiFinanceExportRouteImport } from './routes/api/finance-expor
 import { Route as ApiFinanceUploadRouteImport } from './routes/api/finance-upload'
 import { Route as ApiGatewayReprobeRouteImport } from './routes/api/gateway-reprobe'
 import { Route as ApiGatewayStatusRouteImport } from './routes/api/gateway-status'
+import { Route as ApiHarpCapabilityForgetRouteImport } from './routes/api/harp-capability-forget'
 import { Route as ApiHarpConfigRouteImport } from './routes/api/harp-config'
 import { Route as ApiHarpObservabilityRouteImport } from './routes/api/harp-observability'
+import { Route as ApiHarpRouteStatsRouteImport } from './routes/api/harp-route-stats'
 import { Route as ApiHarpSelectorPreviewRouteImport } from './routes/api/harp-selector-preview'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiHermesConfigRouteImport } from './routes/api/hermes-config'
@@ -628,6 +630,11 @@ const ApiGatewayStatusRoute = ApiGatewayStatusRouteImport.update({
   path: '/api/gateway-status',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiHarpCapabilityForgetRoute = ApiHarpCapabilityForgetRouteImport.update({
+  id: '/api/harp-capability-forget',
+  path: '/api/harp-capability-forget',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiHarpConfigRoute = ApiHarpConfigRouteImport.update({
   id: '/api/harp-config',
   path: '/api/harp-config',
@@ -636,6 +643,11 @@ const ApiHarpConfigRoute = ApiHarpConfigRouteImport.update({
 const ApiHarpObservabilityRoute = ApiHarpObservabilityRouteImport.update({
   id: '/api/harp-observability',
   path: '/api/harp-observability',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHarpRouteStatsRoute = ApiHarpRouteStatsRouteImport.update({
+  id: '/api/harp-route-stats',
+  path: '/api/harp-route-stats',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiHarpSelectorPreviewRoute = ApiHarpSelectorPreviewRouteImport.update({
@@ -1637,8 +1649,10 @@ export interface FileRoutesByFullPath {
   '/api/finance-upload': typeof ApiFinanceUploadRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
+  '/api/harp-capability-forget': typeof ApiHarpCapabilityForgetRoute
   '/api/harp-config': typeof ApiHarpConfigRoute
   '/api/harp-observability': typeof ApiHarpObservabilityRoute
+  '/api/harp-route-stats': typeof ApiHarpRouteStatsRoute
   '/api/harp-selector-preview': typeof ApiHarpSelectorPreviewRoute
   '/api/health': typeof ApiHealthRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
@@ -1895,8 +1909,10 @@ export interface FileRoutesByTo {
   '/api/finance-upload': typeof ApiFinanceUploadRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
+  '/api/harp-capability-forget': typeof ApiHarpCapabilityForgetRoute
   '/api/harp-config': typeof ApiHarpConfigRoute
   '/api/harp-observability': typeof ApiHarpObservabilityRoute
+  '/api/harp-route-stats': typeof ApiHarpRouteStatsRoute
   '/api/harp-selector-preview': typeof ApiHarpSelectorPreviewRoute
   '/api/health': typeof ApiHealthRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
@@ -2155,8 +2171,10 @@ export interface FileRoutesById {
   '/api/finance-upload': typeof ApiFinanceUploadRoute
   '/api/gateway-reprobe': typeof ApiGatewayReprobeRoute
   '/api/gateway-status': typeof ApiGatewayStatusRoute
+  '/api/harp-capability-forget': typeof ApiHarpCapabilityForgetRoute
   '/api/harp-config': typeof ApiHarpConfigRoute
   '/api/harp-observability': typeof ApiHarpObservabilityRoute
+  '/api/harp-route-stats': typeof ApiHarpRouteStatsRoute
   '/api/harp-selector-preview': typeof ApiHarpSelectorPreviewRoute
   '/api/health': typeof ApiHealthRoute
   '/api/hermes-config': typeof ApiHermesConfigRoute
@@ -2416,8 +2434,10 @@ export interface FileRouteTypes {
     | '/api/finance-upload'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
+    | '/api/harp-capability-forget'
     | '/api/harp-config'
     | '/api/harp-observability'
+    | '/api/harp-route-stats'
     | '/api/harp-selector-preview'
     | '/api/health'
     | '/api/hermes-config'
@@ -2674,8 +2694,10 @@ export interface FileRouteTypes {
     | '/api/finance-upload'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
+    | '/api/harp-capability-forget'
     | '/api/harp-config'
     | '/api/harp-observability'
+    | '/api/harp-route-stats'
     | '/api/harp-selector-preview'
     | '/api/health'
     | '/api/hermes-config'
@@ -2933,8 +2955,10 @@ export interface FileRouteTypes {
     | '/api/finance-upload'
     | '/api/gateway-reprobe'
     | '/api/gateway-status'
+    | '/api/harp-capability-forget'
     | '/api/harp-config'
     | '/api/harp-observability'
+    | '/api/harp-route-stats'
     | '/api/harp-selector-preview'
     | '/api/health'
     | '/api/hermes-config'
@@ -3193,8 +3217,10 @@ export interface RootRouteChildren {
   ApiFinanceUploadRoute: typeof ApiFinanceUploadRoute
   ApiGatewayReprobeRoute: typeof ApiGatewayReprobeRoute
   ApiGatewayStatusRoute: typeof ApiGatewayStatusRoute
+  ApiHarpCapabilityForgetRoute: typeof ApiHarpCapabilityForgetRoute
   ApiHarpConfigRoute: typeof ApiHarpConfigRoute
   ApiHarpObservabilityRoute: typeof ApiHarpObservabilityRoute
+  ApiHarpRouteStatsRoute: typeof ApiHarpRouteStatsRoute
   ApiHarpSelectorPreviewRoute: typeof ApiHarpSelectorPreviewRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiHermesConfigRoute: typeof ApiHermesConfigRoute
@@ -3846,6 +3872,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGatewayStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/harp-capability-forget': {
+      id: '/api/harp-capability-forget'
+      path: '/api/harp-capability-forget'
+      fullPath: '/api/harp-capability-forget'
+      preLoaderRoute: typeof ApiHarpCapabilityForgetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/harp-config': {
       id: '/api/harp-config'
       path: '/api/harp-config'
@@ -3858,6 +3891,13 @@ declare module '@tanstack/react-router' {
       path: '/api/harp-observability'
       fullPath: '/api/harp-observability'
       preLoaderRoute: typeof ApiHarpObservabilityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/harp-route-stats': {
+      id: '/api/harp-route-stats'
+      path: '/api/harp-route-stats'
+      fullPath: '/api/harp-route-stats'
+      preLoaderRoute: typeof ApiHarpRouteStatsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/harp-selector-preview': {
@@ -5473,8 +5513,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFinanceUploadRoute: ApiFinanceUploadRoute,
   ApiGatewayReprobeRoute: ApiGatewayReprobeRoute,
   ApiGatewayStatusRoute: ApiGatewayStatusRoute,
+  ApiHarpCapabilityForgetRoute: ApiHarpCapabilityForgetRoute,
   ApiHarpConfigRoute: ApiHarpConfigRoute,
   ApiHarpObservabilityRoute: ApiHarpObservabilityRoute,
+  ApiHarpRouteStatsRoute: ApiHarpRouteStatsRoute,
   ApiHarpSelectorPreviewRoute: ApiHarpSelectorPreviewRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiHermesConfigRoute: ApiHermesConfigRoute,

@@ -14,6 +14,7 @@ import {
   ToggleOnIcon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
+import { HarpRouteOutcomesPanel } from './components/harp-route-outcomes-panel'
 import type * as React from 'react'
 import type {
   HarpBlocklistEntry,
@@ -30,13 +31,29 @@ import { cn } from '@/lib/utils'
 
 // Kept in sync with harp-select-route.py (TASK_MAP keys / RISK_LEVELS).
 const COMBO_TASKS = [
-  'monitoring', 'text_summary', 'documentation', 'code_understanding',
-  'code_generation', 'code_review', 'audit', 'debugging', 'issue_fix',
-  'repo_analysis', 'architecture_reasoning', 'structured_output',
-  'security_review', 'production_risk',
+  'monitoring',
+  'text_summary',
+  'documentation',
+  'code_understanding',
+  'code_generation',
+  'code_review',
+  'audit',
+  'debugging',
+  'issue_fix',
+  'repo_analysis',
+  'architecture_reasoning',
+  'structured_output',
+  'security_review',
+  'production_risk',
 ] as const
 const COMBO_RISKS = [
-  'trivial', 'low', 'standard', 'complex', 'high_risk', 'production', 'unknown',
+  'trivial',
+  'low',
+  'standard',
+  'complex',
+  'high_risk',
+  'production',
+  'unknown',
 ] as const
 
 type HarpApiResponse = { ok: boolean; error?: string } & Partial<HarpConfigView>
@@ -61,13 +78,33 @@ async function patchHarpConfig(
   return data as HarpConfigView
 }
 
-type HarpObsApiResponse = { ok: boolean; error?: string } & Partial<HarpObservabilityView>
+type HarpObsApiResponse = {
+  ok: boolean
+  error?: string
+} & Partial<HarpObservabilityView>
 
 async function fetchHarpObservability(): Promise<HarpObservabilityView> {
   const res = await fetch('/api/harp-observability')
   const data = (await res.json()) as HarpObsApiResponse
-  if (!data.ok) throw new Error(data.error ?? 'Failed to load HARP observability')
+  if (!data.ok)
+    throw new Error(data.error ?? 'Failed to load HARP observability')
   return data as HarpObservabilityView
+}
+
+async function forgetHarpCapability(entry: {
+  model: string
+  option: string
+}): Promise<void> {
+  const res = await fetch('/api/harp-capability-forget', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(entry),
+  })
+  const data = (await res.json().catch(() => ({}))) as {
+    ok?: boolean
+    error?: string
+  }
+  if (!res.ok || !data.ok) throw new Error(data.error ?? `HTTP ${res.status}`)
 }
 
 type HarpSelectorApiResponse = {
@@ -408,8 +445,9 @@ function HarpObservabilityPanel({
                 {discovery.catalogModels ?? '—'} catalog
               </p>
               <p className="mt-1 text-[10px] text-[var(--theme-muted)]">
-                +{discovery.newModels ?? 0} new · -{discovery.removedModels ?? 0}{' '}
-                delisted · ~{discovery.changedModels ?? 0} changed ·{' '}
+                +{discovery.newModels ?? 0} new · -
+                {discovery.removedModels ?? 0} delisted · ~
+                {discovery.changedModels ?? 0} changed ·{' '}
                 {compactDateTime(discovery.startedAt)}
               </p>
             </>
@@ -480,7 +518,9 @@ function HarpObservabilityPanel({
             {decisions.length === 0 && (
               <p className="text-xs text-[var(--theme-muted)]">
                 No routing decisions logged yet. The gateway appends to{' '}
-                <code className="font-mono text-[10px]">harp-routing.jsonl</code>{' '}
+                <code className="font-mono text-[10px]">
+                  harp-routing.jsonl
+                </code>{' '}
                 when HARP routing runs on a request (Telegram, dashboard chat,
                 Hermes CLI).
               </p>
@@ -534,12 +574,137 @@ function HarpObservabilityPanel({
             ))}
             {comboShadow.length === 0 && (
               <p className="text-xs text-[var(--theme-muted)]">
-                No combo evaluations yet. A row lands here when a request matches
-                a combo&apos;s task/risk (see Route Combos below).
+                No combo evaluations yet. A row lands here when a request
+                matches a combo&apos;s task/risk (see Route Combos below).
               </p>
             )}
           </div>
         </div>
+      </div>
+    </SectionCard>
+  )
+}
+
+export function LearnedCapabilitiesPanel({
+  view,
+  onForget,
+  forgettingKey,
+  forgetError,
+}: {
+  view?: HarpObservabilityView
+  onForget?: (entry: { model: string; option: string }) => void
+  forgettingKey?: string | null
+  forgetError?: string | null
+}) {
+  if (!view) return null
+  const caps = view.learnedCapabilities
+  const active = caps.filter((c) => c.active)
+  return (
+    <SectionCard
+      title="Learned Model Capabilities"
+      description="What HARP learned from real failed runs. Plans stop sending a rejected option, and route around an unusable model until its block expires."
+      icon={ShieldKeyIcon}
+    >
+      <p className="mb-2 text-[11px] text-[var(--theme-muted)]">
+        {active.length} active · {caps.length - active.length} expired
+      </p>
+      {forgetError && (
+        <p
+          role="alert"
+          className="mb-2 rounded-md bg-red-50 px-2 py-1 text-[11px] text-red-700 dark:bg-red-950/40 dark:text-red-300"
+        >
+          Forget failed: {forgetError}
+        </p>
+      )}
+      <div className="space-y-1.5">
+        {caps.map((c) => {
+          const isModel = c.option === 'model'
+          const key = `${c.model}:${c.option}`
+          const forgetting = forgettingKey === key
+          return (
+            <div
+              key={key}
+              data-testid="learned-capability"
+              className={cn(
+                'rounded-lg bg-surface px-2 py-1.5',
+                !c.active && 'opacity-60',
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <span
+                  className={cn(
+                    'shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium',
+                    !c.active
+                      ? 'bg-[var(--theme-hover)] text-[var(--theme-muted)]'
+                      : isModel
+                        ? 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300'
+                        : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+                  )}
+                >
+                  {!c.active
+                    ? 'expired'
+                    : isModel
+                      ? 'unusable'
+                      : 'rejects option'}
+                </span>
+                <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[var(--theme-text)]">
+                  {c.model}
+                  {isModel ? '' : ` · ${c.option}`}
+                </span>
+                <span className="shrink-0 text-[10px] text-[var(--theme-muted)]">
+                  {c.count}× · last {compactDateTime(c.lastSeenAt)}
+                </span>
+                {onForget && (
+                  <button
+                    type="button"
+                    data-testid="forget-capability"
+                    disabled={forgetting}
+                    title="Remove this learned entry so plans use the model/option again"
+                    onClick={() => {
+                      const what = isModel
+                        ? c.model
+                        : `${c.option} on ${c.model}`
+                      if (
+                        typeof window !== 'undefined' &&
+                        !window.confirm(
+                          `Forget what HARP learned about ${what}?`,
+                        )
+                      )
+                        return
+                      onForget({ model: c.model, option: c.option })
+                    }}
+                    className="shrink-0 rounded-md border border-[var(--theme-border)] px-1.5 py-0.5 text-[10px] text-[var(--theme-muted)] hover:bg-[var(--theme-hover)] hover:text-[var(--theme-text)] disabled:opacity-50"
+                  >
+                    {forgetting ? 'Forgetting…' : 'Forget'}
+                  </button>
+                )}
+              </div>
+              <p className="mt-0.5 truncate text-[10px] text-[var(--theme-muted)]">
+                {isModel
+                  ? c.active
+                    ? `blocked until ${compactDateTime(c.expiresAt)}${c.ttlDays ? ` (${c.ttlDays}d)` : ''}; plans fall back within the provider`
+                    : `block lapsed ${compactDateTime(c.expiresAt)}; being tried again`
+                  : 'permanent; every host stops sending it'}
+                {c.source ? ` · from ${c.source}` : ''}
+              </p>
+              {c.signature && (
+                <p className="mt-0.5 truncate font-mono text-[10px] text-[var(--theme-muted)]">
+                  {c.signature}
+                </p>
+              )}
+            </div>
+          )
+        })}
+        {caps.length === 0 && (
+          <p className="text-xs text-[var(--theme-muted)]">
+            Nothing learned yet. When a run fails because a model rejects an
+            option or is not available on this account, HARP records it in{' '}
+            <code className="font-mono text-[10px]">
+              model-capabilities.json
+            </code>
+            . Wrong entries can be undone here with Forget.
+          </p>
+        )}
       </div>
     </SectionCard>
   )
@@ -992,7 +1157,9 @@ function ComboStepRow({
       <span className="min-w-0 flex-1 truncate font-mono text-xs font-medium text-[var(--theme-text)]">
         {step}
       </span>
-      <span className="shrink-0 text-[10px] text-[var(--theme-muted)]">#{index + 1}</span>
+      <span className="shrink-0 text-[10px] text-[var(--theme-muted)]">
+        #{index + 1}
+      </span>
       <button
         type="button"
         onClick={onRemove}
@@ -1091,27 +1258,42 @@ function ComboCard({
         </span>
         <select
           value={task}
-          onChange={(e) => onSetMatch({ task: e.target.value || undefined, risk: risk || undefined })}
+          onChange={(e) =>
+            onSetMatch({
+              task: e.target.value || undefined,
+              risk: risk || undefined,
+            })
+          }
           className="h-7 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-2 text-xs outline-none focus:border-accent-400"
         >
           <option value="">— any task —</option>
           {COMBO_TASKS.map((t) => (
-            <option key={t} value={t}>{t}</option>
+            <option key={t} value={t}>
+              {t}
+            </option>
           ))}
         </select>
         <select
           value={risk}
-          onChange={(e) => onSetMatch({ task: task || undefined, risk: e.target.value || undefined })}
+          onChange={(e) =>
+            onSetMatch({
+              task: task || undefined,
+              risk: e.target.value || undefined,
+            })
+          }
           className="h-7 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-panel)] px-2 text-xs outline-none focus:border-accent-400"
         >
           <option value="">— any risk —</option>
           {COMBO_RISKS.map((r) => (
-            <option key={r} value={r}>{r}</option>
+            <option key={r} value={r}>
+              {r}
+            </option>
           ))}
         </select>
         {explicitOnly && (
           <span className="text-[11px] italic text-[var(--theme-muted)]">
-            explicit only — select with <code className="font-mono">--combo {combo.name}</code>
+            explicit only — select with{' '}
+            <code className="font-mono">--combo {combo.name}</code>
           </span>
         )}
       </div>
@@ -1139,7 +1321,9 @@ function ComboCard({
           />
         ))}
         {combo.steps.length === 0 && (
-          <p className="py-1 text-center text-xs text-[var(--theme-muted)]">No steps yet.</p>
+          <p className="py-1 text-center text-xs text-[var(--theme-muted)]">
+            No steps yet.
+          </p>
         )}
       </div>
 
@@ -1214,19 +1398,24 @@ export function CombosSection({
       <div className="flex flex-wrap gap-2">
         <Toggle
           checked={combos.enabled}
-          onChange={(v) => patch({ action: 'set-combos-global', field: 'enabled', value: v })}
+          onChange={(v) =>
+            patch({ action: 'set-combos-global', field: 'enabled', value: v })
+          }
           label="Combos enabled"
         />
         <Toggle
           checked={combos.enforce}
-          onChange={(v) => patch({ action: 'set-combos-global', field: 'enforce', value: v })}
+          onChange={(v) =>
+            patch({ action: 'set-combos-global', field: 'enforce', value: v })
+          }
           label="Enforce (override the default chain)"
         />
       </div>
       <p className="text-[11px] text-[var(--theme-muted)]">
-        Combos are <strong>shadow-only</strong> (logged, not routed) until <em>Enforce</em> is on.
-        Every step still passes the same cooldown / liveness / risk-policy gates as the default
-        chain. Needs a HARP engine build with combo support to take effect.
+        Combos are <strong>shadow-only</strong> (logged, not routed) until{' '}
+        <em>Enforce</em> is on. Every step still passes the same cooldown /
+        liveness / risk-policy gates as the default chain. Needs a HARP engine
+        build with combo support to take effect.
       </p>
 
       <div className="space-y-2">
@@ -1234,16 +1423,28 @@ export function CombosSection({
           <ComboCard
             key={combo.name}
             combo={combo}
-            onRename={(newName) => patch({ action: 'rename-combo', name: combo.name, newName })}
+            onRename={(newName) =>
+              patch({ action: 'rename-combo', name: combo.name, newName })
+            }
             onRemove={() => patch({ action: 'remove-combo', name: combo.name })}
-            onSetMatch={(match) => patch({ action: 'set-combo-match', name: combo.name, match })}
-            onReorderSteps={(steps) => patch({ action: 'reorder-combo-steps', name: combo.name, steps })}
-            onAddStep={(step) => patch({ action: 'add-combo-step', name: combo.name, step })}
-            onRemoveStep={(step) => patch({ action: 'remove-combo-step', name: combo.name, step })}
+            onSetMatch={(match) =>
+              patch({ action: 'set-combo-match', name: combo.name, match })
+            }
+            onReorderSteps={(steps) =>
+              patch({ action: 'reorder-combo-steps', name: combo.name, steps })
+            }
+            onAddStep={(step) =>
+              patch({ action: 'add-combo-step', name: combo.name, step })
+            }
+            onRemoveStep={(step) =>
+              patch({ action: 'remove-combo-step', name: combo.name, step })
+            }
           />
         ))}
         {combos.entries.length === 0 && (
-          <p className="py-1 text-xs text-[var(--theme-muted)]">No combos defined.</p>
+          <p className="py-1 text-xs text-[var(--theme-muted)]">
+            No combos defined.
+          </p>
         )}
       </div>
 
@@ -1373,6 +1574,15 @@ export function HarpConfigScreen() {
     mutation.mutate(p)
   }
 
+  const forgetCapability = useMutation({
+    mutationFn: forgetHarpCapability,
+    onSettled: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['harp-observability'],
+      })
+    },
+  })
+
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 py-8 text-sm text-[var(--theme-muted)]">
@@ -1420,9 +1630,7 @@ export function HarpConfigScreen() {
         </div>
         <button
           type="button"
-          onClick={() =>
-            mutation.mutate({ action: 'create-starter' })
-          }
+          onClick={() => mutation.mutate({ action: 'create-starter' })}
           disabled={mutation.isPending}
           className="flex items-center gap-2 rounded-xl border border-accent-300 bg-accent-50/60 px-4 py-2.5 text-sm font-medium text-accent-700 transition-colors hover:bg-accent-100 disabled:opacity-50 dark:border-accent-700/40 dark:bg-accent-950/20 dark:text-accent-300"
         >
@@ -1469,6 +1677,21 @@ export function HarpConfigScreen() {
         view={observability.data}
         isLoading={observability.isLoading}
         error={observability.error}
+      />
+
+      <HarpRouteOutcomesPanel />
+
+      <LearnedCapabilitiesPanel
+        view={observability.data}
+        onForget={(entry) => forgetCapability.mutate(entry)}
+        forgettingKey={
+          forgetCapability.isPending
+            ? `${forgetCapability.variables.model}:${forgetCapability.variables.option}`
+            : null
+        }
+        forgetError={
+          forgetCapability.error ? forgetCapability.error.message : null
+        }
       />
 
       <HarpSelectorPreviewPanel
