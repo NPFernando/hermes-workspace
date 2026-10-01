@@ -15,8 +15,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 
-import { CombosSection } from './harp-config-screen'
+import { CombosSection, LearnedCapabilitiesPanel } from './harp-config-screen'
 import type { HarpCombosView } from '@/server/harp-config-store'
+import type {
+  HarpLearnedCapability,
+  HarpObservabilityView,
+} from '@/server/harp-observability'
 
 async function renderInto(element: React.ReactElement) {
   const container = document.createElement('div')
@@ -168,5 +172,62 @@ describe('CombosSection — patch bodies', () => {
 
     expect(patch).not.toHaveBeenCalled()
     await unmount()
+  })
+})
+
+describe('LearnedCapabilitiesPanel', () => {
+  function view(caps: Array<HarpLearnedCapability>) {
+    return { learnedCapabilities: caps } as unknown as HarpObservabilityView
+  }
+  const base = {
+    learnedAt: '2026-10-01T12:00:00Z',
+    lastSeenAt: '2026-10-01T12:00:00Z',
+    count: 1,
+    source: 'paperclip:run:abc',
+    signature: null,
+    expiresAt: null,
+    ttlDays: null,
+    active: true,
+  }
+
+  it('labels unusable models, rejected options and expired blocks', async () => {
+    const r = await renderInto(
+      <LearnedCapabilitiesPanel
+        view={view([
+          {
+            ...base,
+            model: 'gpt-6-sol',
+            option: 'model',
+            expiresAt: '2026-10-08T12:00:00Z',
+            ttlDays: 7,
+          },
+          { ...base, model: 'claude-haiku-4-5', option: 'effort' },
+          {
+            ...base,
+            model: 'old-model',
+            option: 'model',
+            active: false,
+            expiresAt: '2026-09-01T00:00:00Z',
+          },
+        ])}
+      />,
+    )
+    const rows = r.container.querySelectorAll(
+      '[data-testid="learned-capability"]',
+    )
+    expect(rows).toHaveLength(3)
+    expect(rows[0].textContent).toContain('unusable')
+    expect(rows[0].textContent).toContain('(7d)')
+    expect(rows[1].textContent).toContain('rejects option')
+    expect(rows[1].textContent).toContain('claude-haiku-4-5 · effort')
+    expect(rows[2].textContent).toContain('expired')
+    expect(r.container.textContent).toContain('2 active · 1 expired')
+    await r.unmount()
+  })
+
+  it('explains the empty state', async () => {
+    const r = await renderInto(<LearnedCapabilitiesPanel view={view([])} />)
+    expect(r.container.textContent).toContain('Nothing learned yet')
+    await r.unmount()
   })
 })
