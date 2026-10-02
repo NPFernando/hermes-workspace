@@ -2521,6 +2521,19 @@ export function getCategoryCorrections(): Record<string, string> {
  * is the only durable signal that a "connected" account actually needs
  * reconnecting (e.g. invalid_grant: token expired or revoked).
  */
+/** A fresh Gmail connection makes any earlier sync error obsolete. */
+export function clearGmailSyncError(): void {
+  const db = ensureFinanceStore()
+  const settings = db.settings as Record<string, unknown>
+  const gmailIngest = settings.gmailIngest as Record<string, unknown> | undefined
+  if (!gmailIngest || typeof gmailIngest !== 'object' || !gmailIngest.lastError)
+    return
+  const next = { ...gmailIngest }
+  delete next.lastError
+  settings.gmailIngest = next
+  writeFinanceStore(db)
+}
+
 export function recordGmailSyncError(message: string): void {
   const db = ensureFinanceStore()
   const settings = db.settings as Record<string, unknown>

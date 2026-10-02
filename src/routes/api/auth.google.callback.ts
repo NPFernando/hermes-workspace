@@ -8,6 +8,7 @@ import {
   storeGmailRefreshToken,
   storeUserProfile,
 } from '../../server/google-oauth'
+import { clearGmailSyncError } from '../../server/finance-store'
 import {
   createSessionCookie,
   generateSessionToken,
@@ -52,6 +53,11 @@ export const Route = createFileRoute('/api/auth/google/callback')({
             const { refreshToken, email } =
               await exchangeCodeForGmailTokens(code)
             storeGmailRefreshToken(refreshToken, email)
+            try {
+              clearGmailSyncError()
+            } catch (err) {
+              console.error('[auth/google/callback] clear lastError', err)
+            }
             return new Response(null, {
               status: 302,
               headers: { Location: '/personal-finance?gmail=connected' },

@@ -35,6 +35,16 @@ export const Route = createFileRoute('/api/auth/gmail-connect')({
               }
             | undefined
           const account = readGmailConnectedAccount()
+          // An error recorded before the current connection belongs to the
+          // old token — reconnecting fixed it, so don't keep showing it.
+          const connectedAtSeconds = account?.connectedAt
+            ? Math.floor(Date.parse(account.connectedAt) / 1000)
+            : 0
+          const lastError =
+            gmailIngest?.lastError &&
+            gmailIngest.lastError.at >= connectedAtSeconds
+              ? gmailIngest.lastError
+              : null
           return Response.json({
             enabled: isGoogleOAuthEnabled(),
             connected: isGmailConnected(),
@@ -42,7 +52,7 @@ export const Route = createFileRoute('/api/auth/gmail-connect')({
             connectedAt: account?.connectedAt ?? null,
             lastSyncedAtSeconds: gmailIngest?.lastSyncedAtSeconds ?? null,
             syncHistory: gmailIngest?.syncHistory ?? [],
-            lastError: gmailIngest?.lastError ?? null,
+            lastError,
           })
         }
 
