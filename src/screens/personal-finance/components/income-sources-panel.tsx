@@ -233,7 +233,7 @@ export function IncomeSourcesPanel({
     setReanalyzingId(id)
     setReanalyzeNote(null)
     try {
-      const res = await fetch('/api/finance', {
+      const res = await fetch('/api/finance?scope=personal_finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({

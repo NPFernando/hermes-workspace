@@ -31,7 +31,7 @@ function parseCategoryRule(
 }
 
 async function post(action: string, extra: Record<string, unknown>) {
-  const res = await fetch('/api/finance', {
+  const res = await fetch('/api/finance?scope=personal_finance', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ action, ...extra }),

@@ -100,7 +100,7 @@ export function StockHoldingsPanel({
   async function refreshPrice(id: string) {
     setRefreshFailedIds((prev) => ({ ...prev, [id]: false }))
     try {
-      const res = await fetch('/api/finance', {
+      const res = await fetch('/api/finance?scope=personal_finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'refresh_stock_price', id }),

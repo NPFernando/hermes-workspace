@@ -83,12 +83,22 @@ vi.mock('../../server/paper-decision-quality', () => ({
 vi.mock('../../server/finance-storage-monitor', () => ({
   startFinanceStorageMonitor: vi.fn(),
 }))
+vi.mock('../../server/ingestion-rules', () => ({
+  deleteIngestionRule: vi.fn(),
+  listIngestionAutoRules: vi.fn(() => []),
+  recordFromIngestion: vi.fn(() => 'record-1'),
+  setIngestionRuleEnabled: vi.fn(),
+  sweepPendingIngestions: vi.fn(() => ({ duplicates: 1, autoConfirmed: 2 })),
+  undoAutoIngestion: vi.fn(),
+  upsertRuleFromApproval: vi.fn(() => ({ id: 'rule-1', label: 'Dialog' })),
+}))
 vi.mock('../../server/finance-store', () => ({
   FINANCE_AUDIT_PATH: '/tmp/audit.jsonl',
   FINANCE_DATA_PATH: '/tmp/finance.json',
   TRADING_MODES: [],
   addFinanceRecord: vi.fn(),
   appendAuditLog: vi.fn(),
+  recordCategoryCorrection: vi.fn(),
   budgetVsActualSummary: vi.fn(() => []),
   computeAccountLedgerBalance: vi.fn(() => null),
   ledgerTransactionsForDb: vi.fn(() => []),
@@ -1301,3 +1311,68 @@ describe('bulk_import_known_senders', () => {
     expect(body.imported).toBe(0)
   })
 })
+
+describe('confirm_pending_ingestion (auto rules)', () => {
+  it('records via the shared builder, creates the sender rule, sweeps the queue, and returns the PF payload when scoped', async () => {
+    state.authenticated = true
+    const store = await import('../../server/finance-store')
+    const rules = await import('../../server/ingestion-rules')
+    vi.mocked(store.financeSummary).mockReturnValue({ baseCurrency: 'LKR' } as never)
+    vi.mocked(store.ensureFinanceStore).mockReturnValue(state.mockFinanceDb() as never)
+    vi.mocked(store.readFinanceStore).mockReturnValue(state.mockFinanceDb() as never)
+    vi.mocked(store.findPossibleDuplicate).mockReturnValue(null)
+    const pending = {
+      id: 'p1',
+      status: 'awaiting_review' as const,
+      source: 'gmail' as const,
+      documentType: 'transaction' as const,
+      sourceRef: 'gmail:m1',
+      senderAddress: 'billing@dialog.test',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    }
+    vi.mocked(store.listPendingIngestions).mockReturnValue([pending])
+    vi.mocked(store.updatePendingIngestion).mockImplementation((id, patch) => ({
+      ...pending,
+      id,
+      ...patch,
+    }))
+    const payload = {
+      kind: 'expense',
+      amount: 2840.48,
+      currency: 'LKR',
+      vendorOrSource: 'Dialog',
+      date: '2026-09-10',
+      category: 'Utilities',
+    }
+
+    const response = await (
+      await handlers()
+    ).POST({
+      request: new Request('http://localhost/api/finance?scope=personal_finance', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'confirm_pending_ingestion',
+          id: 'p1',
+          payload,
+          autoRule: true,
+        }),
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(vi.mocked(rules.recordFromIngestion)).toHaveBeenCalledWith(pending, 'expense', payload)
+    expect(vi.mocked(store.updatePendingIngestion)).toHaveBeenCalledWith('p1', {
+      status: 'confirmed',
+      confirmedRecordId: 'record-1',
+    })
+    expect(vi.mocked(rules.upsertRuleFromApproval)).toHaveBeenCalledWith(
+      pending,
+      expect.objectContaining({ kind: 'expense', vendorOrSource: 'Dialog', amount: 2840.48 }),
+    )
+    const body = (await response.json()) as Record<string, unknown>
+    expect(body.sweep).toEqual({ duplicates: 1, autoConfirmed: 2 })
+    expect(body).toHaveProperty('transactionsWindowMonths')
+  })
+})
+

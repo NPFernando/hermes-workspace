@@ -81,6 +81,15 @@ import {
   rejectMemory,
 } from '../../server/harp-memory-client'
 import { syncGmailNow } from '../../server/gmail-ingest'
+import {
+  deleteIngestionRule,
+  listIngestionAutoRules,
+  recordFromIngestion,
+  setIngestionRuleEnabled,
+  sweepPendingIngestions,
+  undoAutoIngestion,
+  upsertRuleFromApproval,
+} from '../../server/ingestion-rules'
 import { fetchCsePrice } from '../../server/cse-market.service'
 import { fetchLkrExchangeRates } from '../../server/exchange-rate.service'
 import {
@@ -742,6 +751,13 @@ export const Route = createFileRoute('/api/finance')({
       POST: async ({ request }) => {
         if (!isAuthenticated(request)) return unauthorized()
         const body = await parseJsonBody(request)
+        // The Personal Finance screen posts with ?scope=personal_finance and
+        // caches the response as its dashboard payload, so it must get the
+        // personal-finance shape back, not the trading one.
+        const scopedPayload = () =>
+          new URL(request.url).searchParams.get('scope') === 'personal_finance'
+            ? personalFinancePayload()
+            : financePayload()
         const action =
           typeof body.action === 'string' ? body.action : 'add_record'
         try {
@@ -793,21 +809,21 @@ export const Route = createFileRoute('/api/finance')({
               'binance',
               'binance-public-api',
             )
-            return json(financePayload())
+            return json(scopedPayload())
           }
           if (action === 'fetch_news') {
             // Public Google News RSS only: research ingestion has no keys and
             // does not touch trading plans, orders, positions, or execution.
             const symbol = binanceSymbolFromBody(body)
             const newsIngestion = await fetchAndStoreGoogleNews(symbol)
-            return json({ ...financePayload(), newsIngestion })
+            return json({ ...scopedPayload(), newsIngestion })
           }
           if (action === 'refresh_intelligence') {
             // Derives and stores research-only records from already stored
             // inputs. It never creates plans, orders, positions, or execution.
             const symbol = binanceSymbolFromBody(body)
             const intelligence = refreshIntelligence(symbol)
-            return json({ ...financePayload(), intelligence })
+            return json({ ...scopedPayload(), intelligence })
           }
           if (action === 'record_paper_decision') {
             // Authenticated research journal only. It derives a composite from
@@ -840,7 +856,7 @@ export const Route = createFileRoute('/api/finance')({
               idempotencyKey,
             })
             return json({
-              ...financePayload(),
+              ...scopedPayload(),
               paperDecisionJournal: { ...journal, researchOnly: true },
             })
           }
@@ -864,7 +880,7 @@ export const Route = createFileRoute('/api/finance')({
               'binance',
               'binance-public-api',
             )
-            return json(financePayload())
+            return json(scopedPayload())
           }
           if (action === 'set_trading_mode') {
             const requestedMode =
@@ -886,7 +902,7 @@ export const Route = createFileRoute('/api/finance')({
               requestedMode === 'testnet_execute'
             ) {
               setNonLiveExecutionMode(requestedMode)
-              return json(financePayload())
+              return json(scopedPayload())
             }
             // Legacy mode switching must never bypass the staged readiness
             // workflow. Live activation is intentionally single-path through
@@ -930,7 +946,7 @@ export const Route = createFileRoute('/api/finance')({
               liveTradingEnabled: db.settings.liveTradingEnabled,
               executionAccount: db.settings.executionAccount,
             })
-            return json(financePayload())
+            return json(scopedPayload())
           }
           if (action === 'set_execution_account') {
             const account =
@@ -939,7 +955,7 @@ export const Route = createFileRoute('/api/finance')({
               setNonLiveExecutionMode(
                 account === 'paper' ? 'paper_trade' : 'testnet_execute',
               )
-              return json(financePayload())
+              return json(scopedPayload())
             }
             const db = readFinanceStore()
             if (account === 'paper') {
@@ -977,7 +993,7 @@ export const Route = createFileRoute('/api/finance')({
               account: db.settings.executionAccount,
               tradingMode: db.settings.tradingMode,
             })
-            return json(financePayload())
+            return json(scopedPayload())
           }
           if (action === 'arm_live_binance') {
             appendAuditLog('live_binance_arm_blocked', {
@@ -1000,7 +1016,7 @@ export const Route = createFileRoute('/api/finance')({
             db.settings.emergencyKillSwitch = true
             writeFinanceStore(db)
             appendAuditLog('emergency_stop', { source: 'finance_api' })
-            return json(financePayload())
+            return json(scopedPayload())
           }
           if (action === 'set_kill_switch') {
             // Independent master cutoff. `engaged: true` = cutoff ON (all trading halted, safe).
@@ -1037,30 +1053,30 @@ export const Route = createFileRoute('/api/finance')({
               engaged,
               source: 'finance_api',
             })
-            return json(financePayload())
+            return json(scopedPayload())
           }
           if (action === 'assess_live_readiness') {
             const snapshot = assessAndPersistReadiness()
-            return json({ ...financePayload(), liveReadinessResult: snapshot })
+            return json({ ...scopedPayload(), liveReadinessResult: snapshot })
           }
           if (action === 'verify_trading_connectivity') {
             const verification = await verifyTradingConnectivity()
             return json({
-              ...financePayload(),
+              ...scopedPayload(),
               tradingConnectivityResult: verification,
             })
           }
           if (action === 'reconcile_trading_account') {
             const reconciliation = await reconcileTradingAccount()
             return json({
-              ...financePayload(),
+              ...scopedPayload(),
               tradingAccountReconciliationResult: reconciliation,
             })
           }
           if (action === 'request_live_readiness_approval') {
             const result = requestLiveApproval()
             return json(
-              { ...financePayload(), liveReadinessResult: result },
+              { ...scopedPayload(), liveReadinessResult: result },
               { status: result.ok ? 200 : 400 },
             )
           }
@@ -1069,7 +1085,7 @@ export const Route = createFileRoute('/api/finance')({
               typeof body.approval === 'string' ? body.approval : ''
             const result = approveLiveApproval(phrase)
             return json(
-              { ...financePayload(), liveReadinessResult: result },
+              { ...scopedPayload(), liveReadinessResult: result },
               { status: result.ok ? 200 : 400 },
             )
           }
@@ -1078,7 +1094,7 @@ export const Route = createFileRoute('/api/finance')({
               typeof body.approval === 'string' ? body.approval : ''
             const result = activateLiveReadiness(phrase)
             return json(
-              { ...financePayload(), liveReadinessResult: result },
+              { ...scopedPayload(), liveReadinessResult: result },
               { status: result.ok ? 200 : 400 },
             )
           }
@@ -1086,7 +1102,7 @@ export const Route = createFileRoute('/api/finance')({
             const result = deactivateLiveReadiness(
               typeof body.reason === 'string' ? body.reason : 'manual deactivation',
             )
-            return json({ ...financePayload(), liveReadinessResult: result })
+            return json({ ...scopedPayload(), liveReadinessResult: result })
           }
           if (action === 'reset_connectivity_breaker') {
             // Manual-only, same as the kill switch's general philosophy —
@@ -1096,7 +1112,7 @@ export const Route = createFileRoute('/api/finance')({
             appendAuditLog('connectivity_breaker_reset', {
               source: 'finance_api',
             })
-            return json(financePayload())
+            return json(scopedPayload())
           }
           if (action === 'set_alerts_config') {
             // Gates non-critical (info/warning) Telegram delivery in
@@ -1111,7 +1127,7 @@ export const Route = createFileRoute('/api/finance')({
               enabled,
               source: 'finance_api',
             })
-            return json(financePayload())
+            return json(scopedPayload())
           }
           if (action === 'set_emergency_fund_target') {
             // PF-303: user-set target, in months of average expenses. Clamped
@@ -1835,7 +1851,7 @@ export const Route = createFileRoute('/api/finance')({
                 settings.autoRefinement as Record<string, unknown> | undefined
               )?.enabled,
             })
-            return json(financePayload())
+            return json(scopedPayload())
           }
           if (action === 'record_account_baseline') {
             // Snapshots the current sandbox/testnet equity as the new
@@ -1958,7 +1974,7 @@ export const Route = createFileRoute('/api/finance')({
             settings.demoTradingGrid = gc
             writeFinanceStore(db)
             appendAuditLog('grid_config_updated', gc)
-            return json(financePayload())
+            return json(scopedPayload())
           }
           if (action === 'set_rebalance_config') {
             // Only `enabled` is exposed here — the rebalancing bot shares
@@ -1988,7 +2004,7 @@ export const Route = createFileRoute('/api/finance')({
             settings.demoTradingRebalance = rc
             writeFinanceStore(db)
             appendAuditLog('rebalance_config_updated', { enabled: rc.enabled })
-            return json(financePayload())
+            return json(scopedPayload())
           }
           if (action === 'set_strategy_decay_config') {
             // Off by default — mirrors autoRefinementEnabled and the other
@@ -2037,7 +2053,7 @@ export const Route = createFileRoute('/api/finance')({
             settings.strategyDecayDetection = dc
             writeFinanceStore(db)
             appendAuditLog('strategy_decay_config_updated', dc)
-            return json(financePayload())
+            return json(scopedPayload())
           }
           if (action === 'save_strategy_baseline') {
             // Persists a strategy's validated backtest summary so live
@@ -2092,7 +2108,7 @@ export const Route = createFileRoute('/api/finance')({
             settings.strategyBaselines = baselines
             writeFinanceStore(db)
             appendAuditLog('strategy_baseline_saved', baseline)
-            return json(financePayload())
+            return json(scopedPayload())
           }
           if (action === 'set_llm_config') {
             // Only `enabled` is exposed here — same rationale as
@@ -2114,7 +2130,7 @@ export const Route = createFileRoute('/api/finance')({
             settings.demoTradingLlm = lc
             writeFinanceStore(db)
             appendAuditLog('llm_config_updated', { enabled: lc.enabled })
-            return json(financePayload())
+            return json(scopedPayload())
           }
           if (action === 'list_transactions') {
             // PF review item 9: paged unified transaction history. Lets the
@@ -2232,7 +2248,7 @@ export const Route = createFileRoute('/api/finance')({
             return json({ ok: true, snapshot })
           }
           if (action === 'list_pending_ingestions') {
-            // Unmasked on purpose — financePayload()'s `data` blob runs
+            // Unmasked on purpose — scopedPayload()'s `data` blob runs
             // through maskSensitive(), which would redact passwordHint
             // (matches /password/i) even though it's a plain hint the user
             // needs to read, not a secret.
@@ -2394,7 +2410,7 @@ export const Route = createFileRoute('/api/finance')({
               const updated = updatePendingIngestion(id, {
                 status: 'confirmed',
               })
-              return json({ pendingIngestion: updated, ...financePayload() })
+              return json({ pendingIngestion: updated, ...scopedPayload() })
             }
 
             const kind =
@@ -2452,19 +2468,88 @@ export const Route = createFileRoute('/api/finance')({
               recordCategoryCorrection(vendorOrSource, finalCategory)
             }
 
-            addFinanceRecord(kind, {
-              ...payload,
-              source: pending.source,
-              documentRef: pending.sourceRef,
-              ...(kind === 'income'
-                ? {
-                    sourceName: payload.vendorOrSource,
-                    dateReceived: payload.date,
-                  }
-                : { vendor: payload.vendorOrSource, date: payload.date }),
+            const recordId = recordFromIngestion(pending, kind, payload)
+            const updated = updatePendingIngestion(id, {
+              status: 'confirmed',
+              confirmedRecordId: recordId,
             })
-            const updated = updatePendingIngestion(id, { status: 'confirmed' })
-            return json({ pendingIngestion: updated, ...financePayload() })
+            // "Always record bills from this sender": later items from the
+            // same sender are recorded without review (ingestion-rules.ts).
+            const autoRule =
+              body.autoRule === true
+                ? upsertRuleFromApproval(pending, {
+                    kind,
+                    vendorOrSource,
+                    amount,
+                    currency:
+                      typeof payload.currency === 'string'
+                        ? payload.currency
+                        : undefined,
+                    category: finalCategory,
+                  })
+                : null
+            // The new record/rule can settle other queued items (copies of
+            // this bill, more bills from the same sender).
+            const sweep = sweepPendingIngestions()
+            return json({
+              pendingIngestion: updated,
+              autoRule,
+              sweep,
+              ...scopedPayload(),
+            })
+          }
+          if (action === 'undo_auto_ingestion') {
+            const id = typeof body.id === 'string' ? body.id : ''
+            if (!id)
+              return json(
+                { ok: false, error: 'id is required.' },
+                { status: 400 },
+              )
+            const updated = undoAutoIngestion(id)
+            return json({ pendingIngestion: updated, ...scopedPayload() })
+          }
+          if (action === 'list_ingestion_rules') {
+            return json({ ok: true, rules: listIngestionAutoRules() })
+          }
+          if (action === 'set_ingestion_rule_enabled') {
+            const id = typeof body.id === 'string' ? body.id : ''
+            if (!id || typeof body.enabled !== 'boolean')
+              return json(
+                { ok: false, error: 'id and enabled are required.' },
+                { status: 400 },
+              )
+            const rule = setIngestionRuleEnabled(id, body.enabled)
+            const sweep = body.enabled ? sweepPendingIngestions() : undefined
+            return json({ ok: true, rule, sweep })
+          }
+          if (action === 'delete_ingestion_rule') {
+            const id = typeof body.id === 'string' ? body.id : ''
+            if (!id)
+              return json(
+                { ok: false, error: 'id is required.' },
+                { status: 400 },
+              )
+            deleteIngestionRule(id)
+            return json({ ok: true, rules: listIngestionAutoRules() })
+          }
+          if (action === 'sweep_pending_ingestions') {
+            return json({ ok: true, sweep: sweepPendingIngestions() })
+          }
+          if (action === 'restore_duplicate_ingestion') {
+            const id = typeof body.id === 'string' ? body.id : ''
+            const pending = listPendingIngestions().find((p) => p.id === id)
+            if (!pending || pending.status !== 'duplicate')
+              return json(
+                { ok: false, error: 'Duplicate item not found.' },
+                { status: 404 },
+              )
+            const updated = updatePendingIngestion(id, {
+              status: 'awaiting_review',
+              duplicateOfPendingId: undefined,
+              duplicateOfRecordId: undefined,
+              duplicateDismissed: true,
+            })
+            return json({ ok: true, pendingIngestion: updated })
           }
           if (action === 'reject_pending_ingestion') {
             const id = typeof body.id === 'string' ? body.id : ''
@@ -2606,14 +2691,14 @@ export const Route = createFileRoute('/api/finance')({
             if (!priceResult) {
               // Not an error — the unofficial CSE endpoint failing is an
               // expected, documented outcome; manual entry is the fallback.
-              return json({ priceFetchFailed: true, ...financePayload() })
+              return json({ priceFetchFailed: true, ...scopedPayload() })
             }
             updateFinanceRecord('stock_holding', id, {
               lastKnownPrice: priceResult.price,
               lastPriceUpdatedAt: priceResult.asOf,
               priceSource: 'cse_api',
             })
-            return json({ priceFetchFailed: false, ...financePayload() })
+            return json({ priceFetchFailed: false, ...scopedPayload() })
           }
           if (action === 'sync_gmail_now') {
             try {
@@ -2948,7 +3033,7 @@ export const Route = createFileRoute('/api/finance')({
               errorCount: errors.length,
             })
             return json({
-              ...financePayload(),
+              ...scopedPayload(),
               created,
               skippedDuplicates,
               possibleDuplicates,
@@ -2969,25 +3054,25 @@ export const Route = createFileRoute('/api/finance')({
             const result = copyBudgetsToMonth(db, targetMonth)
             writeFinanceStore(db)
             appendAuditLog('budgets_copied_to_month', { targetMonth, ...result })
-            return json({ ...financePayload(), ...result })
+            return json({ ...scopedPayload(), ...result })
           }
           if (action === 'apply_recommended_safeguards') {
             const applied = applyRecommendedSafeguards()
             return json({
-              ...financePayload(),
+              ...scopedPayload(),
               appliedSafeguards: applied.applied,
             })
           }
           if (action === 'run_learning_cycle') {
             const learning = runLearningCycle()
-            return json({ ...financePayload(), learningCycle: learning })
+            return json({ ...scopedPayload(), learningCycle: learning })
           }
           if (action === 'apply_learning_candidate') {
             const candidateId =
               typeof body.candidateId === 'string' ? body.candidateId : ''
             const result = applyLearningCandidate(candidateId)
             return json({
-              ...financePayload(),
+              ...scopedPayload(),
               learningCandidateResult: result,
             })
           }
@@ -3003,12 +3088,12 @@ export const Route = createFileRoute('/api/finance')({
               reviewAfterDays: body.reviewAfterDays,
               expiresAfterDays: body.expiresAfterDays,
             })
-            return json({ ...financePayload(), strategyOverrideResult: result })
+            return json({ ...scopedPayload(), strategyOverrideResult: result })
           }
           if (action === 'apply_strategy_override_recommendations') {
             const applied = applyStrategyOverrideRecommendations()
             return json({
-              ...financePayload(),
+              ...scopedPayload(),
               strategyOverrideRecommendationResult: applied.result,
             })
           }
@@ -3023,7 +3108,7 @@ export const Route = createFileRoute('/api/finance')({
               sizeMultiplierCap: body.sizeMultiplierCap,
             })
             return json({
-              ...financePayload(),
+              ...scopedPayload(),
               sandboxExperimentResult: result,
             })
           }
@@ -3033,7 +3118,7 @@ export const Route = createFileRoute('/api/finance')({
               body.reason,
             )
             return json({
-              ...financePayload(),
+              ...scopedPayload(),
               sandboxExperimentResult: result,
             })
           }
@@ -3043,7 +3128,7 @@ export const Route = createFileRoute('/api/finance')({
               body.reason,
             )
             return json({
-              ...financePayload(),
+              ...scopedPayload(),
               sandboxExperimentResult: result,
             })
           }
@@ -3052,7 +3137,7 @@ export const Route = createFileRoute('/api/finance')({
               typeof body.experimentId === 'string' ? body.experimentId : '',
             )
             return json({
-              ...financePayload(),
+              ...scopedPayload(),
               sandboxExperimentResult: result,
             })
           }
@@ -3065,7 +3150,7 @@ export const Route = createFileRoute('/api/finance')({
               autoRun: body.autoRun,
               cycleIntervalMinutes: body.cycleIntervalMinutes,
             })
-            return json({ ...financePayload(), validationRunResult: result })
+            return json({ ...scopedPayload(), validationRunResult: result })
           }
           if (action === 'run_validation_cycle') {
             if (body.stage !== 'paper' && body.stage !== 'sandbox') {
@@ -3078,7 +3163,7 @@ export const Route = createFileRoute('/api/finance')({
               force: body.force === true,
             })
             return json(
-              { ...financePayload(), validationRunResult: result },
+              { ...scopedPayload(), validationRunResult: result },
               { status: result.ok ? 200 : 400 },
             )
           }
@@ -3108,15 +3193,15 @@ export const Route = createFileRoute('/api/finance')({
                   ? body.quotePerRoundTrip
                   : undefined,
             })
-            return json({ ...financePayload(), testnetExecutionProbeResult: result })
+            return json({ ...scopedPayload(), testnetExecutionProbeResult: result })
           }
           if (action === 'stop_validation_run') {
             const result = stopValidationRun(body.stage, body.reason)
-            return json({ ...financePayload(), validationRunResult: result })
+            return json({ ...scopedPayload(), validationRunResult: result })
           }
           if (action === 'finalize_validation_run') {
             const result = finalizeValidationRun(body.stage, body.notes)
-            return json({ ...financePayload(), validationRunResult: result })
+            return json({ ...scopedPayload(), validationRunResult: result })
           }
           return json(
             { ok: false, error: `Unsupported finance action: ${action}` },

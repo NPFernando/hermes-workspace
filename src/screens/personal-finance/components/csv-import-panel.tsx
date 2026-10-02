@@ -280,7 +280,7 @@ export function CsvImportPanel({
         setNote('No valid rows to import — check your column mapping.')
         return
       }
-      const res = await fetch('/api/finance', {
+      const res = await fetch('/api/finance?scope=personal_finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'import_transactions_csv', rows }),
@@ -328,7 +328,7 @@ export function CsvImportPanel({
     setNote(null)
     try {
       const rows = result.possibleDuplicates.map((candidate) => candidate.row)
-      const res = await fetch('/api/finance', {
+      const res = await fetch('/api/finance?scope=personal_finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'import_transactions_csv', rows, force: true }),

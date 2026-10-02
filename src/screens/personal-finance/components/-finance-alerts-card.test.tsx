@@ -95,7 +95,7 @@ describe('FinanceAlertsCard', () => {
       await Promise.resolve()
     })
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/finance',
+      '/api/finance?scope=personal_finance',
       expect.objectContaining({
         body: JSON.stringify({
           action: 'snooze_alert',
@@ -125,7 +125,7 @@ describe('FinanceAlertsCard', () => {
       await Promise.resolve()
     })
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/finance',
+      '/api/finance?scope=personal_finance',
       expect.objectContaining({
         body: JSON.stringify({
           action: 'snooze_alert',

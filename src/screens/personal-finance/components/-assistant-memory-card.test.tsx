@@ -145,7 +145,7 @@ describe('AssistantMemoryCard', () => {
       await Promise.resolve()
     })
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
-    expect(url).toBe('/api/finance')
+    expect(url).toBe('/api/finance?scope=personal_finance')
     expect(JSON.parse(init.body as string)).toEqual({
       action: 'approve_finance_memory',
       memoryId: 'cand-1',

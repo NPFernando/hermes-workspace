@@ -99,6 +99,7 @@ describe('syncGmailNow', () => {
   const accessToken = 'test-access-token'
   let storeState: ReturnType<typeof makeFinanceStoreState>
   let pendingIngestions: Array<Record<string, unknown>>
+  let policies: ReturnType<typeof vi.fn>
 
   function financeStoreMock(overrides: {
     listKnownSenders?: Array<KnownSender>
@@ -126,6 +127,14 @@ describe('syncGmailNow', () => {
         pendingIngestions = storeState.pending_ingestions
         return record
       }),
+      updatePendingIngestion: vi.fn((id: string, patch: Record<string, unknown>) => {
+        const fresh = structuredClone(storeState)
+        const index = fresh.pending_ingestions.findIndex((p) => p.id === id)
+        fresh.pending_ingestions[index] = { ...fresh.pending_ingestions[index], ...patch }
+        storeState = fresh
+        pendingIngestions = storeState.pending_ingestions
+        return fresh.pending_ingestions[index]
+      }),
       listKnownSenders: vi.fn(() => overrides.listKnownSenders ?? ([] as Array<KnownSender>)),
       decryptKnownSenderPassword: vi.fn(overrides.decryptKnownSenderPassword ?? (() => undefined)),
     }
@@ -133,12 +142,16 @@ describe('syncGmailNow', () => {
 
   beforeEach(() => {
     vi.resetModules()
+    policies = vi.fn(() => 'review')
     storeState = makeFinanceStoreState()
     pendingIngestions = storeState.pending_ingestions
     vi.doMock('./google-oauth', () => ({
       getGmailAccessToken: vi.fn(async () => accessToken),
     }))
     vi.doMock('./finance-store', () => financeStoreMock())
+    vi.doMock('./ingestion-rules', () => ({
+      applyIngestionPolicies: policies,
+    }))
     vi.doMock('./document-normalizer', () => ({
       isPdfEncrypted: vi.fn(() => false),
       pdfToImages: vi.fn(() => ({ ok: true, imagePaths: ['/tmp/preview.png'] })),
@@ -165,6 +178,7 @@ describe('syncGmailNow', () => {
     vi.unstubAllGlobals()
     vi.doUnmock('./google-oauth')
     vi.doUnmock('./finance-store')
+    vi.doUnmock('./ingestion-rules')
     vi.doUnmock('./document-normalizer')
     vi.doUnmock('./finance-extraction')
   })
@@ -172,7 +186,15 @@ describe('syncGmailNow', () => {
   it('returns zero found/queued when Gmail has no matching messages', async () => {
     const { syncGmailNow } = await import('./gmail-ingest')
     const result = await syncGmailNow()
-    expect(result).toEqual({ found: 0, queued: 0, skippedAlreadyQueued: 0 })
+    expect(result).toEqual({
+      found: 0,
+      queued: 0,
+      skippedAlreadyQueued: 0,
+      autoConfirmed: 0,
+      duplicates: 0,
+      retried: 0,
+      deferred: 0,
+    })
   })
 
   it('paginates across multiple pages via nextPageToken and stops once a page has none', async () => {
@@ -297,5 +319,153 @@ describe('syncGmailNow', () => {
     expect(pendingIngestions[0].matchedSenderLabel).toBe('Example Bank')
 
     fs.rmSync(tmp, { recursive: true, force: true })
+  })
+
+  function textMessage(id: string, body: string, from = 'billing@dialog.test') {
+    return {
+      id,
+      payload: {
+        headers: [{ name: 'From', value: from }],
+        mimeType: 'text/plain',
+        body: { data: Buffer.from(body).toString('base64url') },
+      },
+    }
+  }
+
+  function stubInbox(messages: Record<string, unknown>) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('/messages?'))
+          return {
+            ok: true,
+            json: async () => ({ messages: Object.keys(messages).map((id) => ({ id })) }),
+          } as Response
+        const id = Object.keys(messages).find((m) => url.includes(`/messages/${m}?`))
+        if (id) return { ok: true, json: async () => messages[id] } as Response
+        throw new Error(`Unexpected fetch: ${url}`)
+      }),
+    )
+  }
+
+  function extractionMock(
+    text: ReturnType<typeof vi.fn>,
+    image: ReturnType<typeof vi.fn> = vi.fn(async () => ({ ok: false as const, reason: 'x' })),
+  ) {
+    vi.doMock('./finance-extraction', () => ({
+      extractTransactionFromText: text,
+      extractTransactionFromImage: image,
+    }))
+  }
+
+  const dialogBill = {
+    kind: 'expense' as const,
+    amount: 2840.48,
+    currency: 'LKR',
+    vendorOrSource: 'Dialog',
+    date: '2026-09-10',
+    confidence: 'high' as const,
+  }
+
+  it('examines each message once, skips amount-less mail without an LLM call, and applies policies', async () => {
+    const text = vi.fn(async () => ({ ok: true as const, data: dialogBill }))
+    extractionMock(text)
+    policies.mockReturnValueOnce('auto_confirmed')
+    stubInbox({
+      m1: textMessage('m1', 'Your bill of Rs. 2,840.48 is due on 20 Sep.'),
+      m2: textMessage('m2', 'Thanks for your payment, see you soon!'),
+    })
+    const { syncGmailNow } = await import('./gmail-ingest')
+    const first = await syncGmailNow()
+    expect(text).toHaveBeenCalledTimes(1)
+    expect(first.queued).toBe(1)
+    expect(first.autoConfirmed).toBe(1)
+    expect(pendingIngestions[0].gmailMessageId).toBe('m1')
+    expect(pendingIngestions[0].senderAddress).toBe('billing@dialog.test')
+    const ledger = (storeState.settings.gmailIngest as Record<string, unknown>)
+      .processedMessageIds
+    expect(ledger).toEqual(['m1', 'm2'])
+
+    const second = await syncGmailNow()
+    expect(text).toHaveBeenCalledTimes(1)
+    expect(second.skippedAlreadyQueued).toBe(2)
+    expect(second.queued).toBe(0)
+  })
+
+  it('defers messages beyond the per-run extraction budget to the next run', async () => {
+    storeState.settings.gmailIngest = { maxExtractionsPerRun: 1 }
+    const text = vi.fn(async () => ({ ok: true as const, data: dialogBill }))
+    extractionMock(text)
+    stubInbox({
+      m1: textMessage('m1', 'Amount due: LKR 100.00'),
+      m2: textMessage('m2', 'Amount due: LKR 200.00'),
+    })
+    const { syncGmailNow } = await import('./gmail-ingest')
+    const first = await syncGmailNow()
+    expect(first).toMatchObject({ queued: 1, deferred: 1 })
+    const second = await syncGmailNow()
+    expect(second).toMatchObject({ queued: 1, deferred: 0, skippedAlreadyQueued: 1 })
+    expect(text).toHaveBeenCalledTimes(2)
+  })
+
+  it('retries transient extraction failures even when the Gmail token is expired', async () => {
+    storeState.pending_ingestions.push({
+      id: 'old-1',
+      source: 'gmail',
+      status: 'awaiting_review',
+      rawPreviewImagePath: '/tmp/x.png',
+      error: 'all_routes_failed',
+    })
+    const image = vi.fn(async () => ({ ok: true as const, data: dialogBill }))
+    extractionMock(vi.fn(), image)
+    vi.doMock('./google-oauth', () => ({
+      getGmailAccessToken: vi.fn(async () => {
+        throw new Error('invalid_grant')
+      }),
+    }))
+    const { syncGmailNow } = await import('./gmail-ingest')
+    await expect(syncGmailNow()).rejects.toThrow('invalid_grant')
+    expect(image).toHaveBeenCalledTimes(1)
+    expect(storeState.pending_ingestions[0]).toMatchObject({
+      extracted: dialogBill,
+      error: undefined,
+      extractionRetries: 1,
+    })
+    expect(policies).toHaveBeenCalledWith('old-1')
+  })
+
+  it('keeps settings changed by others during the run (merges its own keys only)', async () => {
+    storeState.settings.gmailIngest = { knownSenders: [] }
+    const text = vi.fn(async () => {
+      const gi = storeState.settings.gmailIngest as Record<string, unknown>
+      storeState.settings.gmailIngest = { ...gi, autoRules: [{ id: 'r1' }] }
+      return { ok: true as const, data: dialogBill }
+    })
+    extractionMock(text)
+    stubInbox({ m1: textMessage('m1', 'Total 500.00') })
+    const { syncGmailNow } = await import('./gmail-ingest')
+    await syncGmailNow()
+    expect(
+      (storeState.settings.gmailIngest as Record<string, unknown>).autoRules,
+    ).toEqual([{ id: 'r1' }])
+  })
+
+  it('shares one run between overlapping calls', async () => {
+    const { syncGmailNow } = await import('./gmail-ingest')
+    const a = syncGmailNow()
+    const b = syncGmailNow()
+    expect(a).toBe(b)
+    await a
+  })
+})
+
+describe('looksLikeItHasAnAmount', () => {
+  it('accepts bill-like text and rejects chatter', async () => {
+    const { looksLikeItHasAnAmount } = await import('./gmail-ingest')
+    expect(looksLikeItHasAnAmount('Your bill of Rs. 2,840.48 is due')).toBe(true)
+    expect(looksLikeItHasAnAmount('Total: 500')).toBe(true)
+    expect(looksLikeItHasAnAmount('USD 25 charged')).toBe(true)
+    expect(looksLikeItHasAnAmount('Your OTP is 123456')).toBe(false)
+    expect(looksLikeItHasAnAmount('See you on Monday')).toBe(false)
   })
 })

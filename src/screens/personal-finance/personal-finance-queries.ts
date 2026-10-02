@@ -49,7 +49,7 @@ export async function fetchAssistantMemories(): Promise<{
   memories: Array<AssistantMemory>
   pending: Array<PendingAssistantMemory>
 }> {
-  const res = await fetch('/api/finance', {
+  const res = await fetch('/api/finance?scope=personal_finance', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ action: 'list_finance_memories' }),
@@ -69,7 +69,7 @@ export async function fetchAssistantMemories(): Promise<{
 }
 
 export async function fetchPendingIngestionCount(): Promise<number> {
-  const res = await fetch('/api/finance', {
+  const res = await fetch('/api/finance?scope=personal_finance', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ action: 'list_pending_ingestions' }),

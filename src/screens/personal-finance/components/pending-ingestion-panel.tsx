@@ -12,6 +12,7 @@ import {
 import type {
   ExtractedContract,
   ExtractedTransaction,
+  IngestionAutoRule,
   PendingIngestion,
   PersonalFinancePayload,
 } from '../types'
@@ -44,6 +45,44 @@ function confidenceRank(item: PendingIngestion): number {
   return 0
 }
 
+type GmailSyncRun = {
+  at: number
+  found: number
+  queued: number
+  skippedAlreadyQueued: number
+  autoConfirmed?: number
+  duplicates?: number
+  deferred?: number
+}
+
+type SweepResult = { duplicates: number; autoConfirmed: number }
+
+/** Gmail items from an identifiable sender can become an auto rule. */
+function canCreateRule(item: PendingIngestion): boolean {
+  return (
+    item.source === 'gmail' &&
+    item.documentType !== 'contract' &&
+    Boolean(item.senderAddress || item.matchedSenderId)
+  )
+}
+
+function senderName(item: PendingIngestion): string {
+  return item.matchedSenderLabel || item.senderAddress || 'this sender'
+}
+
+function money(e: ExtractedTransaction | undefined): string {
+  if (!e) return ''
+  return `${e.currency} ${e.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+}
+
+function syncSummary(r: GmailSyncRun): string {
+  const parts = [`found ${r.found}`, `queued ${r.queued}`]
+  if (r.autoConfirmed) parts.push(`auto-added ${r.autoConfirmed}`)
+  if (r.duplicates) parts.push(`${r.duplicates} duplicate${r.duplicates === 1 ? '' : 's'} hidden`)
+  if (r.deferred) parts.push(`${r.deferred} left for next sync`)
+  return parts.join(', ')
+}
+
 /**
  * AI-assisted intake: upload a receipt/bill photo or PDF, or sync Gmail —
  * every extracted item lands here for review and never touches real
@@ -56,7 +95,30 @@ export function PendingIngestionPanel({
   payload: PersonalFinancePayload
   onConfirmed: (payload: PersonalFinancePayload) => void
 }) {
-  const [items, setItems] = useState<Array<PendingIngestion>>([])
+  const [allItems, setAllItems] = useState<Array<PendingIngestion>>([])
+  const [rules, setRules] = useState<Array<IngestionAutoRule>>([])
+  // Per-item "record this sender automatically" choice; default on.
+  const [ruleOptOut, setRuleOptOut] = useState<Record<string, boolean>>({})
+  const items = useMemo(
+    () =>
+      allItems.filter(
+        (p) =>
+          p.status === 'awaiting_password' || p.status === 'awaiting_review',
+      ),
+    [allItems],
+  )
+  const duplicates = useMemo(
+    () => allItems.filter((p) => p.status === 'duplicate'),
+    [allItems],
+  )
+  const autoAdded = useMemo(
+    () =>
+      allItems
+        .filter((p) => p.status === 'auto_confirmed')
+        .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
+        .slice(0, 10),
+    [allItems],
+  )
   const sortedItems = useMemo(
     () => [...items].sort((a, b) => confidenceRank(a) - confidenceRank(b)),
     [items],
@@ -82,12 +144,7 @@ export function PendingIngestionPanel({
     number | null
   >(null)
   const [gmailSyncHistory, setGmailSyncHistory] = useState<
-    Array<{
-      at: number
-      found: number
-      queued: number
-      skippedAlreadyQueued: number
-    }>
+    Array<GmailSyncRun>
   >([])
   const [syncing, setSyncing] = useState(false)
   const [duplicateWarnings, setDuplicateWarnings] = useState<
@@ -110,12 +167,7 @@ export function PendingIngestionPanel({
         (data: {
           connected?: boolean
           lastSyncedAtSeconds?: number | null
-          syncHistory?: Array<{
-            at: number
-            found: number
-            queued: number
-            skippedAlreadyQueued: number
-          }>
+          syncHistory?: Array<GmailSyncRun>
         }) => {
           setGmailConnected(Boolean(data.connected))
           setGmailLastSyncedAtSeconds(data.lastSyncedAtSeconds ?? null)
@@ -129,30 +181,55 @@ export function PendingIngestionPanel({
     void checkGmailConnection()
   }, [checkGmailConnection])
 
+  const post = useCallback(async (body: Record<string, unknown>) => {
+    const res = await fetch('/api/finance?scope=personal_finance', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    return (await res.json()) as Record<string, unknown> & {
+      ok?: boolean
+      error?: string
+    }
+  }, [])
+
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/finance', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'list_pending_ingestions' }),
-      })
-      const data = (await res.json()) as {
-        ok: boolean
-        pendingIngestions?: Array<PendingIngestion>
-      }
-      if (data.ok) {
-        setItems(
-          (data.pendingIngestions ?? []).filter(
-            (p) =>
-              p.status === 'awaiting_password' ||
-              p.status === 'awaiting_review',
-          ),
+      const [queue, ruleList] = await Promise.all([
+        post({ action: 'list_pending_ingestions' }),
+        post({ action: 'list_ingestion_rules' }),
+      ])
+      if (queue.ok)
+        setAllItems(
+          (queue.pendingIngestions as Array<PendingIngestion> | undefined) ??
+            [],
         )
-      }
+      if (ruleList.ok)
+        setRules((ruleList.rules as Array<IngestionAutoRule> | undefined) ?? [])
     } catch {
       /* transient */
     }
-  }, [])
+  }, [post])
+
+  async function runAction(
+    id: string,
+    body: Record<string, unknown>,
+    fallbackError: string,
+  ) {
+    setBusyId(id)
+    setNote(null)
+    try {
+      const data = await post(body)
+      if (data.ok === false) setNote(data.error || fallbackError)
+      else if (body.action === 'undo_auto_ingestion')
+        onConfirmed(data as unknown as PersonalFinancePayload)
+      await load()
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : fallbackError)
+    } finally {
+      setBusyId(null)
+    }
+  }
 
   useEffect(() => {
     void load()
@@ -162,7 +239,7 @@ export function PendingIngestionPanel({
     setSyncing(true)
     setNote(null)
     try {
-      const res = await fetch('/api/finance', {
+      const res = await fetch('/api/finance?scope=personal_finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'sync_gmail_now' }),
@@ -170,13 +247,10 @@ export function PendingIngestionPanel({
       const data = (await res.json()) as {
         ok: boolean
         error?: string
-        result?: { found: number; queued: number; skippedAlreadyQueued: number }
+        result?: GmailSyncRun
       }
       if (!data.ok) setNote(data.error || 'Gmail sync failed')
-      else if (data.result)
-        setNote(
-          `Found ${data.result.found}, queued ${data.result.queued} for review.`,
-        )
+      else if (data.result) setNote(`Gmail sync: ${syncSummary(data.result)}.`)
       await load()
     } catch (e) {
       setNote(e instanceof Error ? e.message : 'Gmail sync failed')
@@ -219,7 +293,7 @@ export function PendingIngestionPanel({
     if (!password) return
     setBusyId(id)
     try {
-      const res = await fetch('/api/finance', {
+      const res = await fetch('/api/finance?scope=personal_finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -239,7 +313,7 @@ export function PendingIngestionPanel({
   async function reject(id: string) {
     setBusyId(id)
     try {
-      await fetch('/api/finance', {
+      await fetch('/api/finance?scope=personal_finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'reject_pending_ingestion', id }),
@@ -258,7 +332,7 @@ export function PendingIngestionPanel({
     setBusyId(id)
     setNote(null)
     try {
-      const res = await fetch('/api/finance', {
+      const res = await fetch('/api/finance?scope=personal_finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'retry_pending_extraction', id }),
@@ -280,7 +354,7 @@ export function PendingIngestionPanel({
     setBusyId(item.id)
     setNote(null)
     try {
-      const res = await fetch('/api/finance', {
+      const res = await fetch('/api/finance?scope=personal_finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -288,6 +362,7 @@ export function PendingIngestionPanel({
           id: item.id,
           payload: draft,
           force,
+          autoRule: canCreateRule(item) && !ruleOptOut[item.id],
         }),
       })
       const data = (await res.json()) as {
@@ -299,6 +374,8 @@ export function PendingIngestionPanel({
           vendorOrSource: string
           confidence: 'exact' | 'likely' | 'possible'
         }
+        autoRule?: IngestionAutoRule | null
+        sweep?: SweepResult
       }
       if (data.ok === false) {
         setNote(data.error || 'Confirm failed')
@@ -316,7 +393,23 @@ export function PendingIngestionPanel({
         delete next[item.id]
         return next
       })
-      onConfirmed(data as PersonalFinancePayload)
+      onConfirmed(data as unknown as PersonalFinancePayload)
+      const settled = data.sweep
+        ? data.sweep.autoConfirmed + data.sweep.duplicates
+        : 0
+      if (data.autoRule || settled > 0)
+        setNote(
+          [
+            data.autoRule
+              ? `Future bills from ${data.autoRule.label} will be recorded automatically.`
+              : '',
+            settled > 0
+              ? `${data.sweep!.autoConfirmed} more added automatically, ${data.sweep!.duplicates} duplicate${data.sweep!.duplicates === 1 ? '' : 's'} hidden.`
+              : '',
+          ]
+            .filter(Boolean)
+            .join(' '),
+        )
       await load()
     } catch (e) {
       setNote(e instanceof Error ? e.message : 'Confirm failed')
@@ -345,7 +438,7 @@ export function PendingIngestionPanel({
     setNote(null)
     try {
       const targetIncomeSourceId = targetJobDrafts[item.id] || undefined
-      const res = await fetch('/api/finance', {
+      const res = await fetch('/api/finance?scope=personal_finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -446,8 +539,7 @@ export function PendingIngestionPanel({
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-[var(--theme-muted)]">
           {[...gmailSyncHistory].reverse().map((run) => (
             <span key={run.at}>
-              {new Date(run.at * 1000).toLocaleDateString()}: found {run.found},
-              queued {run.queued}
+              {new Date(run.at * 1000).toLocaleDateString()}: {syncSummary(run)}
             </span>
           ))}
         </div>
@@ -459,7 +551,10 @@ export function PendingIngestionPanel({
 
       {items.length === 0 ? (
         <p className="mt-3 text-sm text-[var(--theme-muted)]">
-          Nothing pending — upload a receipt or bill to try it.
+          Nothing to review
+          {autoAdded.length + duplicates.length > 0
+            ? '.'
+            : ' — upload a receipt or bill to try it.'}
         </p>
       ) : (
         <div className="mt-4 grid gap-3">
@@ -846,6 +941,22 @@ export function PendingIngestionPanel({
                             {duplicateWarning.amount} already exists.
                           </p>
                         )}
+                        {canCreateRule(item) && (
+                          <label className="mt-2 flex items-center gap-2 text-xs text-[var(--theme-muted)]">
+                            <input
+                              type="checkbox"
+                              checked={!ruleOptOut[item.id]}
+                              onChange={(e) =>
+                                setRuleOptOut((prev) => ({
+                                  ...prev,
+                                  [item.id]: !e.target.checked,
+                                }))
+                              }
+                            />
+                            Record future bills from {senderName(item)}{' '}
+                            automatically
+                          </label>
+                        )}
                       </div>
                     )}
                 </div>
@@ -899,6 +1010,154 @@ export function PendingIngestionPanel({
               </div>
             )
           })}
+        </div>
+      )}
+
+      {autoAdded.length > 0 && (
+        <div className="mt-5" data-testid="auto-added">
+          <h3 className="text-sm font-semibold">Added automatically by your rules</h3>
+          <ul className="mt-2 grid gap-1.5">
+            {autoAdded.map((item) => (
+              <li
+                key={item.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--theme-border)]/60 px-3 py-1.5 text-xs"
+              >
+                <span>
+                  {item.extracted?.date} · {item.extracted?.vendorOrSource} ·{' '}
+                  {money(item.extracted)}
+                </span>
+                <button
+                  type="button"
+                  disabled={busyId === item.id}
+                  onClick={() =>
+                    void runAction(
+                      item.id,
+                      { action: 'undo_auto_ingestion', id: item.id },
+                      'Undo failed',
+                    )
+                  }
+                  className={buttonClass}
+                >
+                  Undo
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-[10px] text-[var(--theme-muted)]">
+            Undo removes the record, returns the item for review, and pauses
+            that sender's rule.
+          </p>
+        </div>
+      )}
+
+      {duplicates.length > 0 && (
+        <details className="mt-4 text-xs" data-testid="duplicates">
+          <summary className="cursor-pointer text-[var(--theme-muted)]">
+            {duplicates.length} duplicate{duplicates.length === 1 ? '' : 's'}{' '}
+            hidden (same bill already recorded or queued)
+          </summary>
+          <ul className="mt-2 grid gap-1.5">
+            {duplicates.map((item) => (
+              <li
+                key={item.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--theme-border)]/60 px-3 py-1.5"
+              >
+                <span>
+                  {item.extracted?.date} · {item.extracted?.vendorOrSource} ·{' '}
+                  {money(item.extracted)}
+                </span>
+                <span className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={busyId === item.id}
+                    onClick={() =>
+                      void runAction(
+                        item.id,
+                        { action: 'restore_duplicate_ingestion', id: item.id },
+                        'Restore failed',
+                      )
+                    }
+                    className={buttonClass}
+                  >
+                    Not a duplicate
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busyId === item.id}
+                    onClick={() =>
+                      void runAction(
+                        item.id,
+                        { action: 'reject_pending_ingestion', id: item.id },
+                        'Dismiss failed',
+                      )
+                    }
+                    className={buttonClass}
+                  >
+                    Dismiss
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
+      {rules.length > 0 && (
+        <div className="mt-5" data-testid="auto-rules">
+          <h3 className="text-sm font-semibold">Automatic recording rules</h3>
+          <p className="text-[10px] text-[var(--theme-muted)]">
+            Bills from these senders are recorded without review when the
+            amount looks normal (up to 3× the largest one you approved).
+            Anything unusual still comes here first.
+          </p>
+          <ul className="mt-2 grid gap-1.5">
+            {rules.map((rule) => (
+              <li
+                key={rule.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--theme-border)]/60 px-3 py-1.5 text-xs"
+              >
+                <span>
+                  {rule.label} → {rule.kind} “{rule.vendorOrSource}”
+                  {rule.category ? ` (${rule.category})` : ''} · used{' '}
+                  {rule.matchCount}×{rule.enabled ? '' : ' · paused'}
+                </span>
+                <span className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={busyId === rule.id}
+                    onClick={() =>
+                      void runAction(
+                        rule.id,
+                        {
+                          action: 'set_ingestion_rule_enabled',
+                          id: rule.id,
+                          enabled: !rule.enabled,
+                        },
+                        'Rule update failed',
+                      )
+                    }
+                    className={buttonClass}
+                  >
+                    {rule.enabled ? 'Pause' : 'Resume'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busyId === rule.id}
+                    onClick={() =>
+                      void runAction(
+                        rule.id,
+                        { action: 'delete_ingestion_rule', id: rule.id },
+                        'Rule delete failed',
+                      )
+                    }
+                    className={buttonClass}
+                  >
+                    Delete
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </section>

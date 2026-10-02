@@ -62,7 +62,7 @@ export function KnownSendersCard() {
 
   const load = useCallback(() => {
     setLoading(true)
-    return fetch('/api/finance', {
+    return fetch('/api/finance?scope=personal_finance', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ action: 'list_known_senders' }),
@@ -101,7 +101,7 @@ export function KnownSendersCard() {
     setBusyId(editing.id ?? 'new')
     setNote(null)
     try {
-      const res = await fetch('/api/finance', {
+      const res = await fetch('/api/finance?scope=personal_finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -126,7 +126,7 @@ export function KnownSendersCard() {
     setBusyId(`candidate-${candidate.senderAddress}`)
     setNote(null)
     try {
-      const res = await fetch('/api/finance', {
+      const res = await fetch('/api/finance?scope=personal_finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -154,7 +154,7 @@ export function KnownSendersCard() {
       // ordered and let one failure short-circuit the rest rather than
       // firing every request at once.
       for (const c of targets) {
-        const res = await fetch('/api/finance', {
+        const res = await fetch('/api/finance?scope=personal_finance', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
@@ -184,7 +184,7 @@ export function KnownSendersCard() {
       prev.filter((c) => c.senderAddress !== candidate.senderAddress),
     )
     try {
-      await fetch('/api/finance', {
+      await fetch('/api/finance?scope=personal_finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -203,7 +203,7 @@ export function KnownSendersCard() {
   async function remove(id: string) {
     setBusyId(id)
     try {
-      await fetch('/api/finance', {
+      await fetch('/api/finance?scope=personal_finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'delete_known_sender', id }),
@@ -220,7 +220,7 @@ export function KnownSendersCard() {
     setBusyId(id)
     setNote(null)
     try {
-      const res = await fetch('/api/finance', {
+      const res = await fetch('/api/finance?scope=personal_finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'set_known_sender_password', id, password }),
@@ -265,7 +265,7 @@ export function KnownSendersCard() {
         setNote('No data rows found in that file.')
         return
       }
-      const res = await fetch('/api/finance', {
+      const res = await fetch('/api/finance?scope=personal_finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -296,7 +296,7 @@ export function KnownSendersCard() {
   async function clearPassword(id: string) {
     setBusyId(id)
     try {
-      await fetch('/api/finance', {
+      await fetch('/api/finance?scope=personal_finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'clear_known_sender_password', id }),

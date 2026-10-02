@@ -577,7 +577,14 @@ export type Beneficiary = {
  * since a pending ingestion isn't a real finance record yet.
  */
 export type PendingIngestionStatus =
-  'awaiting_password' | 'awaiting_review' | 'confirmed' | 'rejected'
+  | 'awaiting_password'
+  | 'awaiting_review'
+  | 'confirmed'
+  | 'rejected'
+  /** Same bill already on record or already queued — hidden from review. */
+  | 'duplicate'
+  /** Recorded automatically by an approved sender rule (ingestion-rules.ts). */
+  | 'auto_confirmed'
 
 export type ExtractedTransaction = {
   kind: 'income' | 'expense'
@@ -634,6 +641,19 @@ export type PendingIngestion = {
   extractedContract?: ExtractedContract
   rawPreviewImagePath?: string
   error?: string
+  /** Gmail message id, so a backlog sync never re-processes the same email. */
+  gmailMessageId?: string
+  /** Set with status 'duplicate': the record or queued item this repeats. */
+  duplicateOfRecordId?: string
+  duplicateOfPendingId?: string
+  /** The user restored this item from duplicates — never auto-hide it again. */
+  duplicateDismissed?: boolean
+  /** Set with status 'auto_confirmed': the rule that recorded it. */
+  autoRuleId?: string
+  /** The income/expense record created on confirm (manual or automatic). */
+  confirmedRecordId?: string
+  /** Automatic extraction retries already spent on this item. */
+  extractionRetries?: number
   createdAt: string
   updatedAt: string
 }
@@ -2415,6 +2435,39 @@ export function findPossibleDuplicate(
 }
 
 /**
+ * Another queued item (awaiting review) for the same bill: same kind, same
+ * normalized vendor, amount within 1%, dated within a day. Used to show one
+ * item per bill when the same bill arrives in several emails.
+ */
+export function findPendingDuplicate(
+  item: Pick<PendingIngestion, 'id' | 'extracted' | 'createdAt'>,
+  pending: Array<PendingIngestion>,
+): PendingIngestion | null {
+  const e = item.extracted
+  if (!e || !Number.isFinite(e.amount)) return null
+  const vendorKey = normalizeVendorName(e.vendorOrSource || '')
+  if (!vendorKey || !e.date) return null
+  return (
+    pending.find((p) => {
+      const o = p.extracted
+      if (p.id === item.id || p.status !== 'awaiting_review' || !o) return false
+      // Only an earlier copy counts, so the first-queued item is the one kept.
+      if (
+        p.createdAt > item.createdAt ||
+        (p.createdAt === item.createdAt && p.id > item.id)
+      )
+        return false
+      if (o.kind !== e.kind) return false
+      if (normalizeVendorName(o.vendorOrSource || '') !== vendorKey) return false
+      if (Math.abs(o.amount - e.amount) / Math.max(Math.abs(e.amount), 1) >= 0.01)
+        return false
+      const dayDiff = daysBetween(o.date.slice(0, 10), e.date.slice(0, 10))
+      return dayDiff !== null && dayDiff <= 1
+    }) ?? null
+  )
+}
+
+/**
  * Learns a vendor -> category mapping from a user's correction at
  * ingestion-confirm time, so future AI extractions for the same vendor
  * start from what the user actually picked instead of the model's guess.
@@ -2825,6 +2878,7 @@ export function addPendingIngestion(
         | 'extractedContract'
         | 'rawPreviewImagePath'
         | 'error'
+        | 'gmailMessageId'
       >
     >,
 ): PendingIngestion {
@@ -2844,6 +2898,7 @@ export function addPendingIngestion(
     extractedContract: input.extractedContract,
     rawPreviewImagePath: input.rawPreviewImagePath,
     error: input.error,
+    gmailMessageId: input.gmailMessageId,
     createdAt,
     updatedAt: createdAt,
   }
