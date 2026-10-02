@@ -177,7 +177,7 @@ describe('AssistantMemoryCard', () => {
       edit!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       await Promise.resolve()
     })
-    const inputs = [...container.querySelectorAll('input')] as HTMLInputElement[]
+    const inputs = [...container.querySelectorAll('input')] as Array<HTMLInputElement>
     expect(inputs).toHaveLength(2)
     // the edit input is seeded with the rule's current category
     expect(inputs.some((i) => i.value === 'Groceries')).toBe(true)
