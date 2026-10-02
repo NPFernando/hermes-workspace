@@ -31,7 +31,7 @@ function LinkedLoanControl({
 
   async function setLinkedLoan(nextId: string) {
     setEditingId(null)
-    await fetch('/api/finance', {
+    await fetch('/api/finance?scope=personal_finance', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({

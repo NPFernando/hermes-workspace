@@ -401,7 +401,7 @@ export function TransactionsPanel({
       let cursor: string | null = null
       // Bounded loop — 500 rows/page, cap at 200 pages (100k txns).
       for (let guard = 0; guard < 200; guard += 1) {
-        const res: Response = await fetch('/api/finance', {
+        const res: Response = await fetch('/api/finance?scope=personal_finance', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({

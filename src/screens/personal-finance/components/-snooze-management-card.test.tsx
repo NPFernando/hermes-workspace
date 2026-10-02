@@ -119,7 +119,7 @@ describe('SnoozeManagementCard', () => {
       await Promise.resolve()
     })
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/finance',
+      '/api/finance?scope=personal_finance',
       expect.objectContaining({
         body: JSON.stringify({ action: 'remove_alert_snooze', key: 'tax-record:2026' }),
       }),
@@ -149,7 +149,7 @@ describe('SnoozeManagementCard', () => {
       await Promise.resolve()
     })
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/finance',
+      '/api/finance?scope=personal_finance',
       expect.objectContaining({
         body: JSON.stringify({
           action: 'remove_dismissed_sender_candidate',

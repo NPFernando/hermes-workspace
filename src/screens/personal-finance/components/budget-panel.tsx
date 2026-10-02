@@ -113,7 +113,7 @@ export function BudgetPanel({
     setErr(null)
     setCopyNote(null)
     try {
-      const res = await fetch('/api/finance', {
+      const res = await fetch('/api/finance?scope=personal_finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'copy_budgets_to_month', targetMonth: currentMonth }),

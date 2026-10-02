@@ -276,16 +276,47 @@ export type ExtractedContract = {
 
 export type PendingIngestion = {
   id: string
-  status: 'awaiting_password' | 'awaiting_review' | 'confirmed' | 'rejected'
+  status:
+    | 'awaiting_password'
+    | 'awaiting_review'
+    | 'confirmed'
+    | 'rejected'
+    | 'duplicate'
+    | 'auto_confirmed'
   source: 'gmail' | 'upload'
   documentType: 'transaction' | 'contract'
   passwordHint?: string
   matchedSenderId?: string
   matchedSenderLabel?: string
+  senderAddress?: string
   extracted?: ExtractedTransaction
   extractedContract?: ExtractedContract
   rawPreviewImagePath?: string
   error?: string
+  duplicateOfRecordId?: string
+  duplicateOfPendingId?: string
+  autoRuleId?: string
+  confirmedRecordId?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+/** Mirrors IngestionAutoRule in ingestion-rules.ts. */
+export type IngestionAutoRule = {
+  id: string
+  senderAddress?: string
+  knownSenderId?: string
+  label: string
+  kind: 'income' | 'expense'
+  vendorOrSource: string
+  category?: string
+  currency?: string
+  enabled: boolean
+  maxAmount: number
+  matchCount: number
+  lastMatchedAt?: string
+  createdAt: string
+  updatedAt: string
 }
 
 /** Mirrors KnownSender in finance-store.ts, minus the encrypted secret — the API never returns that, only `hasPassword`. */

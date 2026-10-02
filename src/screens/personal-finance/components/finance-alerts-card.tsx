@@ -24,7 +24,7 @@ export function FinanceAlertsCard({
     setSnoozed((prev) => new Set(prev).add(dismissKey))
     setBusyKey(dismissKey)
     try {
-      await fetch('/api/finance', {
+      await fetch('/api/finance?scope=personal_finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({

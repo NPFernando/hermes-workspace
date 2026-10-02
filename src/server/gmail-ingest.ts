@@ -1,7 +1,10 @@
 /**
- * Gmail sync — manual "Sync now" only for now (no cron; see the plan's own
- * sequencing rationale: prove extraction quality on real mail before
- * automating it). Lists recent messages via the Gmail API using the
+ * Gmail sync — "Sync now" plus the hourly Hermes cron (gmail-sync.sh).
+ * Every message in the lookback window that has not been examined yet is
+ * processed once (settings.gmailIngest.processedMessageIds), within a
+ * per-run extraction budget; the rest wait for the next run. Each extracted
+ * item then goes through ingestion-rules.ts (duplicates hidden, approved
+ * senders recorded automatically). Lists messages via the Gmail API using the
  * connect-flow refresh token (google-oauth.ts), pre-filters by a Gmail
  * search query before spending any LLM call, downloads attachments to the
  * same directory direct uploads use, and lands everything as a
@@ -35,8 +38,10 @@ import {
   listKnownSenders,
   listPendingIngestions,
   readFinanceStore,
+  updatePendingIngestion,
   writeFinanceStore,
 } from './finance-store'
+import { applyIngestionPolicies } from './ingestion-rules'
 import { isPdfEncrypted, pdfToImages } from './document-normalizer'
 import {
   extractTransactionFromImage,
@@ -52,7 +57,7 @@ const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1/users/me'
 const KEYWORD_GROUP =
   '(invoice OR receipt OR bill OR statement OR payment OR salary OR "payment received" OR "amount due") -category:promotions -category:social'
 
-const MAX_PAGES = 4
+const MAX_PAGES = 10
 const PAGE_SIZE = 50
 
 export function buildSearchQuery(knownSenders: Array<KnownSender>, afterSeconds: number): string {
@@ -197,8 +202,17 @@ function alreadyQueued(messageId: string): boolean {
   return listPendingIngestions().some(
     (p) =>
       p.source === 'gmail' &&
-      (p.sourceRef === `gmail:${messageId}` ||
+      (p.gmailMessageId === messageId ||
+        p.sourceRef === `gmail:${messageId}` ||
         p.sourceRef.includes(`gmail-${messageId}-`)),
+  )
+}
+
+/** Text-only emails without anything amount-shaped are not bills — skip them
+ *  without spending an extraction call. Deliberately loose. */
+export function looksLikeItHasAnAmount(text: string): boolean {
+  return /\d[\d,]*\.\d{2}\b|\b(?:rs|lkr|usd|eur|gbp|aud|inr)\.?\s*[\d,]+|[$€£₹]\s?[\d,]+|\b(?:amount|total|due|balance|paid)\b[^\n\d]{0,20}\d/i.test(
+    text,
   )
 }
 
@@ -206,32 +220,135 @@ export interface GmailSyncResult {
   found: number
   queued: number
   skippedAlreadyQueued: number
+  /** Recorded automatically by an approved sender rule. */
+  autoConfirmed: number
+  /** Hidden as a repeat of a bill already recorded or queued. */
+  duplicates: number
+  /** Failed extractions retried this run (no Gmail call needed). */
+  retried: number
+  /** Messages left for the next run because the per-run extraction budget ran out. */
+  deferred: number
 }
 
-export async function syncGmailNow(): Promise<GmailSyncResult> {
-  const accessToken = await getGmailAccessToken()
-  const db = readFinanceStore()
-  const settings = db.settings as Record<string, unknown>
-  const gmailIngest = (
-    settings.gmailIngest && typeof settings.gmailIngest === 'object'
-      ? { ...(settings.gmailIngest as Record<string, unknown>) }
+const DEFAULT_LOOKBACK_DAYS = 90
+const DEFAULT_MAX_EXTRACTIONS_PER_RUN = 25
+const MAX_EXTRACTION_RETRIES = 3
+const PROCESSED_LEDGER_CAP = 5000
+// Transient failures worth retrying; anything else (unreadable document,
+// "no transaction found") is final.
+const RETRYABLE_ERRORS = new Set(['all_routes_failed'])
+
+function numberSetting(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? value
+    : fallback
+}
+
+let runningSync: Promise<GmailSyncResult> | null = null
+
+/** Overlapping calls (hourly cron + a "Sync now" click) share one run. */
+export function syncGmailNow(): Promise<GmailSyncResult> {
+  if (!runningSync) {
+    runningSync = runGmailSync().finally(() => {
+      runningSync = null
+    })
+  }
+  return runningSync
+}
+
+async function runGmailSync(): Promise<GmailSyncResult> {
+  const startSettings = readFinanceStore().settings as Record<string, unknown>
+  const startIngest = (
+    startSettings.gmailIngest && typeof startSettings.gmailIngest === 'object'
+      ? startSettings.gmailIngest
       : {}
   ) as Record<string, unknown>
   const lastSyncedAtSeconds =
-    typeof gmailIngest.lastSyncedAtSeconds === 'number'
-      ? gmailIngest.lastSyncedAtSeconds
+    typeof startIngest.lastSyncedAtSeconds === 'number'
+      ? startIngest.lastSyncedAtSeconds
       : 0
+  const lookbackDays = numberSetting(startIngest.lookbackDays, DEFAULT_LOOKBACK_DAYS)
+  let budget = numberSetting(
+    startIngest.maxExtractionsPerRun,
+    DEFAULT_MAX_EXTRACTIONS_PER_RUN,
+  )
+  const processed = new Set<string>(
+    Array.isArray(startIngest.processedMessageIds)
+      ? (startIngest.processedMessageIds as Array<unknown>).filter(
+          (v): v is string => typeof v === 'string',
+        )
+      : [],
+  )
+  const newlyProcessed: Array<string> = []
+  const markProcessed = (id: string) => {
+    if (!processed.has(id)) {
+      processed.add(id)
+      newlyProcessed.push(id)
+    }
+  }
 
-  // First sync ever: only look back 14 days, not the whole mailbox.
-  const afterSeconds =
-    lastSyncedAtSeconds || Math.floor(Date.now() / 1000) - 14 * 24 * 60 * 60
+  let queued = 0
+  let skippedAlreadyQueued = 0
+  let autoConfirmed = 0
+  let duplicates = 0
+  let retried = 0
+  let deferred = 0
+  const categoryHints = getCategoryCorrections()
+
+  const applyPolicies = (id: string) => {
+    const outcome = applyIngestionPolicies(id)
+    if (outcome === 'auto_confirmed') autoConfirmed += 1
+    if (outcome === 'duplicate') duplicates += 1
+  }
+  const queue = (input: Parameters<typeof addPendingIngestion>[0]) => {
+    const record = addPendingIngestion(input)
+    queued += 1
+    if (record.extracted) applyPolicies(record.id)
+  }
+
+  // 1. Retry transient extraction failures from earlier runs first — these
+  //    only need the saved preview image, so they still happen while the
+  //    Gmail token is expired.
+  for (const item of listPendingIngestions()) {
+    if (budget <= 0) break
+    if (
+      item.source !== 'gmail' ||
+      item.status !== 'awaiting_review' ||
+      item.documentType === 'contract' ||
+      item.extracted ||
+      !item.rawPreviewImagePath ||
+      !item.error ||
+      !RETRYABLE_ERRORS.has(item.error) ||
+      (item.extractionRetries ?? 0) >= MAX_EXTRACTION_RETRIES
+    )
+      continue
+    budget -= 1
+    retried += 1
+    const extraction = await extractTransactionFromImage(
+      item.rawPreviewImagePath,
+      categoryHints,
+    )
+    updatePendingIngestion(item.id, {
+      extracted: extraction.ok ? extraction.data : undefined,
+      error: extraction.ok ? undefined : extraction.reason,
+      extractionRetries: (item.extractionRetries ?? 0) + 1,
+    })
+    if (extraction.ok) applyPolicies(item.id)
+  }
+
+  const accessToken = await getGmailAccessToken()
+
+  // 2. Every message in the lookback window that has not been examined yet —
+  //    not just mail newer than the last sync, so nothing missed while the
+  //    token was expired (or deferred by the budget) is lost.
+  const nowSeconds = Math.floor(Date.now() / 1000)
+  const windowStart = nowSeconds - lookbackDays * 24 * 60 * 60
+  const afterSeconds = lastSyncedAtSeconds
+    ? Math.min(lastSyncedAtSeconds, windowStart)
+    : windowStart
   const knownSenders = listKnownSenders()
   const query = buildSearchQuery(knownSenders, afterSeconds)
 
-  // Broadening the query with known-sender clauses means more candidates
-  // than a single 25-result page can hold — paginate (bounded) instead of
-  // relying on one flat maxResults, or a noisy month could push a real
-  // statement off the end of page one silently.
   const messageIds: Array<string> = []
   let pageToken: string | undefined
   for (let page = 0; page < MAX_PAGES; page += 1) {
@@ -250,13 +367,18 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
     pageToken = listData.nextPageToken
   }
 
-  let queued = 0
-  let skippedAlreadyQueued = 0
-  const categoryHints = getCategoryCorrections()
-
   for (const messageId of messageIds) {
-    if (alreadyQueued(messageId)) {
+    if (processed.has(messageId)) {
       skippedAlreadyQueued += 1
+      continue
+    }
+    if (alreadyQueued(messageId)) {
+      markProcessed(messageId)
+      skippedAlreadyQueued += 1
+      continue
+    }
+    if (budget <= 0) {
+      deferred += 1
       continue
     }
 
@@ -274,24 +396,36 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
       (a) =>
         a.mimeType === 'application/pdf' || a.mimeType.startsWith('image/'),
     )
+    const base = {
+      source: 'gmail' as const,
+      gmailMessageId: messageId,
+      matchedSenderId: matchedSender?.id,
+      matchedSenderLabel: matchedSender?.label,
+      senderAddress,
+    }
 
     if (attachments.length === 0) {
-      if (!bodyText.trim()) continue
+      if (!bodyText.trim() || !looksLikeItHasAnAmount(bodyText)) {
+        markProcessed(messageId)
+        continue
+      }
+      budget -= 1
       const extraction = await extractTransactionFromText(
         bodyText,
         categoryHints,
       )
-      if (!extraction.ok) continue // no clear transaction in this email — skip rather than queue noise
-      addPendingIngestion({
-        source: 'gmail',
+      if (!extraction.ok) {
+        // A transient failure is retried next run; "no transaction" is final.
+        if (!RETRYABLE_ERRORS.has(extraction.reason)) markProcessed(messageId)
+        continue
+      }
+      queue({
+        ...base,
         sourceRef: `gmail:${messageId}`,
         status: 'awaiting_review',
         extracted: extraction.data,
-        matchedSenderId: matchedSender?.id,
-        matchedSenderLabel: matchedSender?.label,
-        senderAddress,
       })
-      queued += 1
+      markProcessed(messageId)
       continue
     }
 
@@ -303,6 +437,7 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
       attachment.filename,
       accessToken,
     )
+    markProcessed(messageId)
 
     const isPdf = savedPath.toLowerCase().endsWith('.pdf')
     let unlockedPassword: string | undefined
@@ -320,16 +455,12 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
         }
       }
       if (!unlockedPassword) {
-        addPendingIngestion({
-          source: 'gmail',
+        queue({
+          ...base,
           sourceRef: savedPath,
           status: 'awaiting_password',
           passwordHint: matchedSender?.passwordScheme ?? findPasswordHint(bodyText),
-          matchedSenderId: matchedSender?.id,
-          matchedSenderLabel: matchedSender?.label,
-        senderAddress,
         })
-        queued += 1
         continue
       }
     }
@@ -338,62 +469,70 @@ export async function syncGmailNow(): Promise<GmailSyncResult> {
     if (isPdf) {
       const normalized = pdfToImages(savedPath, unlockedPassword)
       if (!normalized.ok) {
-        addPendingIngestion({
-          source: 'gmail',
+        queue({
+          ...base,
           sourceRef: savedPath,
           status: 'awaiting_review',
           error: `Could not process document: ${normalized.reason}`,
-          matchedSenderId: matchedSender?.id,
-          matchedSenderLabel: matchedSender?.label,
-        senderAddress,
         })
-        queued += 1
         continue
       }
       previewImagePath = normalized.imagePaths[0]
     }
 
+    budget -= 1
     const extraction = await extractTransactionFromImage(
       previewImagePath,
       categoryHints,
     )
-    addPendingIngestion({
-      source: 'gmail',
+    queue({
+      ...base,
       sourceRef: savedPath,
       status: 'awaiting_review',
       rawPreviewImagePath: previewImagePath,
       extracted: extraction.ok ? extraction.data : undefined,
       error: extraction.ok ? undefined : extraction.reason,
-      matchedSenderId: matchedSender?.id,
-      matchedSenderLabel: matchedSender?.label,
-        senderAddress,
     })
-    queued += 1
   }
 
   const now = Math.floor(Date.now() / 1000)
+  const summary = {
+    found: messageIds.length,
+    queued,
+    skippedAlreadyQueued,
+    autoConfirmed,
+    duplicates,
+    retried,
+    deferred,
+  }
+  // Re-read and merge only the keys this run owns: every addPendingIngestion
+  // / rule update above did its own read/write, and the user may have edited
+  // known senders or rules mid-run — writing back the object captured at the
+  // start would clobber all of that (a real bug, 2026-09-11, for the queue).
+  const freshDb = readFinanceStore()
+  const freshSettings = freshDb.settings as Record<string, unknown>
+  const gmailIngest = (
+    freshSettings.gmailIngest && typeof freshSettings.gmailIngest === 'object'
+      ? { ...(freshSettings.gmailIngest as Record<string, unknown>) }
+      : {}
+  ) as Record<string, unknown>
   gmailIngest.lastSyncedAtSeconds = now
   // A run that got this far succeeded — clear any stale "reconnect needed" flag.
   delete gmailIngest.lastError
+  const freshLedger = Array.isArray(gmailIngest.processedMessageIds)
+    ? (gmailIngest.processedMessageIds as Array<string>)
+    : []
+  gmailIngest.processedMessageIds = Array.from(
+    new Set([...freshLedger, ...newlyProcessed]),
+  ).slice(-PROCESSED_LEDGER_CAP)
   // AI-506: capped recent-activity list, not a full audit trail — the
   // unbounded gmail_sync_run audit-log entries already cover that.
   const priorHistory = Array.isArray(gmailIngest.syncHistory)
     ? gmailIngest.syncHistory
     : []
-  gmailIngest.syncHistory = [
-    ...priorHistory,
-    { at: now, found: messageIds.length, queued, skippedAlreadyQueued },
-  ].slice(-10)
-  // Re-read rather than reusing the `db` captured at the top of this
-  // function: every addPendingIngestion() call above did its own
-  // independent read/write round-trip via ensureFinanceStore(), so `db`
-  // here is stale — writing it back would silently clobber every
-  // pending_ingestion this run just queued. Confirmed as a real bug via a
-  // live sync test (2026-09-11): syncGmailNow reported queued: 4 but zero
-  // of those 4 rows existed in either store afterward.
-  const freshDb = readFinanceStore()
-  ;(freshDb.settings as Record<string, unknown>).gmailIngest = gmailIngest
+  gmailIngest.syncHistory = [...priorHistory, { at: now, ...summary }].slice(-10)
+  freshSettings.gmailIngest = gmailIngest
   writeFinanceStore(freshDb)
 
-  return { found: messageIds.length, queued, skippedAlreadyQueued }
+  return summary
 }

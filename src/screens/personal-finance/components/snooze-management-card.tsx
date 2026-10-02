@@ -50,7 +50,7 @@ export function SnoozeManagementCard() {
 
   const load = useCallback(() => {
     setLoading(true)
-    return fetch('/api/finance', {
+    return fetch('/api/finance?scope=personal_finance', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ action: 'list_snoozes' }),
@@ -79,7 +79,7 @@ export function SnoozeManagementCard() {
   async function unsnooze(key: string) {
     setBusyKey(key)
     try {
-      await fetch('/api/finance', {
+      await fetch('/api/finance?scope=personal_finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'remove_alert_snooze', key }),
@@ -93,7 +93,7 @@ export function SnoozeManagementCard() {
   async function undismiss(senderAddress: string) {
     setBusyKey(senderAddress)
     try {
-      await fetch('/api/finance', {
+      await fetch('/api/finance?scope=personal_finance', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
